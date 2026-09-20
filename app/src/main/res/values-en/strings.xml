@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ToolNexa</string>
+    <string name="app_description">Useful tools in one app.</string>
+
+    <string name="support_back">‹  ToolNexa</string>
+    <string name="support_title">Support, suggestions and complaints</string>
+    <string name="support_description">Choose the contact type, the related tool and the specific problem. When you tap Send, your email app opens with the report filled in so you can review it before sending.</string>
+    <string name="support_type_label">Contact type</string>
+    <string name="support_tool_label">Tool or area</string>
+    <string name="support_problem_label">Problem</string>
+    <string name="support_message_label">Message</string>
+    <string name="support_message_hint">Explain the problem, idea or suggestion...</string>
+    <string name="support_diagnostics">Include technical diagnostics (device model, Android, app version and language)</string>
+    <string name="support_privacy_note">No passwords, authentication tokens, private keys or other secrets are included. The email opens for review before it is sent.</string>
+    <string name="support_send">Send to support</string>
+    <string name="support_message_required">Write your message.</string>
+    <string name="support_subject_prefix">[ToolNexa]</string>
+    <string name="support_no_email_app">No email application was found.</string>
+
+    <string-array name="support_types">
+        <item>Technical support</item>
+        <item>Complaint</item>
+        <item>Suggestion</item>
+        <item>Payment problem</item>
+        <item>Account problem</item>
+    </string-array>
+
+    <string-array name="support_tools">
+        <item>General</item>
+        <item>Background Remover</item>
+        <item>Image Compressor</item>
+        <item>Image Resizer</item>
+        <item>Image Converter</item>
+        <item>Plans / PayPal</item>
+        <item>Login / Account</item>
+        <item>History</item>
+        <item>Other tool</item>
+    </string-array>
+
+    <string-array name="support_problems">
+        <item>No specific problem</item>
+        <item>App closes / crashes</item>
+        <item>White screen</item>
+        <item>Feature does not work</item>
+        <item>AI does not work</item>
+        <item>Wrong result</item>
+        <item>Cannot save or share</item>
+        <item>Login / account issue</item>
+        <item>Payment / plan issue</item>
+        <item>Slow or freezes</item>
+        <item>Other</item>
+    </string-array>
+</resources>
