@@ -1019,12 +1019,24 @@ async function listPlans(
         );
 
     if (plans.length > 0) {
+      const billingReady =
+        plans.some(
+          plan =>
+            plan.id === "PRO" &&
+            plan.hasPayPalPlan
+        );
+
       return json({
         ok:
           true,
         plans,
-        billingReady:
-          true
+        billingReady,
+        ...(billingReady
+          ? {}
+          : {
+              warning:
+                "O plano Pro ainda não foi provisionado no PayPal Sandbox. Ele será preparado no início da assinatura."
+            })
       });
     }
 
@@ -1445,7 +1457,9 @@ async function createPayPalProduct(
               plan.description,
             type:
               "SERVICE",
-                })
+            category:
+              "SOFTWARE"
+          })
       }
     );
 
