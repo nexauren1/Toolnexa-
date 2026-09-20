@@ -90,6 +90,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        LanguageManager.apply(this)
         super.onCreate(savedInstanceState)
 
         window.statusBarColor = bg
@@ -410,6 +411,27 @@ class MainActivity : ComponentActivity() {
             android.R.drawable.ic_menu_preferences
         ) {
             showSettings()
+            closeDrawer()
+        }
+
+        drawerItem(
+            "Suporte",
+            android.R.drawable.ic_menu_help
+        ) {
+            startActivity(
+                Intent(
+                    this,
+                    SupportActivity::class.java
+                )
+            )
+            closeDrawer()
+        }
+
+        drawerItem(
+            "Idioma",
+            android.R.drawable.ic_menu_set_as
+        ) {
+            showLanguageDialog()
             closeDrawer()
         }
 
@@ -1770,6 +1792,114 @@ class MainActivity : ComponentActivity() {
             }
         )
 
+        val languageCard = card()
+        languageCard.setPadding(
+            dp(18),
+            dp(14),
+            dp(18),
+            dp(14)
+        )
+
+        languageCard.addView(
+            title(
+                "Idioma da aplicação",
+                19f
+            )
+        )
+
+        languageCard.addView(
+            bodyText(
+                "Escolhe Português, English, Español, Français ou العربية."
+            )
+        )
+
+        val languageButton =
+            Button(this).apply {
+                text =
+                    "Alterar idioma"
+            }
+
+        styleSecondary(languageButton)
+
+        languageButton.setOnClickListener {
+            showLanguageDialog()
+        }
+
+        languageCard.addView(
+            languageButton
+        )
+
+        content.addView(
+            languageCard,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(
+                    dp(16),
+                    0,
+                    dp(16),
+                    14
+                )
+            }
+        )
+
+        val supportCard = card()
+        supportCard.setPadding(
+            dp(18),
+            dp(14),
+            dp(18),
+            dp(14)
+        )
+
+        supportCard.addView(
+            title(
+                "Precisas de ajuda?",
+                19f
+            )
+        )
+
+        supportCard.addView(
+            bodyText(
+                "Envia uma reclamação, sugestão ou pedido de suporte diretamente para a equipa ToolNexa."
+            )
+        )
+
+        val supportButton =
+            Button(this).apply {
+                text = "Abrir suporte"
+            }
+
+        stylePrimary(supportButton)
+
+        supportButton.setOnClickListener {
+            startActivity(
+                Intent(
+                    this@MainActivity,
+                    SupportActivity::class.java
+                )
+            )
+        }
+
+        supportCard.addView(
+            supportButton
+        )
+
+        content.addView(
+            supportCard,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(
+                    dp(16),
+                    0,
+                    dp(16),
+                    14
+                )
+            }
+        )
+
         val updateCard = card()
         updateCard.setPadding(
             dp(18),
@@ -1874,6 +2004,58 @@ class MainActivity : ComponentActivity() {
                 )
             }
         )
+    }
+
+    private fun showLanguageDialog() {
+        val codes =
+            LanguageManager.supported
+
+        val labels =
+            arrayOf(
+                "Português",
+                "English",
+                "Español",
+                "Français",
+                "العربية"
+            )
+
+        val current =
+            LanguageManager.current(this)
+
+        val checked =
+            codes.indexOf(current)
+                .coerceAtLeast(0)
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "Idioma da aplicação"
+            )
+            .setSingleChoiceItems(
+                labels,
+                checked
+            ) { dialog, which ->
+                val code =
+                    codes[which]
+
+                LanguageManager.set(
+                    this,
+                    code
+                )
+
+                analytics.event(
+                    "language_changed",
+                    "language" to code
+                )
+
+                dialog.dismiss()
+
+                recreate()
+            }
+            .setNegativeButton(
+                "Cancelar",
+                null
+            )
+            .show()
     }
 
     private fun showAbout() {
