@@ -348,7 +348,6 @@ class MainActivity : ComponentActivity() {
 
         setContentView(root)
         buildDrawer()
-        I18n.localizeWindow(this)
     }
 
     private fun buildDrawer() {
@@ -2035,7 +2034,10 @@ class MainActivity : ComponentActivity() {
 
         AlertDialog.Builder(this)
             .setTitle(
-                I18n.t(this, "Idioma da aplicação")
+                I18n.t(
+                    this,
+                    "Idioma da aplicação"
+                )
             )
             .setSingleChoiceItems(
                 labels,
@@ -2061,12 +2063,28 @@ class MainActivity : ComponentActivity() {
 
                 dialog.dismiss()
 
-                // Rebuild the UI in-place. This avoids Activity recreation
-                // and prevents the black/empty screen on affected devices.
-                refreshAfterLanguageChange()
+                /*
+                 * Do not rebuild the Activity from inside the dialog's
+                 * touch callback. Post the refresh to the next UI turn
+                 * so the dialog is fully dismissed before the view tree
+                 * is replaced.
+                 */
+                window.decorView.post {
+                    if (
+                        !isFinishing &&
+                        android.os.Build.VERSION.SDK_INT >=
+                            android.os.Build.VERSION_CODES.JELLY_BEAN_MR1 &&
+                        !isDestroyed
+                    ) {
+                        refreshAfterLanguageChange()
+                    }
+                }
             }
             .setNegativeButton(
-                I18n.t(this, "Cancelar"),
+                I18n.t(
+                    this,
+                    "Cancelar"
+                ),
                 null
             )
             .show()
@@ -2074,14 +2092,36 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshAfterLanguageChange() {
         try {
+            val previousScreen =
+                toolbarTitle.text
+                    ?.toString()
+                    .orEmpty()
+
             buildShell()
-            showHome()
-            I18n.localizeWindow(this)
+
+            when (previousScreen) {
+                "Definições" -> showSettings()
+                "Categorias" -> showCategories()
+                "Conta" -> showAccount()
+                "Sobre" -> showAbout()
+                else -> showHome()
+            }
+
+            root.post {
+                if (!isFinishing) {
+                    I18n.localizeWindow(this)
+                }
+            }
         } catch (error: Exception) {
             analytics.event(
                 "language_refresh_failed",
                 "error" to error.javaClass.simpleName
             )
+            Toast.makeText(
+                this,
+                "Não foi possível atualizar o idioma. A aplicação continua disponível.",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
