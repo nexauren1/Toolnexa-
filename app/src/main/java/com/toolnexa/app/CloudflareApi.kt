@@ -310,8 +310,15 @@ object CloudflareApi {
                 connection.responseCode
 
             if (status !in 200..299) {
+                val message =
+                    readError(
+                        connection
+                    )
+
                 throw IOException(
-                    "Não foi possível carregar os planos."
+                    message.ifBlank {
+                        "Não foi possível carregar os planos."
+                    }
                 )
             }
 
