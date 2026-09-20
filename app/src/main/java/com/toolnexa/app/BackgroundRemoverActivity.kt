@@ -3165,7 +3165,7 @@ class BackgroundRemoverActivity : Activity() {
             computeSample(
                 bounds.outWidth,
                 bounds.outHeight,
-                3200
+                EDITOR_PREVIEW_MAX
             )
 
         val options =
