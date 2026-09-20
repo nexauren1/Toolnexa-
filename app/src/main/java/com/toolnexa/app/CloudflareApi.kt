@@ -286,54 +286,20 @@ object CloudflareApi {
     fun loadPlans():
         List<PlanInfo> {
         val connection =
-            (URL(
-                BASE_URL +
-                    "/api/plans"
-            ).openConnection()
-                as HttpURLConnection).apply {
-                connectTimeout = 15_000
-                readTimeout = 30_000
-                requestMethod = "GET"
-                setRequestProperty(
-                    "Accept",
-                    "application/json"
-                )
-                setRequestProperty(
-                    "User-Agent",
-                    "ToolNexa-Android/" +
-                        BuildConfig.VERSION_NAME
-                )
-            }
+            openConnection(
+                "/api/plans",
+                "GET",
+                null
+            )
 
         try {
-            val status =
-                connection.responseCode
-
-            if (status !in 200..299) {
-                val message =
-                    readError(
-                        connection
-                    )
-
-                throw IOException(
-                    message.ifBlank {
-                        "Não foi possível carregar os planos."
-                    }
+            val result =
+                readJsonResponse(
+                    connection
                 )
-            }
-
-            val body =
-                connection.inputStream
-                    .bufferedReader()
-                    .use {
-                        it.readText()
-                    }
-
-            val root =
-                JSONObject(body)
 
             val array =
-                root.optJSONArray(
+                result.optJSONArray(
                     "plans"
                 ) ?: JSONArray()
 
@@ -345,15 +311,18 @@ object CloudflareApi {
                 0 until array.length()
             ) {
                 val item =
-                    array.getJSONObject(
+                    array.optJSONObject(
                         index
-                    )
+                    ) ?: continue
 
                 plans.add(
                     PlanInfo(
                         code =
                             item.optString(
-                                "code"
+                                "id",
+                                item.optString(
+                                    "code"
+                                )
                             ),
                         name =
                             item.optString(
@@ -361,11 +330,17 @@ object CloudflareApi {
                             ),
                         priceUsd =
                             item.optString(
-                                "price_usd"
+                                "priceUsd",
+                                item.optString(
+                                    "price_usd"
+                                )
                             ),
                         interval =
                             item.optString(
-                                "billing_interval"
+                                "billingInterval",
+                                item.optString(
+                                    "billing_interval"
+                                )
                             ),
                         paypalPlanId =
                             item.optString(
@@ -385,198 +360,296 @@ object CloudflareApi {
 
     fun createProSubscription(
         firebaseIdToken: String
-    ): String {
+    ): PayPalSubscriptionInfo {
         val connection =
-            (URL(
-                BASE_URL +
-                    "/api/paypal/create-subscription"
-            ).openConnection()
-                as HttpURLConnection).apply {
-                connectTimeout = 20_000
-                readTimeout = 45_000
-                requestMethod = "POST"
-                doOutput = true
-                setRequestProperty(
-                    "Authorization",
-                    "Bearer " +
-                        firebaseIdToken
-                )
-                setRequestProperty(
-                    "Content-Type",
-                    "application/json"
-                )
-                setRequestProperty(
-                    "Accept",
-                    "application/json"
-                )
-            }
+            openConnection(
+                "/api/paypal/create-subscription",
+                "POST",
+                firebaseIdToken
+            )
 
         try {
             connection.outputStream
                 .use {
                     it.write(
-                        """{"plan_code":"pro"}"""
+                        JSONObject()
+                            .put(
+                                "planId",
+                                "PRO"
+                            )
+                            .toString()
                             .toByteArray(
                                 Charsets.UTF_8
                             )
                     )
                 }
 
-            val status =
-                connection.responseCode
-
-            val stream =
-                if (status in 200..299) {
-                    connection.inputStream
-                } else {
-                    connection.errorStream
-                }
-
-            val body =
-                stream
-                    ?.bufferedReader()
-                    ?.use {
-                        it.readText()
-                    }
-                    ?: ""
-
             val json =
-                JSONObject(
-                    body.ifBlank {
-                        "{}"
-                    }
+                readJsonResponse(
+                    connection
                 )
 
-            if (status !in 200..299) {
-                throw IOException(
-                    serverMessage(
-                        json,
-                        "Não foi possível iniciar o PayPal Sandbox."
+            val id =
+                json.optString(
+                    "subscriptionId"
+                )
+
+            val approvalUrl =
+                json.optString(
+                    "approvalUrl",
+                    json.optString(
+                        "approval_url"
                     )
                 )
-            }
 
-            return json.optString(
-                "approval_url"
-            ).ifBlank {
+            if (
+                id.isBlank() ||
+                approvalUrl.isBlank()
+            ) {
                 throw IOException(
-                    "O PayPal não devolveu o link de aprovação."
+                    "O PayPal não devolveu uma assinatura válida."
                 )
             }
+
+            return PayPalSubscriptionInfo(
+                subscriptionId = id,
+                approvalUrl = approvalUrl
+            )
         } finally {
             connection.disconnect()
         }
     }
 
-    fun loadAccount(
+    fun activateProSubscription(
+        firebaseIdToken: String,
+        subscriptionId: String
+    ): AccountInfo {
+        val connection =
+            openConnection(
+                "/api/paypal/activate-subscription",
+                "POST",
+                firebaseIdToken
+            )
+
+        try {
+            connection.outputStream
+                .use {
+                    it.write(
+                        JSONObject()
+                            .put(
+                                "subscriptionId",
+                                subscriptionId
+                            )
+                            .toString()
+                            .toByteArray(
+                                Charsets.UTF_8
+                            )
+                    )
+                }
+
+            val json =
+                readJsonResponse(
+                    connection
+                )
+
+            return AccountInfo(
+                uid = "",
+                planCode =
+                    json.optString(
+                        "plan",
+                        "FREE"
+                    ),
+                planName =
+                    json.optString(
+                        "planName",
+                        json.optString(
+                            "plan",
+                            "Free"
+                  fun loadAccount(
         firebaseIdToken: String
     ): AccountInfo {
         val connection =
-            (URL(
-                BASE_URL +
-                    "/api/account"
+            openConnection(
+                "/api/entitlement",
+                "GET",
+                firebaseIdToken
+            )
+
+        try {
+            val root =
+                readJsonResponse(
+                    connection
+                )
+
+            val planCode =
+                root.optString(
+                    "plan",
+                    "FREE"
+                ).uppercase()
+
+            return AccountInfo(
+                uid = "",
+                planCode =
+                    planCode,
+                planName =
+                    root.optString(
+                        "planName",
+                        if (
+                            planCode ==
+                            "PRO"
+                        ) {
+                            "Pro"
+                        } else {
+                            "Free"
+                        }
+                    ),
+                priceUsd =
+                    root.optString(
+                        "priceUsd",
+                        if (
+                            planCode ==
+                            "PRO"
+                        ) {
+                            "5.00"
+                        } else {
+                            "0.00"
+                        }
+                    ),
+                subscriptionStatus =
+                    root.optString(
+                        "status"
+                    ).ifBlank {
+                        null
+                    }
+            )
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun openConnection(
+        path: String,
+        method: String,
+        firebaseIdToken: String?
+    ): HttpURLConnection {
+        return (
+            URL(
+                BASE_URL + path
             ).openConnection()
-                as HttpURLConnection).apply {
-                connectTimeout = 15_000
-                readTimeout = 30_000
-                requestMethod = "GET"
+                as HttpURLConnection
+        ).apply {
+            connectTimeout =
+                if (
+                    path.contains(
+                        "/paypal/"
+                    )
+                ) {
+                    30_000
+                } else {
+                    15_000
+                }
+
+            readTimeout =
+                if (
+                    path.contains(
+                        "/paypal/"
+                    )
+                ) {
+                    60_000
+                } else {
+                    30_000
+                }
+
+            requestMethod =
+                method
+
+            doInput =
+                true
+
+            if (
+                method != "GET"
+            ) {
+                doOutput =
+                    true
+            }
+
+            setRequestProperty(
+                "Accept",
+                "application/json"
+            )
+
+            setRequestProperty(
+                "User-Agent",
+                "ToolNexa-Android/" +
+                    BuildConfig.VERSION_NAME
+            )
+
+            if (
+                !firebaseIdToken
+                    .isNullOrBlank()
+            ) {
                 setRequestProperty(
                     "Authorization",
                     "Bearer " +
                         firebaseIdToken
                 )
+            }
+
+            if (
+                method != "GET"
+            ) {
                 setRequestProperty(
-                    "Accept",
+                    "Content-Type",
                     "application/json"
                 )
             }
+        }
+    }
 
-        try {
-            val status =
-                connection.responseCode
+    private fun readJsonResponse(
+        connection: HttpURLConnection
+    ): JSONObject {
+        val status =
+            connection.responseCode
 
-            val stream =
-                if (status in 200..299) {
-                    connection.inputStream
-                } else {
-                    connection.errorStream
-                }
-
-            val body =
-                stream
-                    ?.bufferedReader()
-                    ?.use {
-                        it.readText()
-                    }
-                    ?: ""
-
-            val root =
-                JSONObject(
-                    body.ifBlank {
-                        "{}"
-                    }
-                )
-
-            if (status !in 200..299) {
-                throw IOException(
-                    serverMessage(
-                        root,
-                        "Não foi possível verificar o plano."
-                    )
-                )
+        val stream =
+            if (
+                status in
+                200..299
+            ) {
+                connection.inputStream
+            } else {
+                connection.errorStream
             }
 
-            val account =
-                root.optJSONObject(
-                    "account"
-                ) ?: throw IOException(
-                    "Resposta de conta inválida."
-                )
+        val body =
+            stream
+                ?.bufferedReader()
+                ?.use {
+                    it.readText()
+                }
+                ?: ""
 
-            val plan =
-                account.optJSONObject(
-                    "plan"
-                ) ?: throw IOException(
-                    "Plano não encontrado."
-                )
-
-            val subscription =
-                account.optJSONObject(
-                    "subscription"
-                )
-
-            return AccountInfo(
-                uid =
-                    account.optString(
-                        "uid"
-                    ),
-                planCode =
-                    plan.optString(
-                        "code",
-                        "free"
-                    ),
-                planName =
-                    plan.optString(
-                        "name",
-                        "Free"
-                    ),
-                priceUsd =
-                    plan.optString(
-                        "price_usd",
-                        "0.00"
-                    ),
-                subscriptionStatus =
-                    subscription
-                        ?.optString(
-                            "status"
-                        )
-                        ?.ifBlank {
-                            null
-                        }
+        val json =
+            JSONObject(
+                body.ifBlank {
+                    "{}"
+                }
             )
-        } finally {
-            connection.disconnect()
+
+        if (
+            status !in
+            200..299
+        ) {
+            throw IOException(
+                serverMessage(
+                    json,
+                    "O servidor recusou o pedido."
+                )
+            )
         }
+
+        return json
     }
 
     private fun serverMessage(
@@ -589,8 +662,22 @@ object CloudflareApi {
                 ""
             ).trim()
 
-        if (message.isNotBlank()) {
+        if (
+            message.isNotBlank()
+        ) {
             return message
+        }
+
+        val error =
+            json.optString(
+                "error",
+                ""
+            ).trim()
+
+        if (
+            error.isNotBlank()
+        ) {
+            return error
         }
 
         val details =
@@ -598,10 +685,13 @@ object CloudflareApi {
                 "details"
             )
 
-        if (details != null) {
+        if (
+            details != null
+        ) {
             for (
                 index in
-                0 until details.length()
+                0 until
+                details.length()
             ) {
                 val item =
                     details.optJSONObject(
@@ -634,41 +724,7 @@ object CloudflareApi {
             }
         }
 
-        val name =
-            json.optString(
-                "name",
-                ""
-            ).trim()
-
-        return name.ifBlank {
-            fallback
-        }
-    }
-
-    private fun readError(
-        connection: HttpURLConnection
-    ): String {
-        return try {
-            val body =
-                connection.errorStream
-                    ?.bufferedReader()
-                    ?.use {
-                        it.readText()
-                    }
-                    ?: ""
-
-            if (body.isBlank()) {
-                return ""
-            }
-
-            JSONObject(body)
-                .optString(
-                    "message",
-                    ""
-                )
-        } catch (_: Exception) {
-            ""
-        }
+        return fallback
     }
 
     private fun querySize(
@@ -710,6 +766,11 @@ object CloudflareApi {
         val priceUsd: String,
         val interval: String,
         val paypalPlanId: String?
+    )
+
+    data class PayPalSubscriptionInfo(
+        val subscriptionId: String,
+        val approvalUrl: String
     )
 
     data class AccountInfo(
