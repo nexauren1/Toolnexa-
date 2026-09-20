@@ -18,6 +18,37 @@ object NexaurenStorage {
             .apply()
     }
 
+    fun rootName(context: Context): String? {
+        val raw = context.getSharedPreferences(
+            PREFS,
+            Context.MODE_PRIVATE
+        ).getString(ROOT_URI, null) ?: return null
+
+        return try {
+            val uri = Uri.parse(raw)
+            context.contentResolver.query(
+                uri,
+                arrayOf(
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME
+                ),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    cursor.getString(0)
+                } else {
+                    null
+                }
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun hasRoot(context: Context): Boolean =
+        !rootName(context).isNullOrBlank()
+
     fun save(
         context: Context,
         category: String,
