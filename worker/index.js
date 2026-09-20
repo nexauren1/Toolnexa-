@@ -29,7 +29,7 @@ export default {
           ok: true,
           service: "ToolNexa API",
           worker: "toolnexa",
-          api_version: "1.12.4",
+          api_version: "1.12.5",
           paypal: env.PAYPAL_ENV || "sandbox",
           workers_ai: !!env.AI,
           images_binding: !!env.IMAGES,
@@ -247,6 +247,251 @@ function nowSeconds() {
   return Math.floor(
     Date.now() / 1000
   );
+}
+
+async function backgroundRemover(
+  request,
+  env
+) {
+  if (!env.IMAGES) {
+    return json(
+      {
+        ok: false,
+        error: "images_binding_missing",
+        message:
+          "O processamento de imagens do ToolNexa não está configurado."
+      },
+      503
+    );
+  }
+
+  const contentType =
+    request.headers.get(
+      "content-type"
+    ) || "";
+
+  if (!contentType.startsWith("image/")) {
+    return json(
+      {
+        ok: false,
+        error: "invalid_image_type",
+        message:
+          "Envie uma imagem JPG, PNG ou WebP."
+      },
+      415
+    );
+  }
+
+  const length =
+    Number(
+      request.headers.get(
+        "content-length"
+      ) || "0"
+    );
+
+  if (
+    length >
+      20 * 1024 * 1024
+  ) {
+    return json(
+      {
+        ok: false,
+        error: "image_too_large",
+        message:
+          "A imagem deve ter no máximo 20 MB."
+      },
+      413
+    );
+  }
+
+  if (!request.body) {
+    return json(
+      {
+        ok: false,
+        error: "empty_body",
+        message:
+          "Nenhuma imagem foi recebida."
+      },
+      400
+    );
+  }
+
+  try {
+    const result =
+      await env.IMAGES
+        .input(request.body)
+        .transform({
+          segment:
+            "foreground"
+        })
+        .output({
+          format:
+            "image/png"
+        });
+
+    return result.response({
+      headers: {
+        "content-type":
+          "image/png",
+        "content-disposition":
+          "attachment; filename=\"toolnexa-background-removed.png\"",
+        "cache-control":
+          "no-store",
+        "x-toolnexa-engine":
+          "Cloudflare Images / BiRefNet",
+        ...corsHeaders()
+      }
+    });
+  } catch (error) {
+    console.error(
+      "ToolNexa background remover error",
+      error
+    );
+
+    return json(
+      {
+        ok: false,
+        error:
+          "background_remover_failed",
+        message:
+          error?.message ||
+          "O processamento da imagem falhou."
+      },
+      502
+    );
+  }
+}
+
+async function aiBackground(
+  request,
+  env,
+  user
+) {
+  if (!env.AI) {
+    return json(
+      {
+        ok: false,
+        error: "ai_binding_missing",
+        message:
+          "O motor de IA do ToolNexa não está configurado."
+      },
+      503
+    );
+  }
+
+  let body = {};
+
+  try {
+    body =
+      await request.json();
+  } catch (_) {
+    return json(
+      {
+        ok: false,
+        error: "invalid_json",
+        message:
+          "Pedido de fundo com IA inválido."
+      },
+      400
+    );
+  }
+
+  const rawPrompt =
+    String(
+      body.prompt ||
+        ""
+    ).trim();
+
+  if (!rawPrompt) {
+    return json(
+      {
+        ok: false,
+        error:
+          "prompt_required",
+        message:
+          "Descreva o fundo que deseja criar."
+      },
+      400
+    );
+  }
+
+  if (
+    rawPrompt.length >
+      1200
+  ) {
+    return json(
+      {
+        ok: false,
+        error:
+          "prompt_too_long",
+        message:
+          "A descrição do fundo é muito longa."
+      },
+      400
+    );
+  }
+
+  const prompt =
+    [
+      "Photorealistic professional background photograph.",
+      "Highly realistic lighting, depth and textures.",
+      "No people, no text, no logos, no watermark.",
+      "Keep the central area visually clean for a foreground subject.",
+      rawPrompt
+    ].join(" ");
+
+  try {
+    const result =
+      await env.AI.run(
+        "@cf/black-forest-labs/flux-1-schnell",
+        {
+          prompt,
+          steps: 6,
+          seed:
+            Math.floor(
+              Math.random() *
+                2147483647
+            )
+        }
+      );
+
+    if (
+      !result ||
+      !result.image
+    ) {
+      throw new Error(
+        "AI image missing."
+      );
+    }
+
+    return json({
+      ok: true,
+      data_uri:
+        "data:image/jpeg;base64," +
+        result.image,
+      prompt: rawPrompt
+    });
+  } catch (error) {
+    console.error(
+      "ToolNexa AI background error",
+      {
+        uid: user.uid,
+        error
+      }
+    );
+
+    return json(
+      {
+        ok: false,
+        error:
+          "ai_background_failed",
+        message:
+          error?.message ||
+          "A geração do fundo falhou. Tente novamente."
+      },
+      502
+    );
+  }
 }
 
 async function ensureBillingSchema(db) {
