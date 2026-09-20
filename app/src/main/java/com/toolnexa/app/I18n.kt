@@ -1090,12 +1090,6 @@ object I18n {
                 context,
                 decor
             )
-            decor.post {
-                localizeViewTree(
-                    context,
-                    decor
-                )
-            }
         }
     }
 
