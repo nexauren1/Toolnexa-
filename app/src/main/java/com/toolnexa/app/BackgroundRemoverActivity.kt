@@ -4668,8 +4668,6 @@ class BackgroundRemoverActivity : Activity() {
         }
     }
 
-    private enum class ExportFormat    }
-
     private enum class ExportFormat {
         PNG,
         JPG
