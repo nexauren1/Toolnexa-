@@ -6,7 +6,6 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
-import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -33,7 +32,7 @@ class SupportActivity : Activity() {
         getColor(R.color.toolnexa_surface)
     }
 
-    private val text by lazy {
+    private val textColor by lazy {
         getColor(R.color.toolnexa_text)
     }
 
@@ -49,6 +48,7 @@ class SupportActivity : Activity() {
         state: Bundle?
     ) {
         super.onCreate(state)
+        LanguageManager.apply(this)
         analytics.screen("support")
         build()
     }
@@ -91,7 +91,7 @@ class SupportActivity : Activity() {
 
         body.addView(
             TextView(this).apply {
-                text = "‹  ToolNexa"
+                text = getString(R.string.support_back)
                 textSize = 15f
                 setTextColor(blue)
                 setOnClickListener {
@@ -106,18 +106,20 @@ class SupportActivity : Activity() {
 
         body.addView(
             TextView(this).apply {
-                text = "Suporte, sugestões e reclamações"
+                text = getString(R.string.support_title)
                 textSize = 27f
                 typeface =
                     android.graphics.Typeface.DEFAULT_BOLD
-                setTextColor(text)
+                setTextColor(textColor)
             }
         )
 
         body.addView(
             TextView(this).apply {
                 text =
-                    "Escolhe o tipo de contacto e a ferramenta relacionada. Ao tocar em Enviar, o teu aplicativo de email abre com o relatório preenchido para reveres antes de enviar."
+                    getString(
+                        R.string.support_description
+                    )
                 textSize = 14f
                 setTextColor(muted)
                 setPadding(
@@ -130,23 +132,23 @@ class SupportActivity : Activity() {
         )
 
         val type =
-            Spinner(this)
-
-        type.adapter =
-            ArrayAdapter(
-                this,
-                android.R.layout.simple_spinner_dropdown_item,
-                arrayOf(
-                    "Suporte técnico",
-                    "Reclamação",
-                    "Sugestão",
-                    "Problema de pagamento",
-                    "Problema de conta"
-                )
-            )
+            Spinner(this).apply {
+                adapter =
+                    ArrayAdapter(
+                        this@SupportActivity,
+                        android.R.layout.simple_spinner_dropdown_item,
+                        resources.getStringArray(
+                            R.array.support_types
+                        )
+                    )
+            }
 
         body.addView(
-            label("Tipo de contacto")
+            label(
+                getString(
+                    R.string.support_type_label
+                )
+            )
         )
         body.addView(
             type,
@@ -157,27 +159,23 @@ class SupportActivity : Activity() {
         )
 
         val tool =
-            Spinner(this)
-
-        tool.adapter =
-            ArrayAdapter(
-                this,
-                android.R.layout.simple_spinner_dropdown_item,
-                arrayOf(
-                    "Geral",
-                    "Background Remover",
-                    "Image Compressor",
-                    "Image Resizer",
-                    "Image Converter",
-                    "Planos / PayPal",
-                    "Login / Conta",
-                    "Histórico",
-                    "Outra ferramenta"
-                )
-            )
+            Spinner(this).apply {
+                adapter =
+                    ArrayAdapter(
+                        this@SupportActivity,
+                        android.R.layout.simple_spinner_dropdown_item,
+                        resources.getStringArray(
+                            R.array.support_tools
+                        )
+                    )
+            }
 
         body.addView(
-            label("Ferramenta ou área")
+            label(
+                getString(
+                    R.string.support_tool_label
+                )
+            )
         )
         body.addView(
             tool,
@@ -187,12 +185,43 @@ class SupportActivity : Activity() {
             )
         )
 
+        val problem =
+            Spinner(this).apply {
+                adapter =
+                    ArrayAdapter(
+                        this@SupportActivity,
+                        android.R.layout.simple_spinner_dropdown_item,
+                        resources.getStringArray(
+                            R.array.support_problems
+                        )
+                    )
+            }
+
+        body.addView(
+            label(
+                getString(
+                    R.string.support_problem_label
+                )
+            )
+        )
+        body.addView(
+            problem,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(52)
+            )
+        )
+
         val message =
             EditText(this).apply {
                 hint =
-                    "Explica o problema, a ideia ou a sugestão..."
+                    getString(
+                        R.string.support_message_hint
+                    )
                 minLines = 6
                 gravity = Gravity.TOP
+                setTextColor(textColor)
+                setHintTextColor(muted)
                 setPadding(
                     dp(14),
                     dp(14),
@@ -214,7 +243,11 @@ class SupportActivity : Activity() {
             }
 
         body.addView(
-            label("Mensagem")
+            label(
+                getString(
+                    R.string.support_message_label
+                )
+            )
         )
         body.addView(
             message,
@@ -227,9 +260,11 @@ class SupportActivity : Activity() {
         val includeDiagnostics =
             android.widget.CheckBox(this).apply {
                 text =
-                    "Incluir diagnóstico técnico (modelo do aparelho, Android, versão da app e idioma)"
+                    getString(
+                        R.string.support_diagnostics
+                    )
                 isChecked = true
-                setTextColor(text)
+                setTextColor(textColor)
             }
 
         body.addView(
@@ -245,7 +280,9 @@ class SupportActivity : Activity() {
         body.addView(
             TextView(this).apply {
                 text =
-                    "Não incluímos palavras-passe, tokens, chaves privadas ou dados secretos. O email abre para poderes rever tudo antes de enviar."
+                    getString(
+                        R.string.support_privacy_note
+                    )
                 textSize = 12f
                 setTextColor(muted)
                 setPadding(
@@ -259,7 +296,10 @@ class SupportActivity : Activity() {
 
         val send =
             Button(this).apply {
-                text = "Enviar para o suporte"
+                text =
+                    getString(
+                        R.string.support_send
+                    )
                 isAllCaps = false
                 setTextColor(Color.WHITE)
                 background =
@@ -273,23 +313,31 @@ class SupportActivity : Activity() {
             }
 
         send.setOnClickListener {
-            val textValue =
+            val messageText =
                 message.text
                     .toString()
                     .trim()
 
-            if (textValue.isBlank()) {
+            if (messageText.isBlank()) {
                 message.error =
-                    "Escreve a tua mensagem."
+                    getString(
+                        R.string.support_message_required
+                    )
                 return@setOnClickListener
             }
 
             val subject =
-                "[ToolNexa] " +
+                getString(
+                    R.string.support_subject_prefix
+                ) +
+                    " " +
                     type.selectedItem
                         .toString() +
                     " • " +
                     tool.selectedItem
+                        .toString() +
+                    " • " +
+                    problem.selectedItem
                         .toString()
 
             val bodyText =
@@ -298,7 +346,9 @@ class SupportActivity : Activity() {
                         .toString(),
                     tool.selectedItem
                         .toString(),
-                    textValue,
+                    problem.selectedItem
+                        .toString(),
+                    messageText,
                     includeDiagnostics.isChecked
                 )
 
@@ -309,6 +359,9 @@ class SupportActivity : Activity() {
                         .toString(),
                 "tool" to
                     tool.selectedItem
+                        .toString(),
+                "problem" to
+                    problem.selectedItem
                         .toString()
             )
 
@@ -332,6 +385,7 @@ class SupportActivity : Activity() {
     private fun buildReport(
         type: String,
         tool: String,
+        problem: String,
         message: String,
         diagnostics: Boolean
     ): String {
@@ -351,30 +405,31 @@ class SupportActivity : Activity() {
             appendLine("TOOLNEXA SUPPORT REPORT")
             appendLine("========================")
             appendLine()
-            appendLine("Tipo: $type")
-            appendLine("Área/ferramenta: $tool")
-            appendLine("Data: $date")
-            appendLine("Mensagem:")
+            appendLine("Type: $type")
+            appendLine("Area/tool: $tool")
+            appendLine("Problem: $problem")
+            appendLine("Date: $date")
+            appendLine("Message:")
             appendLine(message)
             appendLine()
 
-            appendLine("Conta")
-            appendLine("------")
+            appendLine("Account")
+            appendLine("-------")
             appendLine(
-                "Nome: " +
+                "Name: " +
                     (user?.displayName
-                        ?: "Não disponível")
+                        ?: "Not available")
             )
             appendLine(
-                "Email da conta: " +
+                "Account email: " +
                     (user?.email
-                        ?: "Não disponível")
+                        ?: "Not available")
             )
             appendLine()
 
             if (diagnostics) {
-                appendLine("Diagnóstico técnico")
-                appendLine("------------------")
+                appendLine("Technical diagnostics")
+                appendLine("---------------------")
                 appendLine(
                     "App: ToolNexa " +
                         BuildConfig.VERSION_NAME
@@ -392,26 +447,26 @@ class SupportActivity : Activity() {
                         android.os.Build.VERSION.SDK_INT
                 )
                 appendLine(
-                    "Fabricante: " +
+                    "Manufacturer: " +
                         android.os.Build.MANUFACTURER
                 )
                 appendLine(
-                    "Modelo: " +
+                    "Model: " +
                         android.os.Build.MODEL
                 )
                 appendLine(
-                    "Idioma: " +
+                    "Language: " +
                         Locale.getDefault().toLanguageTag()
                 )
                 appendLine(
-                    "País/região: " +
+                    "Country/region: " +
                         Locale.getDefault().country
                 )
             }
 
             appendLine()
             appendLine(
-                "Nota: este relatório não contém palavra-passe, token de autenticação ou chave privada."
+                "The email opens for review before sending. No password, auth token or private key is included."
             )
         }
     }
@@ -445,7 +500,9 @@ class SupportActivity : Activity() {
         } else {
             Toast.makeText(
                 this,
-                "Não foi encontrada uma aplicação de email.",
+                getString(
+                    R.string.support_no_email_app
+                ),
                 Toast.LENGTH_LONG
             ).show()
         }
@@ -459,7 +516,7 @@ class SupportActivity : Activity() {
             textSize = 13f
             typeface =
                 android.graphics.Typeface.DEFAULT_BOLD
-            setTextColor(text)
+            setTextColor(textColor)
             setPadding(
                 2,
                 dp(14),
