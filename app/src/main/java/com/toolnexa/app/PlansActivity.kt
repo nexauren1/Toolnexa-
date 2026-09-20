@@ -20,40 +20,94 @@ class PlansActivity : Activity() {
     }
 
     private val bg by lazy {
-        getColor(R.color.toolnexa_bg)
+        getColor(
+            R.color.toolnexa_bg
+        )
     }
 
     private val surface by lazy {
-        getColor(R.color.toolnexa_surface)
+        getColor(
+            R.color.toolnexa_surface
+        )
     }
 
     private val textColor by lazy {
-        getColor(R.color.toolnexa_text)
+        getColor(
+            R.color.toolnexa_text
+        )
     }
 
     private val muted by lazy {
-        getColor(R.color.toolnexa_muted)
+        getColor(
+            R.color.toolnexa_muted
+        )
     }
 
     private val border by lazy {
-        getColor(R.color.toolnexa_border)
+        getColor(
+            R.color.toolnexa_border
+        )
     }
 
-    private var currentPlanView: TextView? = null
-    private var subscriptionView: TextView? = null
-    private var plansContainer: LinearLayout? = null
-    private var subscribeButton: Button? = null
-    private var loadingAccount = false
-    private var loadingPlans = false
+    private var currentPlanView:
+        TextView? = null
 
-    override fun onCreate(state: Bundle?) {
-        super.onCreate(state)
+    private var subscriptionView:
+        TextView? = null
+
+    private var plansContainer:
+        LinearLayout? = null
+
+    private var subscribeButton:
+        Button? = null
+
+    private var loadingAccount =
+        false
+
+    private var loadingPlans =
+        false
+
+    private var activatingSubscription =
+        false
+
+    override fun onCreate(
+        state: Bundle?
+    ) {
+        super.onCreate(
+            state
+        )
+
         showPlans()
+        handlePaymentReturn(
+            intent
+        )
+    }
+
+    override fun onNewIntent(
+        intent: Intent
+    ) {
+        super.onNewIntent(
+            intent
+        )
+
+        setIntent(
+            intent
+        )
+
+        handlePaymentReturn(
+            intent
+        )
     }
 
     override fun onResume() {
         super.onResume()
-        refreshAccount()
+
+        if (
+            !activatingSubscription
+        ) {
+            refreshAccount()
+        }
+
         loadPlansFromServer()
     }
 
@@ -62,7 +116,11 @@ class PlansActivity : Activity() {
             LinearLayout(this).apply {
                 orientation =
                     LinearLayout.VERTICAL
-                setBackgroundColor(bg)
+
+                setBackgroundColor(
+                    bg
+                )
+
                 setPadding(
                     18,
                     24,
@@ -74,8 +132,13 @@ class PlansActivity : Activity() {
         val scroll =
             ScrollView(this)
 
-        scroll.addView(root)
-        setContentView(scroll)
+        scroll.addView(
+            root
+        )
+
+        setContentView(
+            scroll
+        )
 
         root.addView(
             title(
@@ -104,12 +167,17 @@ class PlansActivity : Activity() {
 
                 background =
                     GradientDrawable().apply {
-                        setColor(surface)
+                        setColor(
+                            surface
+                        )
+
                         setStroke(
                             1,
                             border
                         )
-                        cornerRadius = 18f
+
+                        cornerRadius =
+                            18f
                     }
             }
 
@@ -140,7 +208,8 @@ class PlansActivity : Activity() {
 
         val refreshButton =
             Button(this).apply {
-                text = "Atualizar estado"
+                text =
+                    "Atualizar estado"
 
                 setOnClickListener {
                     refreshAccount()
@@ -166,7 +235,8 @@ class PlansActivity : Activity() {
                 -1,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
-                bottomMargin = 16
+                bottomMargin =
+                    16
             }
         )
 
@@ -205,11 +275,15 @@ class PlansActivity : Activity() {
     }
 
     private fun loadPlansFromServer() {
-        if (loadingPlans) {
+        if (
+            loadingPlans
+        ) {
             return
         }
 
-        loadingPlans = true
+        loadingPlans =
+            true
+
         showPlansLoading()
 
         Thread {
@@ -218,12 +292,16 @@ class PlansActivity : Activity() {
                     CloudflareApi.loadPlans()
 
                 runOnUiThread {
-                    loadingPlans = false
+                    loadingPlans =
+                        false
 
-                    if (plans.isEmpty()) {
+                    if (
+                        plans.isEmpty()
+                    ) {
                         showPlansError(
                             "Nenhum plano ativo foi encontrado no billing."
                         )
+
                         return@runOnUiThread
                     }
 
@@ -231,9 +309,12 @@ class PlansActivity : Activity() {
                         plans
                     )
                 }
-            } catch (error: Exception) {
+            } catch (
+                error: Exception
+            ) {
                 runOnUiThread {
-                    loadingPlans = false
+                    loadingPlans =
+                        false
 
                     showPlansError(
                         error.message
@@ -245,7 +326,8 @@ class PlansActivity : Activity() {
     }
 
     private fun renderPlans(
-        plans: List<CloudflareApi.PlanInfo>
+        plans:
+            List<CloudflareApi.PlanInfo>
     ) {
         plansContainer?.removeAllViews()
         subscribeButton = null
@@ -253,7 +335,7 @@ class PlansActivity : Activity() {
         plans.forEach { plan ->
             val isPro =
                 plan.code.equals(
-                    "pro",
+                    "PRO",
                     ignoreCase = true
                 )
 
@@ -263,14 +345,13 @@ class PlansActivity : Activity() {
                         it.isNotBlank()
                     }
                     ?.let {
-                        " / $it"
+                        " / " + it.lowercase()
                     }
                     ?: ""
 
             val price =
                 if (
-                    plan.priceUsd
-                        .isBlank()
+                    plan.priceUsd.isBlank()
                 ) {
                     "Preço não definido"
                 } else {
@@ -280,7 +361,9 @@ class PlansActivity : Activity() {
                 }
 
             val description =
-                if (isPro) {
+                if (
+                    isPro
+                ) {
                     "Acesso ao plano Pro do ToolNexa."
                 } else {
                     "Plano " +
@@ -298,7 +381,8 @@ class PlansActivity : Activity() {
                     -1,
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    bottomMargin = 14
+                    bottomMargin =
+                        14
                 }
             )
         }
@@ -340,12 +424,17 @@ class PlansActivity : Activity() {
 
             background =
                 GradientDrawable().apply {
-                    setColor(surface)
+                    setColor(
+                        surface
+                    )
+
                     setStroke(
                         1,
                         border
                     )
-                    cornerRadius = 18f
+
+                    cornerRadius =
+                        18f
                 }
 
             addView(
@@ -371,7 +460,7 @@ class PlansActivity : Activity() {
 
             if (
                 plan.code.equals(
-                    "pro",
+                    "PRO",
                     ignoreCase = true
                 )
             ) {
@@ -396,6 +485,7 @@ class PlansActivity : Activity() {
                                         R.color.toolnexa_blue
                                     )
                                 )
+
                                 cornerRadius =
                                     14f
                             }
@@ -416,27 +506,30 @@ class PlansActivity : Activity() {
         }
 
     private fun refreshAccount() {
-        if (loadingAccount) {
+        if (
+            loadingAccount ||
+            activatingSubscription
+        ) {
             return
         }
 
         val user =
             auth.currentUser
 
-        if (user == null) {
+        if (
+            user == null
+        ) {
             currentPlanView?.text =
                 "Plano atual: Free"
 
             subscriptionView?.text =
                 "Estado da subscrição: sessão não iniciada"
 
-            subscribeButton?.isEnabled =
-                false
-
             return
         }
 
-        loadingAccount = true
+        loadingAccount =
+            true
 
         currentPlanView?.text =
             "Plano atual: a verificar..."
@@ -444,67 +537,85 @@ class PlansActivity : Activity() {
         subscriptionView?.text =
             "Estado da subscrição: a verificar..."
 
-        user.getIdToken(false)
-            .addOnCompleteListener { task ->
-                val token =
-                    task.result?.token
+        user.getIdToken(
+            false
+        ).addOnCompleteListener { task ->
+            val token =
+                task.result?.token
 
-                if (
-                    !task.isSuccessful ||
-                    token.isNullOrBlank()
-                ) {
-                    loadingAccount = false
-                    showAccountError()
-                    return@addOnCompleteListener
-                }
+            if (
+                !task.isSuccessful ||
+                token.isNullOrBlank()
+            ) {
+                loadingAccount =
+                    false
 
-                Thread {
-                    try {
-                        val account =
-                            CloudflareApi
-                                .loadAccount(
-                                    token
-                                )
+                showAccountError(
+                    "Não foi possível validar a sessão Firebase."
+                )
 
-                        runOnUiThread {
-                            loadingAccount =
-                                false
-
-                            currentPlanView?.text =
-                                "Plano atual: " +
-                                    account.planName +
-                                    " (US$ " +
-                                    account.priceUsd +
-                                    ")"
-
-                            subscriptionView?.text =
-                                "Estado da subscrição: " +
-                                    (
-                                        account
-                                            .subscriptionStatus
-                                            ?: "Sem subscrição"
-                                    )
-
-                            subscribeButton?.isEnabled =
-                                account.planCode !=
-                                    "pro"
-                        }
-                    } catch (error: Exception) {
-                        runOnUiThread {
-                            loadingAccount =
-                                false
-
-                            showAccountError(
-                                error.message
-                            )
-                        }
-                    }
-                }.start()
+                return@addOnCompleteListener
             }
+
+            Thread {
+                try {
+                    val account =
+                        CloudflareApi.loadAccount(
+                            token
+                        )
+
+                    runOnUiThread {
+                        loadingAccount =
+                            false
+
+                        renderAccount(
+                            account
+                        )
+                    }
+                } catch (
+                    error: Exception
+                ) {
+                    runOnUiThread {
+                        loadingAccount =
+                            false
+
+                        showAccountError(
+                            error.message
+                        )
+                    }
+                }
+            }.start()
+        }
+    }
+
+    private fun renderAccount(
+        account:
+            CloudflareApi.AccountInfo
+    ) {
+        currentPlanView?.text =
+            "Plano atual: " +
+                account.planName +
+                " (US$ " +
+                account.priceUsd +
+                ")"
+
+        subscriptionView?.text =
+            "Estado da subscrição: " +
+                (
+                    account.subscriptionStatus
+                        ?: "Sem subscrição"
+                )
+
+        subscribeButton?.isEnabled =
+            !account.planCode.equals(
+                "PRO",
+                ignoreCase = true
+            )
     }
 
     private fun showAccountError(
-        message: String? = null
+        message: String? =
+            null
     ) {
         currentPlanView?.text =
             "Plano atual: não foi possível verificar"
@@ -514,13 +625,22 @@ class PlansActivity : Activity() {
                 it.isNotBlank()
             }
                 ?: "Verifique a internet e tente novamente."
+
+        if (
+            auth.currentUser != null
+        ) {
+            subscribeButton?.isEnabled =
+                true
+        }
     }
 
     private fun startProSubscription() {
         val user =
             auth.currentUser
 
-        if (user == null) {
+        if (
+            user == null
+        ) {
             toast(
                 "Inicie sessão antes de assinar o Pro."
             )
@@ -531,63 +651,218 @@ class PlansActivity : Activity() {
             false
 
         subscriptionView?.text =
-            "Estado da subscrição: a iniciar PayPal..."
+            "Estado da subscrição: a preparar PayPal..."
 
-        user.getIdToken(false)
-            .addOnCompleteListener { task ->
-                val token =
-                    task.result?.token
+        user.getIdToken(
+            false
+        ).addOnCompleteListener { task ->
+            val token =
+                task.result?.token
 
-                if (
-                    !task.isSuccessful ||
-                    token.isNullOrBlank()
-                ) {
-                    subscribeButton?.isEnabled =
-                        true
+            if (
+                !task.isSuccessful ||
+                token.isNullOrBlank()
+            ) {
+                subscribeButton?.isEnabled =
+                    true
 
-                    toast(
-                        "Não foi possível validar a conta Firebase."
-                    )
-                    return@addOnCompleteListener
-                }
+                toast(
+                    "Não foi possível validar a conta Firebase."
+                )
 
-                Thread {
-                    try {
-                        val approvalUrl =
-                            CloudflareApi
-                                .createProSubscription(
-                                    token
-                                )
-
-                        runOnUiThread {
-                            subscribeButton?.isEnabled =
-                                true
-
-                            startActivity(
-                                Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse(
-                                        approvalUrl
-                                    )
-                                )
-                            )
-                        }
-                    } catch (error: Exception) {
-                        runOnUiThread {
-                            subscribeButton?.isEnabled =
-                                true
-
-                            subscriptionView?.text =
-                                "Estado da subscrição: erro ao iniciar"
-
-                            toast(
-                                error.message
-                                    ?: "Não foi possível iniciar o PayPal."
-                            )
-                        }
-                    }
-                }.start()
+                return@addOnCompleteListener
             }
+
+            Thread {
+                try {
+                    val subscription =
+                        CloudflareApi
+                            .createProSubscription(
+                                token
+                            )
+
+                    runOnUiThread {
+                        subscribeButton?.isEnabled =
+                            true
+
+                        subscriptionView?.text =
+                            "Estado da subscrição: aguardando aprovação no PayPal..."
+
+                        startActivity(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse(
+                                    subscription.approvalUrl
+                                )
+                            )
+                        )
+                    }
+                } catch (
+                    error: Exception
+                ) {
+                    runOnUiThread {
+                        subscribeButton?.isEnabled =
+                            true
+
+                        subscriptionView?.text =
+                            "Estado da subscrição: erro ao iniciar"
+
+                        toast(
+                            error.message
+                                ?: "Não foi possível iniciar o PayPal Sandbox."
+                        )
+                    }
+                }
+            }.start()
+        }
+    }
+
+    private fun handlePaymentReturn(
+        incoming:
+            Intent?
+    ) {
+        val data =
+            incoming?.data
+                ?: return
+
+        if (
+            data.scheme !=
+                "toolnexa" ||
+            data.host !=
+                "paypal"
+        ) {
+            return
+        }
+
+        if (
+            data.path ==
+                "/cancel"
+        ) {
+            toast(
+                "A assinatura Pro foi cancelada."
+            )
+
+            refreshAccount()
+            return
+        }
+
+        if (
+            data.path !=
+                "/complete"
+        ) {
+            return
+        }
+
+        val subscriptionId =
+            data.getQueryParameter(
+                "subscription_id"
+            ).orEmpty()
+
+        if (
+            subscriptionId.isBlank()
+        ) {
+            toast(
+                "O PayPal voltou sem o ID da assinatura."
+            )
+
+            return
+        }
+
+        activateReturnedSubscription(
+            subscriptionId
+        )
+    }
+
+    private fun activateReturnedSubscription(
+        subscriptionId: String
+    ) {
+        if (
+            activatingSubscription
+        ) {
+            return
+        }
+
+        val user =
+            auth.currentUser
+                ?: return
+
+        activatingSubscription =
+            true
+
+        subscribeButton?.isEnabled =
+            false
+
+        currentPlanView?.text =
+            "Plano atual: a ativar..."
+
+        subscriptionView?.text =
+            "Estado da subscrição: a confirmar com PayPal..."
+
+        user.getIdToken(
+            false
+        ).addOnCompleteListener { task ->
+            val token =
+                task.result?.token
+
+            if (
+                !task.isSuccessful ||
+                token.isNullOrBlank()
+            ) {
+                activatingSubscription =
+                    false
+
+                showAccountError(
+                    "Não foi possível validar a sessão para ativar a assinatura."
+                )
+
+                return@addOnCompleteListener
+            }
+
+            Thread {
+                try {
+                    val account =
+                        CloudflareApi
+                            .activateProSubscription(
+                                token,
+                                subscriptionId
+                            )
+
+                    runOnUiThread {
+                        activatingSubscription =
+                            false
+
+                        renderAccount(
+                            account
+                        )
+
+                        toast(
+                            "Plano Pro ativado com sucesso."
+                        )
+
+                        loadPlansFromServer()
+                    }
+                } catch (
+                    error: Exception
+                ) {
+                    runOnUiThread {
+                        activatingSubscription =
+                            false
+
+                        subscribeButton?.isEnabled =
+                            true
+
+                        subscriptionView?.text =
+                            error.message
+                                ?: "A assinatura ainda não pôde ser ativada."
+
+                        toast(
+                            error.message
+                                ?: "Não foi possível ativar a assinatura."
+                        )
+                    }
+                }
+            }.start()
+        }
     }
 
     private fun styleSecondary(
@@ -626,7 +901,7 @@ class PlansActivity : Activity() {
         Toast.makeText(
             this,
             message,
-            Toast.LENGTH_SHORT
+            Toast.LENGTH_LONG
         ).show()
     }
 
@@ -635,8 +910,11 @@ class PlansActivity : Activity() {
         size: Float
     ): TextView =
         TextView(this).apply {
-            text = value
-            textSize = size
+            text =
+                value
+
+            textSize =
+                size
 
             typeface =
                 android.graphics.Typeface
@@ -658,8 +936,11 @@ class PlansActivity : Activity() {
         value: String
     ): TextView =
         TextView(this).apply {
-            text = value
-            textSize = 14f
+            text =
+                value
+
+            textSize =
+                14f
 
             setTextColor(
                 muted
