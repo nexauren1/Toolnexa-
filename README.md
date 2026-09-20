@@ -2,7 +2,7 @@
 
 ToolNexa is a native Android utility app focused on practical tools with a clean, light and mobile-first experience.
 
-## v1.11.0
+## v1.12.0
 
 - Image Compressor
 - Image Resizer
@@ -12,6 +12,9 @@ ToolNexa is a native Android utility app focused on practical tools with a clean
 - D1 entitlement billing for PayPal Sandbox
 - Free and Pro ($5/month) plan catalog without credits
 - Direct PayPal subscription creation and post-return activation
+- Hardened plan catalog with recovery response when D1 is temporarily unavailable
+- Automatic PayPal Product + monthly Billing Plan provisioning with D1 lock protection
+- Native billing client repaired and made compatible with current Worker response formats
 - D1-backed Free entitlement for every authenticated Firebase account
 - Searchable 2-column tool grid
 - Firebase Authentication with Google, e-mail/password and international phone SMS verification
