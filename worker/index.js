@@ -33,6 +33,14 @@ export default {
           paypal: env.PAYPAL_ENV || "sandbox",
           workers_ai: !!env.AI,
           images_binding: !!env.IMAGES,
+          paypal_plan_configured:
+            !!(
+              env.PAYPAL_PRO_PLAN_ID
+            ),
+          paypal_webhook_configured:
+            !!(
+              env.PAYPAL_WEBHOOK_ID
+            ),
           timestamp: new Date().toISOString()
         });
       }
