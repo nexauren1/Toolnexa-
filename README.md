@@ -2,13 +2,14 @@
 
 ToolNexa is a native Android utility app focused on practical tools with a clean, light and mobile-first experience.
 
-## v1.1.0
+## v1.2.0
 
 - Image Compressor
 - Image Resizer
 - Searchable 2-column tool grid
-- Firebase Authentication with Google and e-mail/password
+- Firebase Authentication with Google, e-mail/password and phone SMS verification
 - Password recovery by e-mail
+- Phone login with 6-digit SMS code, resend cooldown and number change flow
 - Firebase Analytics for screens and app actions
 - Account page with Firebase profile metadata
 - In-tool processing animation and result previews
@@ -18,6 +19,7 @@ ToolNexa is a native Android utility app focused on practical tools with a clean
 ## Firebase
 
 - Firebase project is configured for package `com.toolnexa.app`.
+- Phone sign-in must be enabled in Firebase Authentication and the SMS region policy must allow the target countries.
 - Google Sign-In uses the Firebase web OAuth client generated in `google-services.json`.
 - Analytics events are normalized for Firebase event-name and parameter limits.
 
