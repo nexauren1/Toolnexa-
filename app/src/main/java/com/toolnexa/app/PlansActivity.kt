@@ -444,7 +444,7 @@ class PlansActivity : Activity() {
         subscriptionView?.text =
             "Estado da subscrição: a verificar..."
 
-        user.getIdToken(true)
+        user.getIdToken(false)
             .addOnCompleteListener { task ->
                 val token =
                     task.result?.token
@@ -533,7 +533,7 @@ class PlansActivity : Activity() {
         subscriptionView?.text =
             "Estado da subscrição: a iniciar PayPal..."
 
-        user.getIdToken(true)
+        user.getIdToken(false)
             .addOnCompleteListener { task ->
                 val token =
                     task.result?.token
