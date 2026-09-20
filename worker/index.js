@@ -29,7 +29,7 @@ export default {
           ok: true,
           service: "ToolNexa API",
           worker: "toolnexa",
-          api_version: "1.12.5",
+          api_version: "1.13.0",
           paypal: env.PAYPAL_ENV || "sandbox",
           workers_ai: !!env.AI,
           images_binding: !!env.IMAGES,
@@ -457,10 +457,11 @@ async function aiBackground(
 
     if (
       !result ||
-      !result.image
+      typeof result.image !== "string" ||
+      !result.image.trim()
     ) {
       throw new Error(
-        "AI image missing."
+        "O modelo de IA não devolveu uma imagem."
       );
     }
 
