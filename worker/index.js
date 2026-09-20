@@ -63,7 +63,7 @@ export default {
           );
         }
 
-        await ensureBillingSchema(
+        await ensurePlansSchema(
           env.DB
         );
 
@@ -272,6 +272,94 @@ function json(data, status = 200) {
       }
     }
   );
+}
+
+async function ensurePlansSchema(db) {
+  if (!db) {
+    const error =
+      new Error(
+        "D1 billing database is missing."
+      );
+
+    error.code =
+      "billing_database_missing";
+
+    error.publicMessage =
+      "O banco de billing do ToolNexa não está ligado ao Worker.";
+
+    error.status = 503;
+
+    throw error;
+  }
+
+  await db.prepare(
+    "CREATE TABLE IF NOT EXISTS plans (" +
+    "code TEXT PRIMARY KEY, " +
+    "name TEXT NOT NULL, " +
+    "price_usd TEXT NOT NULL, " +
+    "billing_interval TEXT NOT NULL, " +
+    "paypal_plan_id TEXT, " +
+    "active INTEGER NOT NULL DEFAULT 1, " +
+    "sort_order INTEGER NOT NULL DEFAULT 0)"
+  ).run();
+
+  const info =
+    await db
+      .prepare(
+        "PRAGMA table_info(plans)"
+      )
+      .all();
+
+  const columns =
+    new Set(
+      (info.results || [])
+        .map(column => column.name)
+    );
+
+  if (!columns.has("paypal_plan_id")) {
+    await db.prepare(
+      "ALTER TABLE plans ADD COLUMN paypal_plan_id TEXT"
+    ).run();
+  }
+
+  if (!columns.has("active")) {
+    await db.prepare(
+      "ALTER TABLE plans ADD COLUMN active INTEGER NOT NULL DEFAULT 1"
+    ).run();
+  }
+
+  if (!columns.has("sort_order")) {
+    await db.prepare(
+      "ALTER TABLE plans ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"
+    ).run();
+  }
+
+  await db.batch([
+    db.prepare(
+      "INSERT OR IGNORE INTO plans " +
+      "(code,name,price_usd,billing_interval," +
+      "paypal_plan_id,active,sort_order) " +
+      "VALUES ('free','Free','0.00','month',NULL,1,1)"
+    ),
+    db.prepare(
+      "INSERT OR IGNORE INTO plans " +
+      "(code,name,price_usd,billing_interval," +
+      "paypal_plan_id,active,sort_order) " +
+      "VALUES ('pro','Pro','5.00','month',NULL,1,2)"
+    ),
+    db.prepare(
+      "UPDATE plans SET " +
+      "name='Free', price_usd='0.00', " +
+      "billing_interval='month', active=1, sort_order=1 " +
+      "WHERE code='free'"
+    ),
+    db.prepare(
+      "UPDATE plans SET " +
+      "name='Pro', price_usd='5.00', " +
+      "billing_interval='month', active=1, sort_order=2 " +
+      "WHERE code='pro'"
+    )
+  ]);
 }
 
 async function ensureBillingSchema(db) {
