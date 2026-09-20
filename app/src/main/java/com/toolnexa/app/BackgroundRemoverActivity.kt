@@ -562,16 +562,10 @@ class BackgroundRemoverActivity : Activity() {
 
         editorSurface = EditorSurface(
             this
-        ).also { surfaceView ->
-            previewCard.addView(
-                surfaceView,
-                LinearLayout.LayoutParams(
-                    -1,
-                    0,
-                    1f
-                )
-            )
-            surfaceView.visibility = View.GONE
+        )
+
+        editorImage?.setOnTouchListener { _, event ->
+            editorSurface?.handleTouch(event) ?: false
         }
 
         add(previewCard)
@@ -928,10 +922,6 @@ class BackgroundRemoverActivity : Activity() {
             verticalPercent = it
             renderEditor()
         }
-
-        add(
-            emptySpacer()
-        )
 
         return panel
     }
@@ -2441,9 +2431,31 @@ class BackgroundRemoverActivity : Activity() {
     }
 
     private fun showExportDialog() {
+        if (
+            backgroundKey ==
+            "transparent"
+        ) {
+            AlertDialog.Builder(this)
+                .setTitle(
+                    "Salvar transparente"
+                )
+                .setItems(
+                    arrayOf(
+                        "PNG • máxima qualidade • sem perdas"
+                    )
+                ) { _, _ ->
+                    exportAndSave(
+                        ExportFormat.PNG,
+                        100
+                    )
+                }
+                .show()
+            return
+        }
+
         val labels =
             arrayOf(
-                "PNG • máxima qualidade • transparência",
+                "PNG • máxima qualidade",
                 "JPG • 100% • máxima qualidade",
                 "JPG • 90% • qualidade alta",
                 "JPG • 80% • arquivo menor"
@@ -2457,9 +2469,10 @@ class BackgroundRemoverActivity : Activity() {
                 labels
             ) { _, which ->
                 val format =
-                    when (which) {
-                        0 -> ExportFormat.PNG
-                        else -> ExportFormat.JPG
+                    if (which == 0) {
+                        ExportFormat.PNG
+                    } else {
+                        ExportFormat.JPG
                     }
 
                 val quality =
@@ -3464,82 +3477,81 @@ class BackgroundRemoverActivity : Activity() {
         private var lastX = 0f
         private var lastY = 0f
 
-        init {
-            setBackgroundColor(
-                Color.TRANSPARENT
-            )
-        }
-
-        override fun onTouchEvent(
+        fun handleTouch(
             event: MotionEvent
         ): Boolean {
-            val bitmap =
-                editorForeground
-                    ?: return false
-
             if (
-                event.action ==
-                MotionEvent.ACTION_DOWN
+                editorForeground == null
             ) {
-                lastX = event.x
-                lastY = event.y
-                applyBrush(
-                    event.x,
-                    event.y
-                )
-                return true
+                return false
             }
 
-            if (
-                event.action ==
-                MotionEvent.ACTION_MOVE
-            ) {
-                val dx =
-                    event.x - lastX
-                val dy =
-                    event.y - lastY
-
-                val distance =
-                    kotlin.math.sqrt(
-                        dx * dx +
-                            dy * dy
-                    )
-
-                val steps =
-                    max(
-                        1,
-                        (distance /
-                            max(
-                                4f,
-                                brushSize /
-                                    3f
-                            )
-                            ).roundToInt()
-                    )
-
-                for (
-                    i in 1..steps
-                ) {
-                    val x =
-                        lastX +
-                            dx *
-                            i /
-                            steps
-                    val y =
-                        lastY +
-                            dy *
-                            i /
-                            steps
-
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    lastX = event.x
+                    lastY = event.y
                     applyBrush(
-                        x,
-                        y
+                        event.x,
+                        event.y
                     )
+                    return true
                 }
 
-                lastX = event.x
-                lastY = event.y
-                return true
+                MotionEvent.ACTION_MOVE -> {
+                    val dx =
+                        event.x - lastX
+                    val dy =
+                        event.y - lastY
+
+                    val distance =
+                        kotlin.math.sqrt(
+                            dx * dx +
+                                dy * dy
+                        )
+
+                    val steps =
+                        max(
+                            1,
+                            (
+                                distance /
+                                    max(
+                                        4f,
+                                        brushSize /
+                                            3f
+                                    )
+                                ).roundToInt()
+                        )
+
+                    for (
+                        i in 1..steps
+                    ) {
+                        val x =
+                            lastX +
+                                dx *
+                                i /
+                                steps
+                        val y =
+                            lastY +
+                                dy *
+                                i /
+                                steps
+
+                        applyBrush(
+                            x,
+                            y
+                        )
+                    }
+
+                    lastX = event.x
+                    lastY = event.y
+                    return true
+                }
+
+                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_CANCEL -> {
+                    renderEditor()
+                    return true
+                }
             }
 
             return true
@@ -3553,18 +3565,36 @@ class BackgroundRemoverActivity : Activity() {
                 editorForeground
                     ?: return
 
+            val preview =
+                editorImage
+                    ?: return
+
+            val contentWidth =
+                (
+                    preview.width -
+                        preview.paddingLeft -
+                        preview.paddingRight
+                    ).toFloat()
+
+            val contentHeight =
+                (
+                    preview.height -
+                        preview.paddingTop -
+                        preview.paddingBottom
+                    ).toFloat()
+
             if (
-                width <= 0 ||
-                height <= 0
+                contentWidth <= 0f ||
+                contentHeight <= 0f
             ) {
                 return
             }
 
             val scale =
                 min(
-                    width.toFloat() /
+                    contentWidth /
                         bitmap.width,
-                    height.toFloat() /
+                    contentHeight /
                         bitmap.height
                 )
 
@@ -3574,22 +3604,26 @@ class BackgroundRemoverActivity : Activity() {
                 bitmap.height * scale
 
             val left =
-                (width - drawWidth) /
-                    2f
+                preview.paddingLeft +
+                    (
+                        contentWidth -
+                            drawWidth
+                        ) / 2f
             val top =
-                (height - drawHeight) /
-                    2f
+                preview.paddingTop +
+                    (
+                        contentHeight -
+                            drawHeight
+                        ) / 2f
 
             val bx =
                 (
                     x - left
-                    ) /
-                    scale
+                    ) / scale
             val by =
                 (
                     y - top
-                    ) /
-                    scale
+                    ) / scale
 
             if (
                 bx < 0 ||
@@ -3634,6 +3668,7 @@ class BackgroundRemoverActivity : Activity() {
                         ?: return
 
                 canvas.save()
+
                 val path = Path()
                 path.addCircle(
                     bx,
@@ -3641,6 +3676,7 @@ class BackgroundRemoverActivity : Activity() {
                     radius,
                     Path.Direction.CW
                 )
+
                 canvas.clipPath(
                     path
                 )
