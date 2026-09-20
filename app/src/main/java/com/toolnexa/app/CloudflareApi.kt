@@ -151,6 +151,138 @@ object CloudflareApi {
         }
     }
 
+    fun generateAiBackground(
+        context: Context,
+        prompt: String,
+        firebaseIdToken: String
+    ): File {
+        val connection =
+            (URL(
+                BASE_URL +
+                    "/api/tools/background-remover/ai-background"
+            ).openConnection()
+                as HttpURLConnection).apply {
+                connectTimeout = 20_000
+                readTimeout = 120_000
+                requestMethod = "POST"
+                doOutput = true
+
+                setRequestProperty(
+                    "Authorization",
+                    "Bearer " +
+                        firebaseIdToken
+                )
+
+                setRequestProperty(
+                    "Content-Type",
+                    "application/json"
+                )
+
+                setRequestProperty(
+                    "Accept",
+                    "application/json"
+                )
+            }
+
+        try {
+            connection.outputStream
+                .use { output ->
+                    val body =
+                        JSONObject()
+                            .put(
+                                "prompt",
+                                prompt
+                            )
+                            .toString()
+
+                    output.write(
+                        body.toByteArray(
+                            Charsets.UTF_8
+                        )
+                    )
+                }
+
+            val status =
+                connection.responseCode
+
+            val stream =
+                if (status in 200..299) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
+                }
+
+            val body =
+                stream
+                    ?.bufferedReader()
+                    ?.use {
+                        it.readText()
+                    }
+                    ?: ""
+
+            val json =
+                JSONObject(
+                    body.ifBlank {
+                        "{}"
+                    }
+                )
+
+            if (status !in 200..299) {
+                throw IOException(
+                    json.optString(
+                        "message",
+                        "A IA não conseguiu gerar o fundo."
+                    )
+                )
+            }
+
+            val dataUri =
+                json.optString(
+                    "data_uri"
+                )
+
+            val base64 =
+                dataUri.substringAfter(
+                    "base64,",
+                    ""
+                )
+
+            if (base64.isBlank()) {
+                throw IOException(
+                    "A IA devolveu uma imagem inválida."
+                )
+            }
+
+            val bytes =
+                android.util.Base64.decode(
+                    base64,
+                    android.util.Base64.DEFAULT
+                )
+
+            if (bytes.isEmpty()) {
+                throw IOException(
+                    "A imagem gerada está vazia."
+                )
+            }
+
+            val file =
+                File.createTempFile(
+                    "toolnexa-ai-bg-",
+                    ".jpg",
+                    context.cacheDir
+                )
+
+            FileOutputStream(file)
+                .use {
+                    it.write(bytes)
+                }
+
+            return file
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     fun loadPlans():
         List<PlanInfo> {
         val connection =

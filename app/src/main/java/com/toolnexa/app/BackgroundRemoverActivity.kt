@@ -35,8 +35,11 @@ import android.widget.TextView
 import android.widget.Toast
 import com.google.firebase.auth.FirebaseAuth
 import java.io.File
+import java.io.IOException
 import java.util.Locale
-import kotlin.math.abs
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -68,6 +71,15 @@ class BackgroundRemoverActivity : Activity() {
     private var editorImage: ImageView? = null
     private var editorSurface: EditorSurface? = null
     private var root: LinearLayout? = null
+
+    private var aiBackgroundFile: File? = null
+    private var aiBackgroundPreview: Bitmap? = null
+
+    private val renderExecutor: ExecutorService =
+        Executors.newSingleThreadExecutor()
+
+    private var renderTask: Future<*>? = null
+    private var displayBitmap: Bitmap? = null
 
     private val blue by lazy { getColor(R.color.toolnexa_blue) }
     private val bg by lazy { getColor(R.color.toolnexa_bg) }
@@ -182,7 +194,10 @@ class BackgroundRemoverActivity : Activity() {
         }
 
         if (requestCode == REQUEST_BACKGROUND) {
-            loadBitmap(uri)?.let {
+            loadScaledBitmap(
+                uri,
+                EDITOR_PREVIEW_MAX
+            )?.let {
                 customBackground = fitBackground(
                     it,
                     editorCanvasSize()
@@ -252,7 +267,12 @@ class BackgroundRemoverActivity : Activity() {
         add(previewCard)
 
         Thread {
-            val bitmap = loadBitmap(uri)
+            val bitmap =
+                loadScaledBitmap(
+                    uri,
+                    EDITOR_PREVIEW_MAX
+                )
+
             runOnUiThread {
                 if (bitmap != null) {
                     imagePreview.setImageBitmap(bitmap)
@@ -313,7 +333,12 @@ class BackgroundRemoverActivity : Activity() {
 
                 Thread {
                     try {
-                        val source = loadBitmap(uri)
+                        val source =
+                            loadScaledBitmap(
+                                uri,
+                                EDITOR_PREVIEW_MAX
+                            )
+
                         val file =
                             CloudflareApi.removeBackground(
                                 this,
@@ -529,12 +554,28 @@ class BackgroundRemoverActivity : Activity() {
     }
 
     private fun resetEditor() {
+        renderTask?.cancel(true)
+
+        displayBitmap?.let {
+            if (!it.isRecycled) {
+                it.recycle()
+            }
+        }
+
+        displayBitmap = null
+
         editorForeground?.recycleIfSafe()
         baseForeground?.recycleIfSafe()
         customBackground?.recycleIfSafe()
+        aiBackgroundPreview?.recycleIfSafe()
+
         editorForeground = null
         baseForeground = null
         customBackground = null
+        aiBackgroundPreview = null
+
+        aiBackgroundFile?.delete()
+        aiBackgroundFile = null
     }
 
     private fun showEditor() {
@@ -553,6 +594,16 @@ class BackgroundRemoverActivity : Activity() {
             contentDescription =
                 "Prévia editável da imagem"
             setPadding(dp(4), dp(4), dp(4), dp(4))
+        }
+
+        editorSurface =
+            EditorSurface(this)
+
+        editorImage?.setOnTouchListener { view, event ->
+            editorSurface?.handleTouch(
+                view,
+                event
+            ) ?: false
         }
 
         previewCard.addView(
@@ -721,6 +772,29 @@ class BackgroundRemoverActivity : Activity() {
             outer.addView(line)
         }
 
+        val ai = smallChoiceButton(
+            "✨ Criar fundo fotográfico com IA"
+        )
+
+        ai.setOnClickListener {
+            showAiBackgroundDialog()
+        }
+
+        outer.addView(
+            ai,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(48)
+            ).apply {
+                setMargins(
+                    dp(3),
+                    dp(5),
+                    dp(3),
+                    dp(3)
+                )
+            }
+        )
+
         val own = smallChoiceButton(
             "Minha imagem"
         )
@@ -743,6 +817,230 @@ class BackgroundRemoverActivity : Activity() {
         )
 
         return outer
+    }
+
+    private fun showAiBackgroundDialog() {
+        val box =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.VERTICAL
+                setPadding(
+                    dp(20),
+                    dp(8),
+                    dp(20),
+                    dp(8)
+                )
+            }
+
+        box.addView(
+            bodyText(
+                "Descreva o cenário que quer colocar atrás " +
+                    "do recorte. A IA cria uma fotografia nova."
+            )
+        )
+
+        val input =
+            android.widget.EditText(this).apply {
+                hint =
+                    "Ex.: praia tropical ao pôr do sol"
+                minLines = 2
+                maxLines = 4
+                textSize = 15f
+            }
+
+        box.addView(input)
+
+        listOf(
+            "Praia tropical com palmeiras, luz dourada, fotografia realista",
+            "Estúdio branco minimalista, luz suave, fotografia comercial",
+            "Cidade moderna à noite, luzes cinematográficas, fotografia realista",
+            "Floresta tropical exuberante, luz natural, fotografia realista",
+            "Montanhas ao pôr do sol, atmosfera cinematográfica, fotografia realista"
+        ).forEach { preset ->
+            val choice =
+                smallChoiceButton(
+                    preset
+                )
+
+            choice.setOnClickListener {
+                input.setText(
+                    preset
+                )
+                input.setSelection(
+                    input.length()
+                )
+            }
+
+            box.addView(
+                choice,
+                LinearLayout.LayoutParams(
+                    -1,
+                    dp(42)
+                ).apply {
+                    setMargins(
+                        0,
+                        dp(3),
+                        0,
+                        dp(3)
+                    )
+                }
+            )
+        }
+
+        val dialog =
+            AlertDialog.Builder(this)
+                .setTitle(
+                    "Fundo fotográfico com IA"
+                )
+                .setView(box)
+                .setPositiveButton(
+                    "Gerar",
+                    null
+                )
+                .setNegativeButton(
+                    "Cancelar",
+                    null
+                )
+                .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(
+                AlertDialog.BUTTON_POSITIVE
+            ).setOnClickListener {
+                val prompt =
+                    input.text
+                        .toString()
+                        .trim()
+
+                if (prompt.isBlank()) {
+                    input.error =
+                        "Descreva o fundo."
+                    return@setOnClickListener
+                }
+
+                dialog.dismiss()
+                generateAiBackground(
+                    prompt
+                )
+            }
+        }
+
+        dialog.show()
+    }
+
+    private fun generateAiBackground(
+        prompt: String
+    ) {
+        val user =
+            auth.currentUser
+
+        if (user == null) {
+            toast(
+                "Inicie sessão para usar a IA."
+            )
+            return
+        }
+
+        val progress =
+            processingDialog()
+
+        user.getIdToken(false)
+            .addOnSuccessListener { tokenResult ->
+                val token =
+                    tokenResult.token
+
+                if (
+                    token.isNullOrBlank()
+                ) {
+                    progress.dismiss()
+                    toast(
+                        "A sessão não está disponível."
+                    )
+                    return@addOnSuccessListener
+                }
+
+                Thread {
+                    try {
+                        val file =
+                            CloudflareApi.generateAiBackground(
+                                this,
+                                prompt,
+                                token
+                            )
+
+                        val preview =
+                            loadScaledBitmap(
+                                file,
+                                EDITOR_PREVIEW_MAX
+                            ) ?: throw IOException(
+                                "O fundo gerado está vazio."
+                            )
+
+                        runOnUiThread {
+                            progress.dismiss()
+
+                            aiBackgroundFile?.delete()
+
+                            aiBackgroundFile =
+                                file
+
+                            aiBackgroundPreview =
+                                preview
+
+                            backgroundKey =
+                                "ai"
+
+                            renderEditor()
+
+                            analytics.event(
+                                "background_remover_ai_background_success"
+                            )
+
+                            toast(
+                                "Fundo fotográfico criado."
+                            )
+                        }
+                    } catch (error: Exception) {
+                        runOnUiThread {
+                            progress.dismiss()
+
+                            analytics.event(
+                                "background_remover_ai_background_failed",
+                                "error" to
+                                    error.javaClass
+                                        .simpleName
+                            )
+
+                            AlertDialog.Builder(this)
+                                .setTitle(
+                                    "Falha ao gerar fundo"
+                                )
+                                .setMessage(
+                                    error.message
+                                        ?: "Tente outra descrição."
+                                )
+                                .setPositiveButton(
+                                    "Tentar novamente"
+                                ) { _, _ ->
+                                    generateAiBackground(
+                                        prompt
+                                    )
+                                }
+                                .setNegativeButton(
+                                    "Fechar",
+                                    null
+                                )
+                                .show()
+                        }
+                    }
+                }.start()
+            }
+            .addOnFailureListener {
+                progress.dismiss()
+                toast(
+                    "Não foi possível validar a sessão."
+                )
+            }
     }
 
     private fun adjustmentPanel(): View {
@@ -1029,7 +1327,9 @@ class BackgroundRemoverActivity : Activity() {
         val foreground =
             editorForeground ?: return
 
-        val maxSide = 1600
+        val maxSide =
+            EDITOR_PREVIEW_MAX
+
         val previewScale =
             min(
                 1f,
@@ -1043,125 +1343,142 @@ class BackgroundRemoverActivity : Activity() {
         val width =
             max(
                 1,
-                (foreground.width * previewScale)
-                    .roundToInt()
+                (
+                    foreground.width *
+                        previewScale
+                    ).roundToInt()
             )
+
         val height =
             max(
                 1,
-                (foreground.height * previewScale)
-                    .roundToInt()
+                (
+                    foreground.height *
+                        previewScale
+                    ).roundToInt()
             )
 
-        Thread {
-            try {
-                val canvasBitmap =
-                    Bitmap.createBitmap(
+        renderTask?.cancel(true)
+
+        renderTask =
+            renderExecutor.submit {
+                try {
+                    val canvasBitmap =
+                        Bitmap.createBitmap(
+                            width,
+                            height,
+                            Bitmap.Config.ARGB_8888
+                        )
+
+                    val canvas =
+                        Canvas(canvasBitmap)
+
+                    drawEditorBackground(
+                        canvas,
                         width,
-                        height,
-                        Bitmap.Config.ARGB_8888
+                        height
                     )
 
-                val canvas =
-                    Canvas(canvasBitmap)
+                    val scaledWidth =
+                        max(
+                            1,
+                            (
+                                width *
+                                    scalePercent /
+                                    100f
+                                ).roundToInt()
+                        )
 
-                drawEditorBackground(
-                    canvas,
-                    width,
-                    height
-                )
+                    val scaledHeight =
+                        max(
+                            1,
+                            (
+                                height *
+                                    scalePercent /
+                                    100f
+                                ).roundToInt()
+                        )
 
-                val paint =
-                    foregroundPaint()
-
-                val scaledWidth =
-                    max(
-                        1,
+                    val left =
                         (
-                            width *
-                                scalePercent /
-                                100f
-                            ).roundToInt()
-                    )
-                val scaledHeight =
-                    max(
-                        1,
+                            width -
+                                scaledWidth
+                            ) / 2f
+
+                    val top =
                         (
-                            height *
-                                scalePercent /
-                                100f
-                            ).roundToInt()
-                    )
+                            height -
+                                scaledHeight
+                            ) / 2f +
+                                (
+                                    height *
+                                        verticalPercent /
+                                        100f
+                                    )
 
-                val left =
-                    (width - scaledWidth) / 2f
-                val top =
-                    (height - scaledHeight) /
-                        2f +
-                        (
-                            height *
-                                verticalPercent /
-                                100f
-                            )
-
-                canvas.drawBitmap(
-                    foreground,
-                    null,
-                    android.graphics.RectF(
-                        left,
-                        top,
-                        left + scaledWidth,
-                        top + scaledHeight
-                    ),
-                    paint
-                )
-
-                runOnUiThread {
-                    val old =
-                        editorImage?.drawable
-
-                    editorImage?.setImageBitmap(
-                        canvasBitmap
+                    canvas.drawBitmap(
+                        foreground,
+                        null,
+                        android.graphics.RectF(
+                            left,
+                            top,
+                            left +
+                                scaledWidth,
+                            top +
+                                scaledHeight
+                        ),
+                        foregroundPaint()
                     )
 
                     if (
-                        old is android.graphics.drawable.BitmapDrawable
+                        Thread.currentThread()
+                            .isInterrupted
                     ) {
-                        val oldBitmap =
-                            old.bitmap
+                        canvasBitmap.recycle()
+                        return@submit
+                    }
+
+                    runOnUiThread {
+                        val old =
+                            displayBitmap
+
+                        displayBitmap =
+                            canvasBitmap
+
+                        editorImage?.setImageBitmap(
+                            canvasBitmap
+                        )
 
                         if (
-                            oldBitmap !==
-                                canvasBitmap &&
-                            !oldBitmap.isRecycled
+                            old != null &&
+                            !old.isRecycled &&
+                            old !== canvasBitmap
                         ) {
-                            oldBitmap.recycle()
+                            old.recycle()
                         }
                     }
-                }
-            } catch (_: OutOfMemoryError) {
-                runOnUiThread {
-                    toast(
-                        "A prévia é grande demais para este dispositivo. " +
-                            "O arquivo original continua em alta qualidade."
-                    )
-                    analytics.event(
-                        "background_remover_preview_oom"
-                    )
-                }
-            } catch (error: Exception) {
-                runOnUiThread {
-                    toast(
-                        "Não foi possível atualizar a prévia."
-                    )
-                    analytics.event(
-                        "background_remover_preview_error",
-                        "error" to
-                            error.javaClass.simpleName
-                    )
+                } catch (_: OutOfMemoryError) {
+                    runOnUiThread {
+                        toast(
+                            "Prévia reduzida para proteger a memória."
+                        )
+                        analytics.event(
+                            "background_remover_preview_oom"
+                        )
+                    }
+                } catch (error: Exception) {
+                    runOnUiThread {
+                        toast(
+                            "Não foi possível atualizar a prévia."
+                        )
+                        analytics.event(
+                            "background_remover_preview_error",
+                            "error" to
+                                error.javaClass.simpleName
+                        )
+                    }
                 }
             }
-        }.start()
     }
 
     private fun drawEditorBackground(
@@ -1198,6 +1515,22 @@ class BackgroundRemoverActivity : Activity() {
 
         if (key == "custom") {
             customBackground?.let {
+                drawBackgroundBitmap(
+                    canvas,
+                    it,
+                    width,
+                    height,
+                    blurLevel
+                )
+            } ?: drawColor(
+                canvas,
+                Color.WHITE
+            )
+            return
+        }
+
+        if (key == "ai") {
+            aiBackgroundPreview?.let {
                 drawBackgroundBitmap(
                     canvas,
                     it,
@@ -2863,6 +3196,90 @@ class BackgroundRemoverActivity : Activity() {
         }
     }
 
+    private fun loadScaledBitmap(
+        uri: Uri,
+        maxDimension: Int
+    ): Bitmap? {
+        return try {
+            val bounds =
+                BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+
+            contentResolver.openInputStream(
+                uri
+            )?.use {
+                BitmapFactory.decodeStream(
+                    it,
+                    null,
+                    bounds
+                )
+            }
+
+            val options =
+                BitmapFactory.Options().apply {
+                    inSampleSize =
+                        computeSample(
+                            bounds.outWidth,
+                            bounds.outHeight,
+                            maxDimension
+                        )
+
+                    inPreferredConfig =
+                        Bitmap.Config.ARGB_8888
+                }
+
+            contentResolver.openInputStream(
+                uri
+            )?.use {
+                BitmapFactory.decodeStream(
+                    it,
+                    null,
+                    options
+                )
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun loadScaledBitmap(
+        file: File,
+        maxDimension: Int
+    ): Bitmap? {
+        return try {
+            val bounds =
+                BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+
+            BitmapFactory.decodeFile(
+                file.absolutePath,
+                bounds
+            )
+
+            val options =
+                BitmapFactory.Options().apply {
+                    inSampleSize =
+                        computeSample(
+                            bounds.outWidth,
+                            bounds.outHeight,
+                            maxDimension
+                        )
+
+                    inPreferredConfig =
+                        Bitmap.Config.ARGB_8888
+                }
+
+            BitmapFactory.decodeFile(
+                file.absolutePath,
+                options
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun computeSample(
         width: Int,
         height: Int,
@@ -3531,10 +3948,12 @@ class BackgroundRemoverActivity : Activity() {
             Paint(
                 Paint.ANTI_ALIAS_FLAG
             )
+
         private var lastX = 0f
         private var lastY = 0f
 
         fun handleTouch(
+            target: View,
             event: MotionEvent
         ): Boolean {
             if (
@@ -3547,10 +3966,13 @@ class BackgroundRemoverActivity : Activity() {
                 MotionEvent.ACTION_DOWN -> {
                     lastX = event.x
                     lastY = event.y
+
                     applyBrush(
+                        target,
                         event.x,
                         event.y
                     )
+
                     return true
                 }
 
@@ -3587,6 +4009,7 @@ class BackgroundRemoverActivity : Activity() {
                                 dx *
                                 i /
                                 steps
+
                         val y =
                             lastY +
                                 dy *
@@ -3594,6 +4017,7 @@ class BackgroundRemoverActivity : Activity() {
                                 steps
 
                         applyBrush(
+                            target,
                             x,
                             y
                         )
@@ -3615,6 +4039,7 @@ class BackgroundRemoverActivity : Activity() {
         }
 
         private fun applyBrush(
+            target: View,
             x: Float,
             y: Float
         ) {
@@ -3622,22 +4047,18 @@ class BackgroundRemoverActivity : Activity() {
                 editorForeground
                     ?: return
 
-            val preview =
-                editorImage
-                    ?: return
-
             val contentWidth =
                 (
-                    preview.width -
-                        preview.paddingLeft -
-                        preview.paddingRight
+                    target.width -
+                        target.paddingLeft -
+                        target.paddingRight
                     ).toFloat()
 
             val contentHeight =
                 (
-                    preview.height -
-                        preview.paddingTop -
-                        preview.paddingBottom
+                    target.height -
+                        target.paddingTop -
+                        target.paddingBottom
                     ).toFloat()
 
             if (
@@ -3661,30 +4082,27 @@ class BackgroundRemoverActivity : Activity() {
                 bitmap.height * scale
 
             val left =
-                preview.paddingLeft +
+                target.paddingLeft +
                     (
                         contentWidth -
                             drawWidth
                         ) / 2f
+
             val top =
-                preview.paddingTop +
+                target.paddingTop +
                     (
                         contentHeight -
                             drawHeight
                         ) / 2f
 
             val bx =
-                (
-                    x - left
-                    ) / scale
+                (x - left) / scale
             val by =
-                (
-                    y - top
-                    ) / scale
+                (y - top) / scale
 
             if (
-                bx < 0 ||
-                by < 0 ||
+                bx < 0f ||
+                by < 0f ||
                 bx >= bitmap.width ||
                 by >= bitmap.height
             ) {
@@ -3726,7 +4144,9 @@ class BackgroundRemoverActivity : Activity() {
 
                 canvas.save()
 
-                val path = Path()
+                val path =
+                    Path()
+
                 path.addCircle(
                     bx,
                     by,
@@ -3747,8 +4167,6 @@ class BackgroundRemoverActivity : Activity() {
 
                 canvas.restore()
             }
-
-            renderEditor()
         }
     }
 
@@ -3766,8 +4184,25 @@ class BackgroundRemoverActivity : Activity() {
         }
     }
 
+    override fun onDestroy() {
+        renderTask?.cancel(true)
+        renderExecutor.shutdownNow()
+
+        displayBitmap?.let {
+            if (!it.isRecycled) {
+                it.recycle()
+            }
+        }
+
+        aiBackgroundPreview?.recycleIfSafe()
+        aiBackgroundFile?.delete()
+
+        super.onDestroy()
+    }
+
     companion object {
         private const val REQUEST_PICK = 801
         private const val REQUEST_BACKGROUND = 802
+        private const val EDITOR_PREVIEW_MAX = 1280
     }
 }

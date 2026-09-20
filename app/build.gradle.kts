@@ -11,8 +11,8 @@ android {
         applicationId = "com.toolnexa.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "1.9.1"
+        versionCode = 14
+        versionName = "1.10.0"
     }
 
     buildFeatures {

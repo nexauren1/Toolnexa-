@@ -100,6 +100,24 @@ export default {
 
       if (
         url.pathname ===
+          "/api/tools/background-remover/ai-background" &&
+        request.method === "POST"
+      ) {
+        const user =
+          await requireFirebaseUser(
+            request,
+            env
+          );
+
+        return aiBackground(
+          request,
+          env,
+          user
+        );
+      }
+
+      if (
+        url.pathname ===
           "/api/paypal/create-subscription" &&
         request.method === "POST"
       ) {
@@ -328,6 +346,131 @@ async function backgroundRemover(
       ...corsHeaders()
     }
   });
+}
+
+async function aiBackground(
+  request,
+  env,
+  user
+) {
+  if (!env.AI) {
+    return json(
+      {
+        ok: false,
+        error: "ai_binding_missing",
+        message:
+          "O motor de IA do ToolNexa não está configurado."
+      },
+      503
+    );
+  }
+
+  let body = {};
+
+  try {
+    body =
+      await request.json();
+  } catch (_) {
+    return json(
+      {
+        ok: false,
+        error: "invalid_json",
+        message:
+          "Pedido de fundo com IA inválido."
+      },
+      400
+    );
+  }
+
+  const rawPrompt =
+    String(
+      body.prompt ||
+        ""
+    ).trim();
+
+  if (!rawPrompt) {
+    return json(
+      {
+        ok: false,
+        error: "prompt_required",
+        message:
+          "Descreva o fundo que deseja criar."
+      },
+      400
+    );
+  }
+
+  if (rawPrompt.length > 1200) {
+    return json(
+      {
+        ok: false,
+        error: "prompt_too_long",
+        message:
+          "A descrição do fundo é muito longa."
+      },
+      400
+    );
+  }
+
+  const prompt =
+    [
+      "Photorealistic professional background photograph.",
+      "Highly realistic lighting, depth and textures.",
+      "No people, no text, no logos, no watermark.",
+      "Keep the central area visually clean for a foreground subject.",
+      rawPrompt
+    ].join(" ");
+
+  try {
+    const result =
+      await env.AI.run(
+        "@cf/black-forest-labs/flux-1-schnell",
+        {
+          prompt,
+          steps: 6,
+          seed:
+            Math.floor(
+              Math.random() *
+                2147483647
+            )
+        }
+      );
+
+    if (
+      !result ||
+      !result.image
+    ) {
+      throw new Error(
+        "AI image missing."
+      );
+    }
+
+    return json({
+      ok: true,
+      data_uri:
+        "data:image/jpeg;base64," +
+        result.image,
+      prompt: rawPrompt
+    });
+  } catch (error) {
+    console.error(
+      "ToolNexa AI background error",
+      {
+        uid: user.uid,
+        error
+      }
+    );
+
+    return json(
+      {
+        ok: false,
+        error: "ai_background_failed",
+        message:
+          "A geração do fundo falhou. Tente novamente."
+      },
+      502
+    );
+  }
 }
 
 async function createSubscription(
