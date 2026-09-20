@@ -95,25 +95,25 @@ object CategoryCatalog {
                         "Image Compressor",
                         "Imagem",
                         "Reduza o tamanho com qualidade ajustável.",
-                        R.drawable.ic_tool_compress
+                        android.R.drawable.ic_menu_save
                     ),
                     ToolDefinition(
                         "Image Resizer",
                         "Imagem",
                         "Altere a largura mantendo a proporção.",
-                        R.drawable.ic_tool_resize
+                        android.R.drawable.ic_menu_crop
                     ),
                     ToolDefinition(
                         "Image Converter",
                         "Imagem",
                         "Converta para JPG, PNG ou WebP.",
-                        R.drawable.ic_tool_convert
+                        android.R.drawable.ic_menu_manage
                     ),
                     ToolDefinition(
                         "Background Remover",
                         "Imagem",
                         "Remova o fundo com IA e preserve transparência.",
-                        R.drawable.ic_tool_background
+                        android.R.drawable.ic_menu_delete
                     )
                 )
 
