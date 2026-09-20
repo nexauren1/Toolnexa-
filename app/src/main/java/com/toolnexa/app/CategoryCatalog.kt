@@ -17,22 +17,22 @@ object CategoryCatalog {
                 "Imagem",
                 "Compressão, tamanho e formatos",
                 android.R.drawable.ic_menu_gallery,
-                Color.parseColor("#2F6BFF"),
-                Color.parseColor("#EAF0FF")
+                Color.parseColor("#111827"),
+                Color.parseColor("#EEF1F5")
             ),
             CategoryDefinition(
                 "Vídeo",
                 "Ferramentas para ficheiros de vídeo",
                 android.R.drawable.ic_menu_slideshow,
-                Color.parseColor("#8B5CF6"),
-                Color.parseColor("#F0E9FF")
+                Color.parseColor("#DC2626"),
+                Color.parseColor("#FFECEC")
             ),
             CategoryDefinition(
                 "Produtividade",
                 "Tarefas, organização e trabalho",
                 android.R.drawable.ic_menu_agenda,
-                Color.parseColor("#0EA5A4"),
-                Color.parseColor("#E4FAF8")
+                Color.parseColor("#16A34A"),
+                Color.parseColor("#E8F8EC")
             ),
             CategoryDefinition(
                 "Código",
@@ -59,15 +59,15 @@ object CategoryCatalog {
                 "Marketplace",
                 "Conteúdo e preparação para vendas online",
                 android.R.drawable.ic_menu_share,
-                Color.parseColor("#EC4899"),
-                Color.parseColor("#FDE9F3")
+                Color.parseColor("#DC2626"),
+                Color.parseColor("#FFECEC")
             ),
             CategoryDefinition(
                 "Texto",
                 "Edição, limpeza e transformação de texto",
                 android.R.drawable.ic_menu_edit,
-                Color.parseColor("#EF4444"),
-                Color.parseColor("#FFE9E9")
+                Color.parseColor("#2563EB"),
+                Color.parseColor("#E8F0FF")
             ),
             CategoryDefinition(
                 "PDF",
@@ -80,8 +80,8 @@ object CategoryCatalog {
                 "Áudio",
                 "Ferramentas para ficheiros e áudio",
                 android.R.drawable.ic_menu_view,
-                Color.parseColor("#06B6D4"),
-                Color.parseColor("#E4F9FD")
+                Color.parseColor("#F59E0B"),
+                Color.parseColor("#FFF5DB")
             )
         )
 
