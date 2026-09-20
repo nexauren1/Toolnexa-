@@ -560,14 +560,6 @@ class BackgroundRemoverActivity : Activity() {
             LinearLayout.LayoutParams(-1, dp(390))
         )
 
-        editorSurface = EditorSurface(
-            this
-        )
-
-        editorImage?.setOnTouchListener { _, event ->
-            editorSurface?.handleTouch(event) ?: false
-        }
-
         add(previewCard)
 
         add(
@@ -1037,72 +1029,137 @@ class BackgroundRemoverActivity : Activity() {
         val foreground =
             editorForeground ?: return
 
-        val width = foreground.width
-        val height = foreground.height
+        val maxSide = 1600
+        val previewScale =
+            min(
+                1f,
+                maxSide.toFloat() /
+                    max(
+                        foreground.width,
+                        foreground.height
+                    )
+            )
+
+        val width =
+            max(
+                1,
+                (foreground.width * previewScale)
+                    .roundToInt()
+            )
+        val height =
+            max(
+                1,
+                (foreground.height * previewScale)
+                    .roundToInt()
+            )
 
         Thread {
-            val canvasBitmap =
-                Bitmap.createBitmap(
+            try {
+                val canvasBitmap =
+                    Bitmap.createBitmap(
+                        width,
+                        height,
+                        Bitmap.Config.ARGB_8888
+                    )
+
+                val canvas =
+                    Canvas(canvasBitmap)
+
+                drawEditorBackground(
+                    canvas,
                     width,
-                    height,
-                    Bitmap.Config.ARGB_8888
+                    height
                 )
 
-            val canvas = Canvas(canvasBitmap)
+                val paint =
+                    foregroundPaint()
 
-            drawEditorBackground(
-                canvas,
-                width,
-                height
-            )
+                val scaledWidth =
+                    max(
+                        1,
+                        (
+                            width *
+                                scalePercent /
+                                100f
+                            ).roundToInt()
+                    )
+                val scaledHeight =
+                    max(
+                        1,
+                        (
+                            height *
+                                scalePercent /
+                                100f
+                            ).roundToInt()
+                    )
 
-            val paint = foregroundPaint()
+                val left =
+                    (width - scaledWidth) / 2f
+                val top =
+                    (height - scaledHeight) /
+                        2f +
+                        (
+                            height *
+                                verticalPercent /
+                                100f
+                            )
 
-            val scaledWidth =
-                (width *
-                    scalePercent /
-                    100f
-                ).roundToInt()
-            val scaledHeight =
-                (height *
-                    scalePercent /
-                    100f
-                ).roundToInt()
-
-            val left =
-                (width - scaledWidth) / 2f
-            val top =
-                (height - scaledHeight) /
-                    2f +
-                    (height *
-                        verticalPercent /
-                        100f)
-
-            val sourceRect =
-                android.graphics.Rect(
-                    0,
-                    0,
-                    foreground.width,
-                    foreground.height
+                canvas.drawBitmap(
+                    foreground,
+                    null,
+                    android.graphics.RectF(
+                        left,
+                        top,
+                        left + scaledWidth,
+                        top + scaledHeight
+                    ),
+                    paint
                 )
 
-            val targetRect =
-                android.graphics.RectF(
-                    left,
-                    top,
-                    left + scaledWidth,
-                    top + scaledHeight
-                )
+                runOnUiThread {
+                    val old =
+                        editorImage?.drawable
 
-            canvas.drawBitmap(
-                foreground,
-                sourceRect,
-                targetRect,
-                paint
-            )
+                    editorImage?.setImageBitmap(
+                        canvasBitmap
+                    )
 
-            runOnUiThread {
-                editorImage?.setImageBitmap(canvasBitmap)
+                    if (
+                        old is android.graphics.drawable.BitmapDrawable
+                    ) {
+                        val oldBitmap =
+                            old.bitmap
+
+                        if (
+                            oldBitmap !==
+                                canvasBitmap &&
+                            !oldBitmap.isRecycled
+                        ) {
+                            oldBitmap.recycle()
+                        }
+                    }
+                }
+            } catch (_: OutOfMemoryError) {
+                runOnUiThread {
+                    toast(
+                        "A prévia é grande demais para este dispositivo. " +
+                            "O arquivo original continua em alta qualidade."
+                    )
+                    analytics.event(
+                        "background_remover_preview_oom"
+                    )
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    toast(
+                        "Não foi possível atualizar a prévia."
+                    )
+                    analytics.event(
+                        "background_remover_preview_error",
+                        "error" to
+                            error.javaClass.simpleName
+                    )
+                }
             }
         }.start()
     }
