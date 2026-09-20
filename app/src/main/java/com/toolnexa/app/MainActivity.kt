@@ -358,6 +358,65 @@ class MainActivity : ComponentActivity() {
     }
 
 
+    private fun addSectionCard(titleText: String, subtitle: String) {
+        val box = card()
+        box.setPadding(dp(16), dp(14), dp(16), dp(14))
+        box.addView(title(titleText, 18f))
+        box.addView(bodyText(subtitle))
+        content.addView(
+            box,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(dp(16), dp(8), dp(16), dp(8))
+            }
+        )
+    }
+
+    private fun addFeatureCard(
+        titleText: String,
+        description: String,
+        badge: String
+    ) {
+        val box = card()
+        box.setPadding(dp(16), dp(16), dp(16), dp(16))
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val texts = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        texts.addView(title(titleText, 17f))
+        texts.addView(bodyText(description))
+        row.addView(
+            texts,
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+        val badgeView = TextView(this).apply {
+            text = badge
+            textSize = 11f
+            setTextColor(blue)
+            setPadding(dp(9), dp(5), dp(9), dp(5))
+            background = roundedBackground(
+                android.graphics.Color.parseColor("#EAF0FF"),
+                10
+            )
+        }
+        row.addView(badgeView)
+        box.addView(row)
+        content.addView(
+            box,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(dp(16), dp(6), dp(16), dp(6))
+            }
+        )
+    }
+
     private fun showHome() {
         toolbarTitle.text = "Início"
         content.removeAllViews()
@@ -377,7 +436,26 @@ class MainActivity : ComponentActivity() {
         )
         content.addView(space(14))
 
+        addSectionCard(
+            "Imagem",
+            "Otimização, tamanho e conversão de imagens"
+        )
         addHomeToolsGrid()
+
+        addSectionCard(
+            "Em breve",
+            "Novas ferramentas para documentos e produtividade"
+        )
+        addFeatureCard(
+            "Conversor de imagens",
+            "JPG, PNG e WebP com preview e preservação de qualidade.",
+            "Planeado"
+        )
+        addFeatureCard(
+            "Histórico",
+            "Aceda rapidamente aos resultados guardados no Nexauren X.",
+            "Planeado"
+        )
 
         content.addView(space(18))
 
