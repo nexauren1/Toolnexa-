@@ -90,6 +90,7 @@ class LoginActivity : ComponentActivity() {
         savedInstanceState: Bundle?
     ) {
         super.onCreate(savedInstanceState)
+        LanguageManager.apply(this)
 
         window.statusBarColor = bg
         window.navigationBarColor = surface
