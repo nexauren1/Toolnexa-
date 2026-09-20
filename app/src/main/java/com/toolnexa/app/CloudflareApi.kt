@@ -449,8 +449,8 @@ object CloudflareApi {
 
             if (status !in 200..299) {
                 throw IOException(
-                    json.optString(
-                        "message",
+                    serverMessage(
+                        json,
                         "Não foi possível iniciar o PayPal Sandbox."
                     )
                 )
@@ -519,8 +519,8 @@ object CloudflareApi {
 
             if (status !in 200..299) {
                 throw IOException(
-                    root.optString(
-                        "message",
+                    serverMessage(
+                        root,
                         "Não foi possível verificar o plano."
                     )
                 )
@@ -576,6 +576,72 @@ object CloudflareApi {
             )
         } finally {
             connection.disconnect()
+        }
+    }
+
+    private fun serverMessage(
+        json: JSONObject,
+        fallback: String
+    ): String {
+        val message =
+            json.optString(
+                "message",
+                ""
+            ).trim()
+
+        if (message.isNotBlank()) {
+            return message
+        }
+
+        val details =
+            json.optJSONArray(
+                "details"
+            )
+
+        if (details != null) {
+            for (
+                index in
+                0 until details.length()
+            ) {
+                val item =
+                    details.optJSONObject(
+                        index
+                    ) ?: continue
+
+                val description =
+                    item.optString(
+                        "description",
+                        ""
+                    ).trim()
+
+                if (
+                    description.isNotBlank()
+                ) {
+                    return description
+                }
+
+                val issue =
+                    item.optString(
+                        "issue",
+                        ""
+                    ).trim()
+
+                if (
+                    issue.isNotBlank()
+                ) {
+                    return issue
+                }
+            }
+        }
+
+        val name =
+            json.optString(
+                "name",
+                ""
+            ).trim()
+
+        return name.ifBlank {
+            fallback
         }
     }
 
