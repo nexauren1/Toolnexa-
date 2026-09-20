@@ -1,13 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="toolnexa_blue">#2F6BFF</color>
-    <color name="toolnexa_blue_soft">#EAF0FF</color>
-    <color name="toolnexa_teal">#11A9A4</color>
+    <color name="toolnexa_blue">#2563EB</color>
+    <color name="toolnexa_blue_soft">#E8F0FF</color>
+
+    <color name="toolnexa_green">#16A34A</color>
+    <color name="toolnexa_green_soft">#E8F8EC</color>
+
+    <color name="toolnexa_red">#DC2626</color>
+    <color name="toolnexa_red_soft">#FFECEC</color>
+
+    <color name="toolnexa_yellow">#F59E0B</color>
+    <color name="toolnexa_yellow_soft">#FFF5DB</color>
+
+    <color name="toolnexa_black">#111827</color>
+    <color name="toolnexa_black_soft">#EEF1F5</color>
+
+    <color name="toolnexa_teal">#0F9D95</color>
     <color name="toolnexa_orange">#F28A38</color>
     <color name="toolnexa_purple">#7A55E8</color>
+
     <color name="toolnexa_bg">#F4F7FB</color>
     <color name="toolnexa_surface">#FFFFFF</color>
-    <color name="toolnexa_text">#152033</color>
-    <color name="toolnexa_muted">#6C7890</color>
-    <color name="toolnexa_border">#DDE5F0</color>
+    <color name="toolnexa_text">#111827</color>
+    <color name="toolnexa_muted">#667085</color>
+    <color name="toolnexa_border">#D9E1EC</color>
 </resources>
