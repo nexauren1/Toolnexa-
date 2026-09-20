@@ -52,6 +52,24 @@ export default {
       }
 
       if (
+        url.pathname ===
+          "/api/paypal/return" &&
+        request.method === "GET"
+      ) {
+        return paypalReturnPage(
+          url
+        );
+      }
+
+      if (
+        url.pathname ===
+          "/api/paypal/cancel" &&
+        request.method === "GET"
+      ) {
+        return paypalCancelPage();
+      }
+
+      if (
         url.pathname === "/api/account" &&
         request.method === "GET"
       ) {
@@ -1028,26 +1046,18 @@ async function createSubscription(
     );
   }
 
-  const paypalPlanId =
+  let paypalPlanId =
     String(
       plan.paypal_plan_id ||
       ""
     ).trim();
 
-  if (
-    !paypalPlanId
-  ) {
-    return json(
-      {
-        ok:
-          false,
-        error:
-          "paypal_plan_not_configured",
-        message:
-          "O Plan ID do PayPal Sandbox ainda não foi colocado no D1 para o plano Pro."
-      },
-      503
-    );
+  if (!paypalPlanId) {
+    paypalPlanId =
+      await ensurePayPalBillingPlan(
+        env,
+        plan
+      );
   }
 
   const accessToken =
@@ -1222,6 +1232,336 @@ async function createSubscription(
     billingInterval:
       plan.billing_interval
   });
+}
+
+async function paypalAccessToken(
+  clientId,
+  clientSecret
+) {
+  if (
+    !clientId ||
+    !clientSecret
+  ) {
+    const error =
+      new Error(
+        "As credenciais do PayPal não estão configuradas."
+      );
+    error.code =
+      "paypal_credentials_missing";
+    error.publicMessage =
+      "O PayPal Sandbox não está configurado no Worker.";
+    error.status = 503;
+    throw error;
+  }
+
+  const basic =
+    btoa(
+      clientId +
+      ":" +
+      clientSecret
+    );
+
+  const response =
+    await fetch(
+      PAYPAL_BASE +
+        "/v1/oauth2/token",
+      {
+        method:
+          "POST",
+        headers: {
+          authorization:
+            "Basic " +
+            basic,
+          "content-type":
+            "application/x-www-form-urlencoded",
+          accept:
+            "application/json"
+        },
+        body:
+          "grant_type=client_credentials"
+      }
+    );
+
+  const data =
+    await response
+      .json()
+      .catch(
+        () => ({})
+      );
+
+  if (
+    !response.ok ||
+    !data.access_token
+  ) {
+    const error =
+      new Error(
+        paypalFailureMessage(
+          data,
+          "Não foi possível autenticar no PayPal Sandbox."
+        )
+      );
+    error.code =
+      "paypal_authentication_failed";
+    error.publicMessage =
+      error.message;
+    error.status = 502;
+    error.paypalDebugId =
+      data?.debug_id ||
+      null;
+    throw error;
+  }
+
+  return data.access_token;
+}
+
+async function createPayPalProduct(
+  env,
+  accessToken,
+  plan
+) {
+  const response =
+    await fetch(
+      PAYPAL_BASE +
+        "/v1/catalogs/products",
+      {
+        method:
+          "POST",
+        headers: {
+          authorization:
+            "Bearer " +
+            accessToken,
+          "content-type":
+            "application/json",
+          accept:
+            "application/json",
+          "paypal-request-id":
+            "toolnexa-product-" +
+            plan.plan_id.toLowerCase() +
+            "-" +
+            crypto.randomUUID()
+        },
+        body:
+          JSON.stringify({
+            name:
+              "ToolNexa " +
+              plan.name,
+            description:
+              plan.description,
+            type:
+              "SERVICE",
+            category:
+              "SOFTWARE"
+          })
+      }
+    );
+
+  const data =
+    await response
+      .json()
+      .catch(
+        () => ({})
+      );
+
+  if (
+    !response.ok ||
+    !data.id
+  ) {
+    const error =
+      new Error(
+        paypalFailureMessage(
+          data,
+          "Não foi possível criar o produto do ToolNexa no PayPal."
+        )
+      );
+    error.code =
+      "paypal_product_creation_failed";
+    error.publicMessage =
+      error.message;
+    error.status = 502;
+    error.paypalDebugId =
+      data?.debug_id ||
+      null;
+    throw error;
+  }
+
+  return data.id;
+}
+
+async function createPayPalBillingPlan(
+  accessToken,
+  plan,
+  productId
+) {
+  const response =
+    await fetch(
+      PAYPAL_BASE +
+        "/v1/billing/plans",
+      {
+        method:
+          "POST",
+        headers: {
+          authorization:
+            "Bearer " +
+            accessToken,
+          "content-type":
+            "application/json",
+          accept:
+            "application/json",
+          "paypal-request-id":
+            "toolnexa-plan-" +
+            plan.plan_id.toLowerCase() +
+            "-" +
+            crypto.randomUUID()
+        },
+        body:
+          JSON.stringify({
+            product_id:
+              productId,
+            name:
+              "ToolNexa " +
+              plan.name +
+              " Monthly",
+            description:
+              plan.description,
+            status:
+              "ACTIVE",
+            billing_cycles: [
+              {
+                frequency: {
+                  interval_unit:
+                    "MONTH",
+                  interval_count:
+                    1
+                },
+                tenure_type:
+                  "REGULAR",
+                sequence:
+                  1,
+                total_cycles:
+                  0,
+                pricing_scheme: {
+                  fixed_price: {
+                    value:
+                      Number(
+                        plan.price_usd
+                      ).toFixed(2),
+                    currency_code:
+                      "USD"
+                  }
+                }
+              }
+            ],
+            payment_preferences: {
+              auto_bill_outstanding:
+                true,
+              payment_failure_threshold:
+                2
+            }
+          })
+      }
+    );
+
+  const data =
+    await response
+      .json()
+      .catch(
+        () => ({})
+      );
+
+  if (
+    !response.ok ||
+    !data.id
+  ) {
+    const error =
+      new Error(
+        paypalFailureMessage(
+          data,
+          "Não foi possível criar o plano Pro do ToolNexa no PayPal."
+        )
+      );
+    error.code =
+      "paypal_plan_creation_failed";
+    error.publicMessage =
+      error.message;
+    error.status = 502;
+    error.paypalDebugId =
+      data?.debug_id ||
+      null;
+    throw error;
+  }
+
+  return data.id;
+}
+
+async function ensurePayPalBillingPlan(
+  env,
+  plan
+) {
+  const savedPlanId =
+    String(
+      plan.paypal_plan_id ||
+      ""
+    ).trim();
+
+  if (
+    savedPlanId
+  ) {
+    return savedPlanId;
+  }
+
+  const accessToken =
+    await paypalAccessToken(
+      env.PAYPAL_CLIENT_ID,
+      env.PAYPAL_CLIENT_SECRET
+    );
+
+  let productId =
+    String(
+      plan.paypal_product_id ||
+      ""
+    ).trim();
+
+  if (!productId) {
+    productId =
+      await createPayPalProduct(
+        env,
+        accessToken,
+        plan
+      );
+
+    await env.DB.prepare(
+      "UPDATE plans SET " +
+      "paypal_product_id = ?, updated_at = ? " +
+      "WHERE plan_id = ?"
+    )
+      .bind(
+        productId,
+        nowSeconds(),
+        plan.plan_id
+      )
+      .run();
+  }
+
+  const paypalPlanId =
+    await createPayPalBillingPlan(
+      accessToken,
+      plan,
+      productId
+    );
+
+  await env.DB.prepare(
+    "UPDATE plans SET " +
+    "paypal_plan_id = ?, updated_at = ? " +
+    "WHERE plan_id = ?"
+  )
+    .bind(
+      paypalPlanId,
+      nowSeconds(),
+      plan.plan_id
+    )
+    .run();
+
+  return paypalPlanId;
 }
 
 async function getPayPalSubscription(
