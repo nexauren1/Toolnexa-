@@ -2,7 +2,7 @@
 <resources>
     <style name="Theme.ToolNexa" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">@color/toolnexa_blue</item>
+        <item name="android:colorAccent">@color/toolnexa_purple</item>
         <item name="android:textColorPrimary">@color/toolnexa_text</item>
         <item name="android:textColorSecondary">@color/toolnexa_muted</item>
         <item name="android:navigationBarColor">@color/toolnexa_surface</item>

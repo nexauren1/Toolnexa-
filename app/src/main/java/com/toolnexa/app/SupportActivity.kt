@@ -138,9 +138,17 @@ class SupportActivity : Activity() {
                     ArrayAdapter(
                         this@SupportActivity,
                         android.R.layout.simple_spinner_dropdown_item,
-                        resources.getStringArray(
-                            R.array.support_types
-                        )
+                        resources
+                            .getStringArray(
+                                R.array.support_types
+                            )
+                            .map {
+                                I18n.t(
+                                    this@SupportActivity,
+                                    it
+                                )
+                            }
+                            .toTypedArray()
                     )
             }
 
@@ -165,9 +173,17 @@ class SupportActivity : Activity() {
                     ArrayAdapter(
                         this@SupportActivity,
                         android.R.layout.simple_spinner_dropdown_item,
-                        resources.getStringArray(
-                            R.array.support_tools
-                        )
+                        resources
+                            .getStringArray(
+                                R.array.support_tools
+                            )
+                            .map {
+                                I18n.t(
+                                    this@SupportActivity,
+                                    it
+                                )
+                            }
+                            .toTypedArray()
                     )
             }
 
@@ -192,9 +208,17 @@ class SupportActivity : Activity() {
                     ArrayAdapter(
                         this@SupportActivity,
                         android.R.layout.simple_spinner_dropdown_item,
-                        resources.getStringArray(
-                            R.array.support_problems
-                        )
+                        resources
+                            .getStringArray(
+                                R.array.support_problems
+                            )
+                            .map {
+                                I18n.t(
+                                    this@SupportActivity,
+                                    it
+                                )
+                            }
+                            .toTypedArray()
                     )
             }
 

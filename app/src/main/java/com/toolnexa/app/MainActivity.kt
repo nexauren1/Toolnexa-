@@ -268,7 +268,9 @@ class MainActivity : ComponentActivity() {
             R.color.toolnexa_green,
             R.color.toolnexa_blue,
             R.color.toolnexa_red,
-            R.color.toolnexa_yellow
+            R.color.toolnexa_yellow,
+            R.color.toolnexa_black,
+            R.color.toolnexa_neon
         ).forEach { colorRes ->
             brandRail.addView(
                 View(this).apply {
@@ -527,7 +529,7 @@ class MainActivity : ComponentActivity() {
             )
             background = GradientDrawable().apply {
                 setColor(
-                    Color.parseColor("#EAF0FF")
+                    getColor(R.color.toolnexa_blue_soft)
                 )
                 cornerRadius =
                     dp(10).toFloat()

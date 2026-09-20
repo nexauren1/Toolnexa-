@@ -1052,7 +1052,21 @@ object I18n {
             ?.get(language)
             ?.let { return it }
 
-        return dynamic(
+        ToolNexaTranslation.exact[value]
+            ?.get(language)
+            ?.let { return it }
+
+        val dynamicValue =
+            dynamic(
+                value,
+                language
+            )
+
+        if (dynamicValue != value) {
+            return dynamicValue
+        }
+
+        return ToolNexaTranslation.words(
             value,
             language
         )
@@ -1076,6 +1090,12 @@ object I18n {
                 context,
                 decor
             )
+            decor.post {
+                localizeViewTree(
+                    context,
+                    decor
+                )
+            }
         }
     }
 

@@ -63,10 +63,32 @@ class BackgroundRemoverActivity : Activity() {
     private var saturation = 0
     private var opacity = 100
     private var scalePercent = 100
+    private var horizontalPercent = 0
     private var verticalPercent = 0
+    private var rotationDegrees = 0
     private var blurLevel = 0
     private var brushMode = BrushMode.ERASE
     private var brushSize = 70
+
+    private data class BrushPoint(
+        val x: Float,
+        val y: Float
+    )
+
+    private data class BrushStroke(
+        val mode: BrushMode,
+        val size: Int,
+        val points: MutableList<BrushPoint> =
+            mutableListOf()
+    )
+
+    private val undoStrokes =
+        mutableListOf<BrushStroke>()
+
+    private val redoStrokes =
+        mutableListOf<BrushStroke>()
+
+    private var currentStroke: BrushStroke? = null
 
     private var editorImage: ImageView? = null
     private var editorSurface: EditorSurface? = null
@@ -631,10 +653,15 @@ class BackgroundRemoverActivity : Activity() {
         saturation = 0
         opacity = 100
         scalePercent = 100
+        horizontalPercent = 0
         verticalPercent = 0
+        rotationDegrees = 0
         blurLevel = 0
         brushMode = BrushMode.ERASE
         brushSize = 70
+        undoStrokes.clear()
+        redoStrokes.clear()
+        currentStroke = null
     }
 
     private fun resetEditor() {
@@ -723,6 +750,7 @@ class BackgroundRemoverActivity : Activity() {
             )
         )
         add(refinePanel())
+        add(editorHistoryPanel())
 
         add(
             sectionTitle(
@@ -1186,6 +1214,17 @@ class BackgroundRemoverActivity : Activity() {
             renderEditor()
         }
 
+        addSeekRow(
+            panel,
+            "Desfoque do fundo",
+            0,
+            12,
+            blurLevel
+        ) {
+            blurLevel = it
+            renderEditor()
+        }
+
         val filters = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
         }
@@ -1300,6 +1339,17 @@ class BackgroundRemoverActivity : Activity() {
 
         addSeekRow(
             panel,
+            "Posição horizontal",
+            -30,
+            30,
+            horizontalPercent
+        ) {
+            horizontalPercent = it
+            renderEditor()
+        }
+
+        addSeekRow(
+            panel,
             "Posição vertical",
             -30,
             30,
@@ -1309,7 +1359,175 @@ class BackgroundRemoverActivity : Activity() {
             renderEditor()
         }
 
+        addSeekRow(
+            panel,
+            "Rotação",
+            -180,
+            180,
+            rotationDegrees
+        ) {
+            rotationDegrees = it
+            renderEditor()
+        }
+
         return panel
+    }
+
+    private fun editorHistoryPanel(): View {
+        val panel = card()
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+
+        fun action(
+            label: String,
+            enabled: Boolean,
+            onClick: () -> Unit
+        ): Button =
+            smallChoiceButton(label).apply {
+                isEnabled = enabled
+                alpha = if (enabled) 1f else 0.45f
+                setOnClickListener {
+                    if (enabled) {
+                        onClick()
+                    }
+                }
+            }
+
+        row.addView(
+            action(
+                "↶ Desfazer",
+                undoStrokes.isNotEmpty()
+            ) {
+                undoLastStroke()
+            },
+            LinearLayout.LayoutParams(
+                0,
+                dp(46),
+                1f
+            ).apply {
+                setMargins(
+                    0,
+                    0,
+                    dp(4),
+                    0
+                )
+            }
+        )
+
+        row.addView(
+            action(
+                "↷ Refazer",
+                redoStrokes.isNotEmpty()
+            ) {
+                redoLastStroke()
+            },
+            LinearLayout.LayoutParams(
+                0,
+                dp(46),
+                1f
+            ).apply {
+                setMargins(
+                    dp(4),
+                    0,
+                    dp(4),
+                    0
+                )
+            }
+        )
+
+        row.addView(
+            action(
+                "↺ Reiniciar edição",
+                true
+            ) {
+                resetEditorValues()
+                renderEditor()
+                showEditor()
+            },
+            LinearLayout.LayoutParams(
+                0,
+                dp(46),
+                1f
+            ).apply {
+                setMargins(
+                    dp(4),
+                    0,
+                    0,
+                    0
+                )
+            }
+        )
+
+        panel.addView(row)
+        panel.addView(
+            bodyText(
+                "Use Desfazer e Refazer para corrigir pinceladas sem perder o recorte."
+            )
+        )
+
+        return panel
+    }
+
+    private fun undoLastStroke() {
+        if (undoStrokes.isEmpty()) return
+        val stroke =
+            undoStrokes.removeAt(
+                undoStrokes.lastIndex
+            )
+        redoStrokes.add(stroke)
+        rebuildForegroundFromStrokes()
+        analytics.event(
+            "background_remover_editor_undo"
+        )
+    }
+
+    private fun redoLastStroke() {
+        if (redoStrokes.isEmpty()) return
+        val stroke =
+            redoStrokes.removeAt(
+                redoStrokes.lastIndex
+            )
+        undoStrokes.add(stroke)
+        rebuildForegroundFromStrokes()
+        analytics.event(
+            "background_remover_editor_redo"
+        )
+    }
+
+    private fun rebuildForegroundFromStrokes() {
+        val base =
+            baseForeground ?: return
+
+        val rebuilt =
+            try {
+                base.copy(
+                    Bitmap.Config.ARGB_8888,
+                    true
+                )
+            } catch (_: OutOfMemoryError) {
+                toast(
+                    "Memória insuficiente para reconstruir o recorte."
+                )
+                return
+            }
+
+        for (stroke in undoStrokes) {
+            for (point in stroke.points) {
+                applyBrushToBitmap(
+                    rebuilt,
+                    point.x,
+                    point.y,
+                    stroke.mode,
+                    stroke.size
+                )
+            }
+        }
+
+        editorForeground?.recycleIfSafe()
+        editorForeground = rebuilt
+        renderEditor()
     }
 
     private fun addSeekRow(
@@ -1499,7 +1717,12 @@ class BackgroundRemoverActivity : Activity() {
                         (
                             width -
                                 scaledWidth
-                            ) / 2f
+                            ) / 2f +
+                            (
+                                width *
+                                    horizontalPercent /
+                                    100f
+                            )
 
                     val top =
                         (
@@ -1512,6 +1735,12 @@ class BackgroundRemoverActivity : Activity() {
                                         100f
                                     )
 
+                    canvas.save()
+                    canvas.rotate(
+                        rotationDegrees.toFloat(),
+                        width / 2f,
+                        height / 2f
+                    )
                     canvas.drawBitmap(
                         foreground,
                         null,
@@ -1525,6 +1754,7 @@ class BackgroundRemoverActivity : Activity() {
                         ),
                         foregroundPaint()
                     )
+                    canvas.restore()
 
                     if (
                         Thread.currentThread()
@@ -3215,14 +3445,27 @@ class BackgroundRemoverActivity : Activity() {
             ).roundToInt()
 
         val left =
-            (width - scaledWidth) / 2f
+            (width - scaledWidth) / 2f +
+                (
+                    width *
+                        horizontalPercent /
+                        100f
+                )
         val top =
             (height - scaledHeight) /
                 2f +
-                (height *
-                    verticalPercent /
-                    100f)
+                (
+                    height *
+                        verticalPercent /
+                        100f
+                )
 
+        canvas.save()
+        canvas.rotate(
+            rotationDegrees.toFloat(),
+            width / 2f,
+            height / 2f
+        )
         canvas.drawBitmap(
             foreground,
             android.graphics.Rect(
@@ -3239,6 +3482,7 @@ class BackgroundRemoverActivity : Activity() {
             ),
             foregroundPaint()
         )
+        canvas.restore()
 
         foreground.recycleIfSafe()
         return output
@@ -4064,6 +4308,12 @@ class BackgroundRemoverActivity : Activity() {
                     lastX = event.x
                     lastY = event.y
 
+                    currentStroke =
+                        BrushStroke(
+                            brushMode,
+                            brushSize
+                        )
+
                     applyBrush(
                         target,
                         event.x,
@@ -4125,8 +4375,20 @@ class BackgroundRemoverActivity : Activity() {
                     return true
                 }
 
-                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_UP -> {
+                    currentStroke?.let {
+                        if (it.points.isNotEmpty()) {
+                            undoStrokes.add(it)
+                            redoStrokes.clear()
+                        }
+                    }
+                    currentStroke = null
+                    renderEditor()
+                    return true
+                }
+
                 MotionEvent.ACTION_CANCEL -> {
+                    currentStroke = null
                     renderEditor()
                     return true
                 }
@@ -4144,28 +4406,58 @@ class BackgroundRemoverActivity : Activity() {
                 editorForeground
                     ?: return
 
+            val mapped =
+                mapTouchToBitmap(
+                    target,
+                    x,
+                    y,
+                    bitmap
+                ) ?: return
+
+            currentStroke?.points?.add(
+                BrushPoint(
+                    mapped.first,
+                    mapped.second
+                )
+            )
+
+            applyBrushToBitmap(
+                bitmap,
+                mapped.first,
+                mapped.second,
+                brushMode,
+                brushSize
+            )
+        }
+
+        private fun mapTouchToBitmap(
+            target: View,
+            x: Float,
+            y: Float,
+            bitmap: Bitmap
+        ): Pair<Float, Float>? {
             val contentWidth =
                 (
                     target.width -
                         target.paddingLeft -
                         target.paddingRight
-                    ).toFloat()
+                ).toFloat()
 
             val contentHeight =
                 (
                     target.height -
                         target.paddingTop -
                         target.paddingBottom
-                    ).toFloat()
+                ).toFloat()
 
             if (
                 contentWidth <= 0f ||
                 contentHeight <= 0f
             ) {
-                return
+                return null
             }
 
-            val scale =
+            val displayScale =
                 min(
                     contentWidth /
                         bitmap.width,
@@ -4173,29 +4465,99 @@ class BackgroundRemoverActivity : Activity() {
                         bitmap.height
                 )
 
-            val drawWidth =
-                bitmap.width * scale
-            val drawHeight =
-                bitmap.height * scale
+            if (displayScale <= 0f) {
+                return null
+            }
 
-            val left =
+            val displayWidth =
+                bitmap.width *
+                    displayScale
+            val displayHeight =
+                bitmap.height *
+                    displayScale
+
+            val viewLeft =
                 target.paddingLeft +
                     (
                         contentWidth -
-                            drawWidth
-                        ) / 2f
+                            displayWidth
+                    ) / 2f
 
-            val top =
+            val viewTop =
                 target.paddingTop +
                     (
                         contentHeight -
-                            drawHeight
-                        ) / 2f
+                            displayHeight
+                    ) / 2f
+
+            var canvasX =
+                (x - viewLeft) /
+                    displayScale
+
+            var canvasY =
+                (y - viewTop) /
+                    displayScale
+
+            if (
+                canvasX < -1f ||
+                canvasY < -1f ||
+                canvasX > bitmap.width + 1f ||
+                canvasY > bitmap.height + 1f
+            ) {
+                return null
+            }
+
+            val editorScale =
+                scalePercent / 100f
+
+            if (editorScale <= 0f) {
+                return null
+            }
+
+            val centerX =
+                bitmap.width / 2f
+            val centerY =
+                bitmap.height / 2f
+
+            val offsetX =
+                bitmap.width *
+                    horizontalPercent /
+                    100f
+            val offsetY =
+                bitmap.height *
+                    verticalPercent /
+                    100f
+
+            canvasX -= centerX + offsetX
+            canvasY -= centerY + offsetY
+
+            val angle =
+                Math.toRadians(
+                    (-rotationDegrees).toDouble()
+                )
+
+            val cos =
+                kotlin.math.cos(angle)
+                    .toFloat()
+            val sin =
+                kotlin.math.sin(angle)
+                    .toFloat()
+
+            val rotatedX =
+                canvasX * cos -
+                    canvasY * sin
+            val rotatedY =
+                canvasX * sin +
+                    canvasY * cos
 
             val bx =
-                (x - left) / scale
+                rotatedX /
+                    editorScale +
+                    centerX
             val by =
-                (y - top) / scale
+                rotatedY /
+                    editorScale +
+                    centerY
 
             if (
                 bx < 0f ||
@@ -4203,69 +4565,110 @@ class BackgroundRemoverActivity : Activity() {
                 bx >= bitmap.width ||
                 by >= bitmap.height
             ) {
-                return
+                return null
             }
+
+            return bx to by
+        }
+    }
+
+    private fun applyBrushToBitmap(
+        bitmap: Bitmap,
+        x: Float,
+        y: Float,
+        mode: BrushMode,
+        size: Int
+    ) {
+        val scale =
+            min(
+                max(
+                    0.01f,
+                    bitmap.width.toFloat() /
+                        max(
+                            1,
+                            editorImage?.width ?: bitmap.width
+                        )
+                ),
+                max(
+                    0.01f,
+                    bitmap.height.toFloat() /
+                        max(
+                            1,
+                            editorImage?.height ?: bitmap.height
+                        )
+                )
+            )
+
+        val radius =
+            max(
+                1f,
+                size /
+                    (2f * max(0.01f, scale)) *
+                    (
+                        100f /
+                            max(
+                                1,
+                                scalePercent
+                            )
+                    )
+            )
+
+        val paint =
+            Paint(
+                Paint.ANTI_ALIAS_FLAG
+            )
+
+        if (
+            mode ==
+            BrushMode.ERASE
+        ) {
+            paint.xfermode =
+                android.graphics
+                    .PorterDuffXfermode(
+                        android.graphics
+                            .PorterDuff
+                            .Mode.CLEAR
+                    )
+
+            Canvas(bitmap).drawCircle(
+                x,
+                y,
+                radius,
+                paint
+            )
+            paint.xfermode = null
+        } else {
+            val original =
+                baseForeground
+                    ?: return
 
             val canvas =
                 Canvas(bitmap)
 
-            val radius =
-                brushSize /
-                    scale /
-                    2f
+            canvas.save()
 
-            if (
-                brushMode ==
-                BrushMode.ERASE
-            ) {
-                brushPaint.xfermode =
-                    android.graphics
-                        .PorterDuffXfermode(
-                            android.graphics
-                                .PorterDuff
-                                .Mode.CLEAR
-                        )
+            val path =
+                Path()
 
-                canvas.drawCircle(
-                    bx,
-                    by,
-                    radius,
-                    brushPaint
-                )
+            path.addCircle(
+                x,
+                y,
+                radius,
+                Path.Direction.CW
+            )
 
-                brushPaint.xfermode = null
-            } else {
-                val original =
-                    baseForeground
-                        ?: return
-
-                canvas.save()
-
-                val path =
-                    Path()
-
-                path.addCircle(
-                    bx,
-                    by,
-                    radius,
-                    Path.Direction.CW
-                )
-
-                canvas.clipPath(
-                    path
-                )
-
-                canvas.drawBitmap(
-                    original,
-                    0f,
-                    0f,
-                    null
-                )
-
-                canvas.restore()
-            }
+            canvas.clipPath(path)
+            canvas.drawBitmap(
+                original,
+                0f,
+                0f,
+                null
+            )
+            canvas.restore()
         }
     }
+
+    private enum class ExportFormat    }
 
     private enum class ExportFormat {
         PNG,

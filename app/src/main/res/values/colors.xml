@@ -12,7 +12,7 @@
     <color name="toolnexa_yellow">#FFB84D</color>
     <color name="toolnexa_yellow_soft">#FFF6E6</color>
 
-    <color name="toolnexa_black">#172033</color>
+    <color name="toolnexa_black">#101828</color>
     <color name="toolnexa_black_soft">#EEF1F5</color>
 
     <color name="toolnexa_teal">#0D9488</color>
@@ -20,6 +20,8 @@
     <color name="toolnexa_purple">#7C3AED</color>
     <color name="toolnexa_cyan">#06B6D4</color>
     <color name="toolnexa_pink">#EC4899</color>
+    <color name="toolnexa_neon">#B7FF2A</color>
+    <color name="toolnexa_black">#101828</color>
 
     <color name="toolnexa_bg">#F5F8FF</color>
     <color name="toolnexa_surface">#FFFFFF</color>
