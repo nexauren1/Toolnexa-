@@ -63,7 +63,8 @@ jobs:
               storeFile = file("signing/toolnexa-upload.p12")
               storePassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
               keyAlias = System.getenv("TOOLNEXA_KEY_ALIAS")
-              keyPassword = System.getenv("TOOLNEXA_KEY_PASSWORD")
+              // The upload keystore uses the store password for its key.
+              keyPassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
           }
 
           android.buildTypes.getByName("release").signingConfig =
