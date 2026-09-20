@@ -1046,10 +1046,7 @@ class LoginActivity : ComponentActivity() {
                 toast(
                     "Login por telefone efetuado com sucesso."
                 )
-                setResult(
-                    RESULT_OK
-                )
-                finish()
+                openMain()
             } else {
                 analytics.event(
                     "auth_phone_code_failed",
