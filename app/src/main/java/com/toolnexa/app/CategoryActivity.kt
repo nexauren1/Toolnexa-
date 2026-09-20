@@ -477,11 +477,52 @@ class CategoryActivity : Activity() {
                 return
             }
 
-            filtered.forEach { tool ->
-                addToolCard(
-                    toolsContainer,
+            for (index in filtered.indices step 2) {
+                val row =
+                    LinearLayout(this).apply {
+                        orientation =
+                            LinearLayout.HORIZONTAL
+                    }
+
+                addToolGridCard(
+                    row,
                     definition,
-                    tool
+                    filtered[index]
+                )
+
+                if (
+                    index + 1 <
+                        filtered.size
+                ) {
+                    addToolGridCard(
+                        row,
+                        definition,
+                        filtered[index + 1]
+                    )
+                } else {
+                    row.addView(
+                        Space(this),
+                        LinearLayout.LayoutParams(
+                            0,
+                            dp(166),
+                            1f
+                        ).apply {
+                            setMargins(
+                                dp(6),
+                                dp(6),
+                                dp(6),
+                                dp(6)
+                            )
+                        }
+                    )
+                }
+
+                toolsContainer.addView(
+                    row,
+                    LinearLayout.LayoutParams(
+                        -1,
+                        dp(166)
+                    )
                 )
             }
         }
@@ -521,23 +562,23 @@ class CategoryActivity : Activity() {
         renderTools("")
     }
 
-        private fun addToolCard(
-        body: LinearLayout,
+        private fun addToolGridCard(
+        row: LinearLayout,
         definition: CategoryDefinition,
         tool: ToolDefinition
     ) {
-        val card =
+        val item =
             LinearLayout(this).apply {
                 orientation =
-                    LinearLayout.HORIZONTAL
-                gravity =
-                    Gravity.CENTER_VERTICAL
+                    LinearLayout.VERTICAL
+
                 setPadding(
-                    dp(15),
                     dp(14),
+                    dp(13),
                     dp(12),
-                    dp(14)
+                    dp(12)
                 )
+
                 background =
                     GradientDrawable().apply {
                         setColor(
@@ -554,9 +595,18 @@ class CategoryActivity : Activity() {
                         cornerRadius =
                             dp(18).toFloat()
                     }
+
                 alpha = 0f
                 translationY =
                     dp(8).toFloat()
+            }
+
+        val top =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.HORIZONTAL
+                gravity =
+                    Gravity.CENTER_VERTICAL
             }
 
         val iconBox =
@@ -568,7 +618,7 @@ class CategoryActivity : Activity() {
                             definition.softColor
                         )
                         cornerRadius =
-                            dp(14).toFloat()
+                            dp(13).toFloat()
                     }
             }
 
@@ -584,91 +634,99 @@ class CategoryActivity : Activity() {
                     tool.name
             },
             LinearLayout.LayoutParams(
-                dp(38),
-                dp(38)
+                dp(34),
+                dp(34)
             )
         )
 
-        card.addView(
+        top.addView(
             iconBox,
             LinearLayout.LayoutParams(
-                dp(54),
-                dp(54)
+                dp(48),
+                dp(48)
             )
         )
 
-        val texts =
-            LinearLayout(this).apply {
-                orientation =
-                    LinearLayout.VERTICAL
-                setPadding(
-                    dp(12),
-                    0,
-                    dp(8),
-                    0
-                )
-            }
+        top.addView(
+            Space(this),
+            LinearLayout.LayoutParams(
+                0,
+                1,
+                1f
+            )
+        )
 
-        texts.addView(
+        top.addView(
+            TextView(this).apply {
+                text = "›"
+                textSize = 26f
+                setTextColor(
+                    definition.accent
+                )
+                gravity = Gravity.CENTER
+            },
+            LinearLayout.LayoutParams(
+                dp(22),
+                dp(42)
+            )
+        )
+
+        item.addView(
+            top,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(48)
+            )
+        )
+
+        item.addView(
             TextView(this).apply {
                 text = tool.name
-                textSize = 17f
+                textSize = 15.5f
                 typeface =
-                    android.graphics.Typeface.DEFAULT_BOLD
+                    android.graphics.Typeface
+                        .DEFAULT_BOLD
                 setTextColor(
                     getColor(
                         R.color.toolnexa_text
                     )
                 )
+                maxLines = 2
+                setPadding(
+                    0,
+                    dp(8),
+                    0,
+                    dp(2)
+                )
             }
         )
 
-        texts.addView(
+        item.addView(
             TextView(this).apply {
-                text =
-                    tool.description
-                textSize = 13f
+                text = tool.description
+                textSize = 12f
                 setTextColor(
                     getColor(
                         R.color.toolnexa_muted
                     )
                 )
-                setPadding(
-                    0,
-                    dp(4),
-                    0,
-                    0
-                )
+                maxLines = 2
             }
         )
 
-        card.addView(
-            texts,
-            LinearLayout.LayoutParams(
-                0,
-                -2,
-                1f
-            )
-        )
-
-        card.addView(
-            TextView(this).apply {
-                text = "›"
-                textSize = 29f
-                setTextColor(
-                    definition.accent
-                )
-            }
-        )
-
-        card.setOnClickListener {
+        item.setOnClickListener {
             analytics.event(
                 "category_tool_open",
-                "category" to definition.name,
-                "tool_name" to tool.name
+                "category" to
+                    definition.name,
+                "tool_name" to
+                    tool.name
             )
 
-            if (tool.name == "Background Remover") {
+            if (
+                tool.name ==
+                    "Background Remover"
+            ) {
                 startActivity(
                     Intent(
                         this,
@@ -686,8 +744,10 @@ class CategoryActivity : Activity() {
                             when (tool.name) {
                                 "Image Compressor" ->
                                     "compressor"
+
                                 "Image Resizer" ->
                                     "resizer"
+
                                 else ->
                                     "converter"
                             }
@@ -697,22 +757,23 @@ class CategoryActivity : Activity() {
             }
         }
 
-        body.addView(
-            card,
+        row.addView(
+            item,
             LinearLayout.LayoutParams(
-                -1,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                0,
+                dp(166),
+                1f
             ).apply {
                 setMargins(
-                    0,
-                    dp(10),
-                    0,
-                    0
+                    dp(6),
+                    dp(6),
+                    dp(6),
+                    dp(6)
                 )
             }
         )
 
-        card.animate()
+        item.animate()
             .alpha(1f)
             .translationY(0f)
             .setDuration(240)
