@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
@@ -61,6 +62,40 @@ class StorageActivity : Activity() {
         )
 
         root.addView(header)
+
+        val brandRail =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.HORIZONTAL
+            }
+
+        listOf(
+            R.color.toolnexa_green,
+            R.color.toolnexa_blue,
+            R.color.toolnexa_red,
+            R.color.toolnexa_yellow
+        ).forEach { colorRes ->
+            brandRail.addView(
+                View(this).apply {
+                    setBackgroundColor(
+                        getColor(colorRes)
+                    )
+                },
+                LinearLayout.LayoutParams(
+                    0,
+                    dp(4),
+                    1f
+                )
+            )
+        }
+
+        root.addView(
+            brandRail,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(4)
+            )
+        )
 
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL

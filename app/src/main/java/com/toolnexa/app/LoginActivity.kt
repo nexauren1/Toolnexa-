@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.CountDownTimer
 import android.text.InputType
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
@@ -118,6 +119,40 @@ class LoginActivity : ComponentActivity() {
         val scroll = android.widget.ScrollView(this)
         val body = LinearLayout(this)
         body.orientation = LinearLayout.VERTICAL
+
+        val brandRail =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.HORIZONTAL
+            }
+
+        listOf(
+            R.color.toolnexa_green,
+            R.color.toolnexa_blue,
+            R.color.toolnexa_red,
+            R.color.toolnexa_yellow
+        ).forEach { colorRes ->
+            brandRail.addView(
+                View(this).apply {
+                    setBackgroundColor(
+                        getColor(colorRes)
+                    )
+                },
+                LinearLayout.LayoutParams(
+                    0,
+                    dp(5),
+                    1f
+                )
+            )
+        }
+
+        body.addView(
+            brandRail,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(5)
+            )
+        )
 
         val brand = TextView(this)
         brand.text = "ToolNexa"
