@@ -6,8 +6,6 @@ const JSON_HEADERS = {
   "cache-control": "no-store"
 };
 
-let billingSchemaPromise = null;
-let billingMigrationPromise = null;
 let firebaseKeysCache = null;
 let firebaseKeysFetchedAt = 0;
 
@@ -48,70 +46,9 @@ export default {
         url.pathname === "/api/plans" &&
         request.method === "GET"
       ) {
-        if (!env.DB) {
-          return json(
-            {
-              ok: false,
-              error: "billing_database_missing",
-              message:
-                "O banco de billing do ToolNexa não está ligado ao Worker."
-            },
-            503
-          );
-        }
-
-        try {
-          await ensurePlansSchema(
-            env.DB
-          );
-
-          const result =
-            await env.DB
-              .prepare(
-                "SELECT code, name, price_usd, " +
-                "billing_interval, paypal_plan_id, active " +
-                "FROM plans WHERE active = 1 " +
-                "ORDER BY sort_order, code"
-              )
-              .all();
-
-          return json({
-            ok: true,
-            plans:
-              result.results || []
-          });
-        } catch (error) {
-          // The public plan catalog must remain readable even
-          // when an older billing schema needs repair.
-          console.error(
-            "ToolNexa plans catalog fallback",
-            error
-          );
-
-          return json({
-            ok: true,
-            plans: [
-              {
-                code: "free",
-                name: "Free",
-                price_usd: "0.00",
-                billing_interval: "month",
-                paypal_plan_id: null,
-                active: 1
-              },
-              {
-                code: "pro",
-                name: "Pro",
-                price_usd: "5.00",
-                billing_interval: "month",
-                paypal_plan_id: null,
-                active: 1
-              }
-            ],
-            billing_catalog:
-              "fallback"
-          });
-        }
+        return listPlans(
+          env
+        );
       }
 
       if (
@@ -124,7 +61,7 @@ export default {
             env
           );
 
-        return accountStatus(
+        return entitlement(
           env,
           user
         );
