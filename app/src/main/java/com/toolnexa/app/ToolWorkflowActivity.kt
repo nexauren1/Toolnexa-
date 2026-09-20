@@ -220,12 +220,37 @@ class ToolWorkflowActivity : Activity() {
 
     private fun saveResult(file: File) {
         analytics.event("tool_save_start", "tool" to tool)
-        val saved = NexaurenStorage.save(this, "Imagem", if (tool == "compressor") "Compressor" else "Resizer", file, "ToolNexa-" + System.currentTimeMillis() + "." + file.extension)
+
+        val saved = NexaurenStorage.save(
+            this,
+            "Imagem",
+            if (tool == "compressor") "Compressor" else "Resizer",
+            file,
+            "ToolNexa-" +
+                System.currentTimeMillis() +
+                "." +
+                file.extension
+        )
+
         if (saved != null) {
-            analytics.event("tool_save_success", "tool" to tool)
-            toast("Guardado em Nexauren X.")
+            analytics.event(
+                "tool_save_success",
+                "tool" to tool,
+                "folder" to (
+                    NexaurenStorage.rootName(this)
+                        ?: "Nexauren X"
+                    )
+            )
+            toast(
+                "Arquivo salvo na pasta " +
+                    (NexaurenStorage.rootName(this)
+                        ?: "Nexauren X")
+            )
         } else {
-            analytics.event("tool_save_folder_needed", "tool" to tool)
+            analytics.event(
+                "tool_save_folder_needed",
+                "tool" to tool
+            )
             chooseRootFolder()
         }
     }
