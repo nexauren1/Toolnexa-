@@ -605,6 +605,23 @@ class MainActivity : ComponentActivity() {
 
         addCategoryBrowser()
 
+        content.addView(space(14))
+
+        content.addView(
+            title(
+                "Ferramentas em destaque",
+                22f
+            )
+        )
+
+        content.addView(
+            bodyText(
+                "Acede rapidamente às ferramentas mais usadas no ToolNexa."
+            )
+        )
+
+        addHomeToolsGrid()
+
         content.addView(space(18))
 
         val info = card()
@@ -1091,46 +1108,167 @@ class MainActivity : ComponentActivity() {
         row: LinearLayout,
         tool: ToolDefinition
     ) {
-        val item = card()
-        item.setPadding(
-            dp(14),
-            dp(13),
-            dp(14),
-            dp(12)
-        )
+        val item = card().apply {
+            setPadding(
+                dp(13),
+                dp(12),
+                dp(12),
+                dp(11)
+            )
+            alpha = 0f
+            translationY =
+                dp(8).toFloat()
+        }
 
-        val icon = ImageView(this)
-        icon.setImageResource(tool.icon)
-        icon.setColorFilter(blue)
-        icon.contentDescription = tool.name
+        val accent =
+            when (tool.name) {
+                "Background Remover" ->
+                    Color.parseColor(
+                        "#7C3AED"
+                    )
 
-        item.addView(
-            icon,
+                "Image Converter" ->
+                    Color.parseColor(
+                        "#0891B2"
+                    )
+
+                "Image Resizer" ->
+                    Color.parseColor(
+                        "#16A34A"
+                    )
+
+                else ->
+                    blue
+            }
+
+        val soft =
+            when (tool.name) {
+                "Background Remover" ->
+                    Color.parseColor(
+                        "#F1EAFE"
+                    )
+
+                "Image Converter" ->
+                    Color.parseColor(
+                        "#E7F8FB"
+                    )
+
+                "Image Resizer" ->
+                    Color.parseColor(
+                        "#EAF8EF"
+                    )
+
+                else ->
+                    Color.parseColor(
+                        "#EAF0FF"
+                    )
+            }
+
+        val top =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.HORIZONTAL
+                gravity =
+                    Gravity.CENTER_VERTICAL
+            }
+
+        val iconBox =
+            LinearLayout(this).apply {
+                gravity = Gravity.CENTER
+                background =
+                    GradientDrawable().apply {
+                        setColor(soft)
+                        cornerRadius =
+                            dp(13).toFloat()
+                    }
+            }
+
+        iconBox.addView(
+            ImageView(this).apply {
+                setImageResource(
+                    tool.icon
+                )
+                setColorFilter(accent)
+                contentDescription =
+                    tool.name
+            },
             LinearLayout.LayoutParams(
-                dp(34),
-                dp(34)
+                dp(32),
+                dp(32)
             )
         )
 
-        val name = TextView(this)
-        name.text = tool.name
-        name.textSize = 15f
-        name.typeface =
-            android.graphics.Typeface.DEFAULT_BOLD
-        name.setTextColor(textColor)
-        name.setPadding(0, dp(5), 0, 0)
-        item.addView(name)
+        top.addView(
+            iconBox,
+            LinearLayout.LayoutParams(
+                dp(46),
+                dp(46)
+            )
+        )
 
-        val desc = TextView(this)
-        desc.text = tool.description
-        desc.textSize = 12f
-        desc.setTextColor(muted)
-        item.addView(desc)
+        top.addView(
+            Space(this),
+            LinearLayout.LayoutParams(
+                0,
+                1,
+                1f
+            )
+        )
+
+        top.addView(
+            TextView(this).apply {
+                text = "›"
+                textSize = 25f
+                setTextColor(accent)
+            },
+            LinearLayout.LayoutParams(
+                dp(22),
+                dp(40)
+            )
+        )
+
+        item.addView(
+            top,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(46)
+            )
+        )
+
+        item.addView(
+            TextView(this).apply {
+                text = tool.name
+                textSize = 15f
+                typeface =
+                    android.graphics.Typeface
+                        .DEFAULT_BOLD
+                setTextColor(
+                    textColor
+                )
+                maxLines = 2
+                setPadding(
+                    0,
+                    dp(7),
+                    0,
+                    dp(2)
+                )
+            }
+        )
+
+        item.addView(
+            TextView(this).apply {
+                text = tool.description
+                textSize = 11.5f
+                setTextColor(muted)
+                maxLines = 2
+            }
+        )
 
         item.setOnClickListener {
             analytics.event(
                 "tool_open",
-                "tool_name" to tool.name
+                "tool_name" to
+                    tool.name
             )
 
             when (tool.name) {
@@ -1163,6 +1301,12 @@ class MainActivity : ComponentActivity() {
                 )
             }
         )
+
+        item.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(240)
+            .start()
     }
 
 
