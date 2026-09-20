@@ -1,5 +1,6 @@
 package com.toolnexa.app
 
+import android.Manifest
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
@@ -26,6 +27,8 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.core.content.FileProvider
+import androidx.core.content.ContextCompat
+import androidx.activity.result.contract.ActivityResultContracts
 import com.google.firebase.auth.FirebaseAuth
 import java.io.File
 import kotlin.math.roundToInt
@@ -56,6 +59,16 @@ class MainActivity : ComponentActivity() {
     private val analytics by lazy {
         AnalyticsTracker(this)
     }
+
+    private val notificationPermission =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            analytics.event(
+                "notification_permission_result",
+                "granted" to granted.toString()
+            )
+        }
 
     private val blue by lazy {
         getColor(R.color.toolnexa_blue)
@@ -92,7 +105,43 @@ class MainActivity : ComponentActivity() {
         analytics.screen("home")
 
         showHome()
+        setupNotifications()
         updateManager.checkForUpdate()
+    }
+
+    private fun setupNotifications() {
+        analytics.event("notification_setup_start")
+
+        com.google.firebase.messaging.FirebaseMessaging
+            .getInstance()
+            .subscribeToTopic("app_updates")
+            .addOnCompleteListener { task ->
+                analytics.event(
+                    "notification_topic_subscription",
+                    "success" to task.isSuccessful.toString()
+                )
+            }
+
+        if (
+            android.os.Build.VERSION.SDK_INT >=
+                android.os.Build.VERSION_CODES.TIRAMISU
+        ) {
+            val granted =
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+
+            if (!granted) {
+                analytics.event(
+                    "notification_permission_request"
+                )
+                notificationPermission.launch(
+                    Manifest.permission.POST_NOTIFICATIONS
+                )
+            }
+        }
     }
 
     override fun onResume() {
