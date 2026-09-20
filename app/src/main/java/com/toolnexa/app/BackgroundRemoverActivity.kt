@@ -1084,6 +1084,18 @@ class BackgroundRemoverActivity : Activity() {
                                 "Fundo fotográfico criado."
                             )
                         }
+                    } catch (error: OutOfMemoryError) {
+                        runOnUiThread {
+                            progress.dismiss()
+                            analytics.event(
+                                "background_remover_ai_background_failed",
+                                "error" to
+                                    "OutOfMemoryError"
+                            )
+                            toast(
+                                "O fundo gerado é grande demais para este dispositivo."
+                            )
+                        }
                     } catch (error: Exception) {
                         runOnUiThread {
                             progress.dismiss()
