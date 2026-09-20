@@ -255,6 +255,38 @@ class MainActivity : ComponentActivity() {
             LinearLayout.LayoutParams(-1, dp(64))
         )
 
+        val brandRail = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+
+        listOf(
+            R.color.toolnexa_green,
+            R.color.toolnexa_blue,
+            R.color.toolnexa_red,
+            R.color.toolnexa_yellow
+        ).forEach { colorRes ->
+            brandRail.addView(
+                View(this).apply {
+                    setBackgroundColor(
+                        getColor(colorRes)
+                    )
+                },
+                LinearLayout.LayoutParams(
+                    0,
+                    dp(4),
+                    1f
+                )
+            )
+        }
+
+        body.addView(
+            brandRail,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(4)
+            )
+        )
+
         content = LinearLayout(this)
         content.orientation = LinearLayout.VERTICAL
 
@@ -1937,9 +1969,39 @@ class MainActivity : ComponentActivity() {
                 analytics.event(
                     "settings_storage_failed"
                 )
-                toast(
-                    "Não foi possível preparar este diretório."
+                android.app.AlertDialog.Builder(
+                    this
                 )
+                    .setTitle(
+                        "Diretório não disponível"
+                    )
+                    .setMessage(
+                        "O ToolNexa não conseguiu criar a pasta Nexauren X neste local. Escolha outra pasta com permissão de escrita e tente novamente."
+                    )
+                    .setPositiveButton(
+                        "Escolher outra"
+                    ) { _, _ ->
+                        analytics.event(
+                            "settings_storage_retry"
+                        )
+                        startActivityForResult(
+                            Intent(
+                                Intent.ACTION_OPEN_DOCUMENT_TREE
+                            ).apply {
+                                addFlags(
+                                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                                        Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                                )
+                            },
+                            REQUEST_SETTINGS_FOLDER
+                        )
+                    }
+                    .setNegativeButton(
+                        "Fechar",
+                        null
+                    )
+                    .show()
             }
 
             showSettings()
