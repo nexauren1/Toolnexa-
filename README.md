@@ -2,14 +2,17 @@
 
 ToolNexa is a native Android utility app focused on practical tools with a clean, light and mobile-first experience.
 
-## v1.2.0
+## v1.3.0
 
 - Image Compressor
 - Image Resizer
 - Searchable 2-column tool grid
-- Firebase Authentication with Google, e-mail/password and phone SMS verification
+- Firebase Authentication with Google, e-mail/password and international phone SMS verification
 - Password recovery by e-mail
-- Phone login with 6-digit SMS code, resend cooldown and number change flow
+- Phone login with country selector, 9-digit local number field, 6-digit SMS code, resend cooldown and number change flow
+- Three-stage tool workflow: choose file, personalize, result/preview/save/share
+- User-selected Nexauren X folder outside Android app storage, organized by category/tool
+- Firebase Cloud Messaging subscription for app update notifications
 - Firebase Analytics for screens and app actions
 - Account page with Firebase profile metadata
 - In-tool processing animation and result previews
