@@ -90,8 +90,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        LanguageManager.apply(this)
         super.onCreate(savedInstanceState)
+        LanguageManager.apply(this)
 
         window.statusBarColor = bg
         window.navigationBarColor = surface
