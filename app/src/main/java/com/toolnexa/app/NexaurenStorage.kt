@@ -10,8 +10,12 @@ object NexaurenStorage {
 
     private const val PREFS = "toolnexa_storage"
     private const val ROOT_URI = "root_uri"
+    private const val NEXAUREN_FOLDER = "Nexauren X"
 
-    fun setRoot(context: Context, uri: Uri) {
+    fun setRoot(
+        context: Context,
+        uri: Uri
+    ) {
         context.getSharedPreferences(
             PREFS,
             Context.MODE_PRIVATE
@@ -23,7 +27,9 @@ object NexaurenStorage {
             .apply()
     }
 
-    fun clearRoot(context: Context) {
+    fun clearRoot(
+        context: Context
+    ) {
         context.getSharedPreferences(
             PREFS,
             Context.MODE_PRIVATE
@@ -37,14 +43,34 @@ object NexaurenStorage {
         uri: Uri
     ): Boolean {
         return try {
+            if (!DocumentsContract.isTreeUri(uri)) {
+                return false
+            }
+
+            val treeDocument =
+                documentUriFromTree(uri)
+
+            val folder =
+                findOrCreateDirectory(
+                    context,
+                    uri,
+                    treeDocument,
+                    NEXAUREN_FOLDER
+                )
+
+            if (folder == null) {
+                return false
+            }
+
             setRoot(context, uri)
-            ensureNexaurenFolder(context) != null
+            true
         } catch (_: Exception) {
+            clearRoot(context)
             false
         }
     }
 
-    private fun rootUri(
+    private fun rootTreeUri(
         context: Context
     ): Uri? {
         val raw =
@@ -57,42 +83,70 @@ object NexaurenStorage {
             ) ?: return null
 
         return try {
-            Uri.parse(raw)
+            val uri = Uri.parse(raw)
+
+            if (
+                DocumentsContract.isTreeUri(uri)
+            ) {
+                uri
+            } else {
+                null
+            }
         } catch (_: Exception) {
             null
         }
     }
 
+    private fun documentUriFromTree(
+        treeUri: Uri
+    ): Uri {
+        val documentId =
+            DocumentsContract.getTreeDocumentId(
+                treeUri
+            )
+
+        require(
+            documentId.isNotBlank()
+        )
+
+        return DocumentsContract.buildDocumentUriUsingTree(
+            treeUri,
+            documentId
+        )
+    }
+
     private fun ensureNexaurenFolder(
         context: Context
     ): Uri? {
-        val root =
-            rootUri(context) ?: return null
+        val treeUri =
+            rootTreeUri(context)
+                ?: return null
+
+        val rootDocument =
+            documentUriFromTree(treeUri)
 
         return try {
             findOrCreateDirectory(
                 context,
-                root,
-                "Nexauren X"
+                treeUri,
+                rootDocument,
+                NEXAUREN_FOLDER
             )
         } catch (_: Exception) {
             null
         }
     }
 
-    fun rootName(context: Context): String? {
-        val raw = context.getSharedPreferences(
-            PREFS,
-            Context.MODE_PRIVATE
-        ).getString(ROOT_URI, null) ?: return null
+    fun rootName(
+        context: Context
+    ): String? {
+        val treeUri =
+            rootTreeUri(context)
+                ?: return null
 
         return try {
-            val uri = Uri.parse(raw)
             val documentUri =
-                DocumentsContract.buildDocumentUriUsingTree(
-                    uri,
-                    DocumentsContract.getTreeDocumentId(uri)
-                )
+                documentUriFromTree(treeUri)
 
             context.contentResolver.query(
                 documentUri,
@@ -114,7 +168,9 @@ object NexaurenStorage {
         }
     }
 
-    fun hasRoot(context: Context): Boolean =
+    fun hasRoot(
+        context: Context
+    ): Boolean =
         !rootName(context).isNullOrBlank()
 
     fun save(
@@ -124,30 +180,41 @@ object NexaurenStorage {
         file: File,
         displayName: String
     ): Uri? {
-        val nexauren =
-            ensureNexaurenFolder(context)
+        val treeUri =
+            rootTreeUri(context)
                 ?: return null
 
         return try {
+            val nexauren =
+                ensureNexaurenFolder(context)
+                    ?: return null
+
             val categoryDir =
                 findOrCreateDirectory(
                     context,
+                    treeUri,
                     nexauren,
                     safeName(category)
-                )
+                ) ?: return null
 
             val toolDir =
                 findOrCreateDirectory(
                     context,
+                    treeUri,
                     categoryDir,
                     safeName(tool)
-                )
+                ) ?: return null
 
             val mime =
                 when (file.extension.lowercase()) {
-                    "png" -> "image/png"
-                    "webp" -> "image/webp"
-                    else -> "image/jpeg"
+                    "png" ->
+                        "image/png"
+
+                    "webp" ->
+                        "image/webp"
+
+                    else ->
+                        "image/jpeg"
                 }
 
             val target =
@@ -174,16 +241,23 @@ object NexaurenStorage {
 
     private fun findOrCreateDirectory(
         context: Context,
-        parent: Uri,
+        treeUri: Uri,
+        parentDocument: Uri,
         name: String
-    ): Uri {
-        val existing = DocumentsContract.buildChildDocumentsUriUsingTree(
-            parent,
-            DocumentsContract.getTreeDocumentId(parent)
-        )
+    ): Uri? {
+        val parentId =
+            DocumentsContract.getDocumentId(
+                parentDocument
+            )
+
+        val children =
+            DocumentsContract.buildChildDocumentsUriUsingTree(
+                treeUri,
+                parentId
+            )
 
         context.contentResolver.query(
-            existing,
+            children,
             arrayOf(
                 DocumentsContract.Document.COLUMN_DOCUMENT_ID,
                 DocumentsContract.Document.COLUMN_DISPLAY_NAME,
@@ -194,37 +268,50 @@ object NexaurenStorage {
             null
         )?.use { cursor ->
             while (cursor.moveToNext()) {
-                val displayName = cursor.getString(1)
-                val mime = cursor.getString(2)
+                val displayName =
+                    cursor.getString(1)
+
+                val mime =
+                    cursor.getString(2)
+
                 if (
                     displayName == name &&
-                    mime == DocumentsContract.Document.MIME_TYPE_DIR
+                    mime ==
+                        DocumentsContract.Document.MIME_TYPE_DIR
                 ) {
-                    val id = cursor.getString(0)
-                    return DocumentsContract.buildDocumentUriUsingTree(
-                        parent,
-                        id
-                    )
+                    val id =
+                        cursor.getString(0)
+
+                    return DocumentsContract
+                        .buildDocumentUriUsingTree(
+                            treeUri,
+                            id
+                        )
                 }
             }
         }
 
-        return DocumentsContract.createDocument(
-            context.contentResolver,
-            parent,
-            DocumentsContract.Document.MIME_TYPE_DIR,
-            name
-        ) ?: throw IllegalStateException(
-            "Unable to create directory"
-        )
+        val created =
+            DocumentsContract.createDocument(
+                context.contentResolver,
+                parentDocument,
+                DocumentsContract.Document.MIME_TYPE_DIR,
+                safeName(name)
+            ) ?: return null
+
+        return created
     }
 
-    private fun safeName(value: String): String =
+    private fun safeName(
+        value: String
+    ): String =
         value
             .replace("/", "_")
             .replace("\\", "_")
             .trim()
-            .ifBlank { "arquivo" }
+            .ifBlank {
+                "arquivo"
+            }
 
     fun fileProviderUri(
         context: Context,
