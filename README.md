@@ -57,3 +57,7 @@ Without those secrets, the workflow creates a debug APK so the project can be te
 ## Build
 
 The project uses Android Gradle Plugin 9.4.0, Gradle 9.6.0 and Java 17.
+
+## CI
+
+Pushes to main build the Android APK and publish/update the matching GitHub Release tag based on versionName.
