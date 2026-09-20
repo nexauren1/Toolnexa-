@@ -1,5 +1,7 @@
 package com.toolnexa.app
 
+import android.graphics.BitmapFactory
+
 import android.content.Context
 import android.database.Cursor
 import android.net.Uri
@@ -260,10 +262,17 @@ object CloudflareApi {
             }
 
             val bytes =
-                android.util.Base64.decode(
-                    base64,
-                    android.util.Base64.DEFAULT
-                )
+                try {
+                    android.util.Base64.decode(
+                        base64,
+                        android.util.Base64.DEFAULT
+                    )
+                } catch (error: IllegalArgumentException) {
+                    throw IOException(
+                        "A IA devolveu uma imagem em Base64 inválida.",
+                        error
+                    )
+                }
 
             if (bytes.isEmpty()) {
                 throw IOException(
@@ -271,10 +280,34 @@ object CloudflareApi {
                 )
             }
 
+            val bounds =
+                BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+
+            BitmapFactory.decodeByteArray(
+                bytes,
+                0,
+                bytes.size,
+                bounds
+            )
+
+            val mime =
+                bounds.outMimeType
+                    ?.lowercase()
+                    .orEmpty()
+
+            val extension =
+                when (mime) {
+                    "image/png" -> ".png"
+                    "image/webp" -> ".webp"
+                    else -> ".jpg"
+                }
+
             val file =
                 File.createTempFile(
                     "toolnexa-ai-bg-",
-                    ".jpg",
+                    extension,
                     context.cacheDir
                 )
 
