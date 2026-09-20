@@ -220,6 +220,7 @@ class StorageActivity : Activity() {
         )
 
         setContentView(root)
+        I18n.localizeWindow(this)
     }
 
     override fun onActivityResult(

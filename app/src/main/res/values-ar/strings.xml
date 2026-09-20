@@ -9,7 +9,7 @@
     <string name="support_message_hint">اشرح المشكلة أو الفكرة أو الاقتراح...</string>
     <string name="support_diagnostics">تضمين التشخيص التقني (طراز الجهاز وAndroid وإصدار التطبيق واللغة)</string>
     <string name="support_privacy_note">لا يتم تضمين كلمات المرور أو رموز المصادقة أو المفاتيح الخاصة أو الأسرار الأخرى. يفتح البريد للمراجعة قبل الإرسال.</string>
-    <string name="support_send">إرسال إلى الدعم</string><string name="support_message_required">اكتب رسالتك.</string><string name="support_subject_prefix">[ToolNexa]</string><string name="support_no_email_app">لم يتم العثور على تطبيق بريد إلكتروني.</string>
+    <string name="support_send">إرسال إلى الدعم</string><string name="support_message_required">اكتب رسالتك.</string><string name="support_subject_prefix">[ToolNexa]</string><string name="support_no_email_app">تعذر فتح تطبيق بريد إلكتروني.</string>
     <string-array name="support_types"><item>دعم فني</item><item>شكوى</item><item>اقتراح</item><item>مشكلة دفع</item><item>مشكلة حساب</item></string-array>
     <string-array name="support_tools"><item>عام</item><item>Background Remover</item><item>Image Compressor</item><item>Image Resizer</item><item>Image Converter</item><item>الخطط / PayPal</item><item>تسجيل الدخول / الحساب</item><item>السجل</item><item>أداة أخرى</item></string-array>
     <string-array name="support_problems"><item>لا توجد مشكلة محددة</item><item>التطبيق يغلق / يتعطل</item><item>شاشة بيضاء</item><item>الميزة لا تعمل</item><item>الذكاء الاصطناعي لا يعمل</item><item>نتيجة غير صحيحة</item><item>لا يمكن الحفظ أو المشاركة</item><item>مشكلة تسجيل الدخول / الحساب</item><item>مشكلة الدفع / الخطة</item><item>بطيء أو يتجمد</item><item>أخرى</item></string-array>

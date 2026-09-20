@@ -6,34 +6,26 @@
     android:viewportHeight="108">
 
     <path
-        android:fillColor="#FF102A72"
+        android:fillColor="#FFF4F7FF"
         android:pathData="M18,4L90,4Q104,4 104,18L104,90Q104,104 90,104L18,104Q4,104 4,90L4,18Q4,4 18,4Z" />
 
     <path
-        android:fillColor="#FF175BDB"
-        android:pathData="M18,12L90,12Q96,12 96,18L96,90Q96,96 90,96L18,96Q12,96 12,90L12,18Q12,12 18,12Z" />
-
-    <path
-        android:fillColor="#FF25D7F2"
-        android:pathData="M20,22L37,22L54,39L71,22L88,22L62,50L62,78L46,78L46,50Z" />
+        android:fillColor="#FF5B55E8"
+        android:pathData="M21,14L87,14Q96,14 96,23L96,85Q96,94 87,94L21,94Q12,94 12,85L12,23Q12,14 21,14Z" />
 
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M24,30L39,30L54,45L69,30L84,30L60,54L60,76L48,76L48,54Z" />
+        android:pathData="M28,31L40,31L54,45L68,31L80,31L60,52L60,77L48,77L48,52Z" />
 
     <path
-        android:fillColor="#FF7D4DFF"
-        android:pathData="M78,54L84,58L90,59L86,64L87,70L81,67L75,70L76,64L72,59L78,58Z" />
+        android:fillColor="#FF1CC8C2"
+        android:pathData="M68,64L76,58L84,64L76,70Z" />
 
     <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M79,45A7,7 0,1 0,79 59A7,7 0,1 0,79 45Z" />
-
-    <path
-        android:fillColor="#FF175BDB"
-        android:pathData="M79,49A3,3 0,1 1,79 55A3,3 0,1 1,79 49Z" />
+        android:fillColor="#FFFF7A5C"
+        android:pathData="M79,28A6,6 0,1 0,79 40A6,6 0,1 0,79 28Z" />
 
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M76,56L67,65L72,70L81,61Z" />
+        android:pathData="M25,22L31,22L31,27L25,27Z" />
 </vector>

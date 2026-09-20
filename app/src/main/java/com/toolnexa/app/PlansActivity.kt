@@ -153,6 +153,7 @@ class PlansActivity : Activity() {
         )
 
         setContentView(root)
+        I18n.localizeWindow(this)
 
         val back =
             TextView(this).apply {

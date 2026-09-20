@@ -132,6 +132,9 @@ class MainActivity : ComponentActivity() {
         } else {
             showHome()
         }
+
+        I18n.localizeWindow(this)
+
         setupNotifications()
         updateManager.checkForUpdate()
     }
@@ -342,6 +345,7 @@ class MainActivity : ComponentActivity() {
         )
 
         setContentView(root)
+        I18n.localizeWindow(this)
         buildDrawer()
     }
 
@@ -2013,11 +2017,11 @@ class MainActivity : ComponentActivity() {
 
         val labels =
             arrayOf(
-                "Português",
-                "English",
-                "Español",
-                "Français",
-                "العربية"
+                I18n.t(this, "Português"),
+                I18n.t(this, "English"),
+                I18n.t(this, "Español"),
+                I18n.t(this, "Français"),
+                I18n.t(this, "العربية")
             )
 
         val current =
@@ -2029,7 +2033,7 @@ class MainActivity : ComponentActivity() {
 
         AlertDialog.Builder(this)
             .setTitle(
-                "Idioma da aplicação"
+                I18n.t(this, "Idioma da aplicação")
             )
             .setSingleChoiceItems(
                 labels,
@@ -2053,7 +2057,7 @@ class MainActivity : ComponentActivity() {
                 recreate()
             }
             .setNegativeButton(
-                "Cancelar",
+                I18n.t(this, "Cancelar"),
                 null
             )
             .show()
@@ -2241,6 +2245,7 @@ class MainActivity : ComponentActivity() {
             .withEndAction {
                 drawerShade.visibility =
                     View.GONE
+                I18n.localizeWindow(this)
             }
             .start()
     }

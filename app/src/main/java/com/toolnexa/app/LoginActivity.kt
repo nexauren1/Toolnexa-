@@ -519,6 +519,7 @@ class LoginActivity : ComponentActivity() {
         )
 
         setContentView(root)
+        I18n.localizeWindow(this)
     }
 
     private fun openMain() {
@@ -1442,7 +1443,10 @@ class LoginActivity : ComponentActivity() {
     ) {
         Toast.makeText(
             this,
-            message,
+            I18n.t(
+                this,
+                message
+            ),
             Toast.LENGTH_SHORT
         ).show()
     }

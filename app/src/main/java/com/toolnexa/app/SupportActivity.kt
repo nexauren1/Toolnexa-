@@ -88,6 +88,7 @@ class SupportActivity : Activity() {
         )
 
         setContentView(root)
+        I18n.localizeWindow(this)
 
         body.addView(
             TextView(this).apply {
@@ -475,12 +476,20 @@ class SupportActivity : Activity() {
         subject: String,
         body: String
     ) {
-        val intent =
-            Intent(Intent.ACTION_SENDTO).apply {
+        val mailto =
+            Intent(
+                Intent.ACTION_SENDTO
+            ).apply {
                 data =
                     Uri.parse(
                         "mailto:nexaurenstore@gmail.com"
                     )
+                putExtra(
+                    Intent.EXTRA_EMAIL,
+                    arrayOf(
+                        "nexaurenstore@gmail.com"
+                    )
+                )
                 putExtra(
                     Intent.EXTRA_SUBJECT,
                     subject
@@ -491,17 +500,63 @@ class SupportActivity : Activity() {
                 )
             }
 
-        if (
-            intent.resolveActivity(
-                packageManager
-            ) != null
-        ) {
-            startActivity(intent)
-        } else {
+        try {
+            startActivity(
+                Intent.createChooser(
+                    mailto,
+                    I18n.t(
+                        this,
+                        "Abrir aplicação de email"
+                    )
+                )
+            )
+            analytics.event(
+                "support_email_opened"
+            )
+            return
+        } catch (_: android.content.ActivityNotFoundException) {
+        }
+
+        val fallback =
+            Intent(
+                Intent.ACTION_SEND
+            ).apply {
+                type = "text/plain"
+                putExtra(
+                    Intent.EXTRA_EMAIL,
+                    arrayOf(
+                        "nexaurenstore@gmail.com"
+                    )
+                )
+                putExtra(
+                    Intent.EXTRA_SUBJECT,
+                    subject
+                )
+                putExtra(
+                    Intent.EXTRA_TEXT,
+                    body
+                )
+            }
+
+        try {
+            startActivity(
+                Intent.createChooser(
+                    fallback,
+                    I18n.t(
+                        this,
+                        "Abrir aplicação de email"
+                    )
+                )
+            )
+            analytics.event(
+                "support_email_opened"
+            )
+        } catch (_: android.content.ActivityNotFoundException) {
             Toast.makeText(
                 this,
-                getString(
-                    R.string.support_no_email_app
+                I18n.t(
+                    this,
+                    "Não foi possível abrir uma aplicação de email."
                 ),
                 Toast.LENGTH_LONG
             ).show()

@@ -497,6 +497,7 @@ class ToolWorkflowActivity : Activity() {
         scroll.addView(body)
         root!!.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
+        I18n.localizeWindow(this)
     }
 
     private fun body(): LinearLayout? {

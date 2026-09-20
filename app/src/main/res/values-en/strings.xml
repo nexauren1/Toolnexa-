@@ -16,7 +16,7 @@
     <string name="support_send">Send to support</string>
     <string name="support_message_required">Write your message.</string>
     <string name="support_subject_prefix">[ToolNexa]</string>
-    <string name="support_no_email_app">No email application was found.</string>
+    <string name="support_no_email_app">Could not open an email app.</string>
 
     <string-array name="support_types">
         <item>Technical support</item>

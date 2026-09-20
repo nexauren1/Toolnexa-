@@ -9,6 +9,7 @@
         android:name=".ToolNexaApplication"
         android:allowBackup="true"
         android:icon="@drawable/ic_toolnexa"
+        android:roundIcon="@drawable/ic_toolnexa"
         android:label="@string/app_name"
         android:resizeableActivity="true"
         android:supportsRtl="true"

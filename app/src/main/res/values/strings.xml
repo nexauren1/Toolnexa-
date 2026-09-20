@@ -15,7 +15,7 @@
     <string name="support_send">Enviar para o suporte</string>
     <string name="support_message_required">Escreva a sua mensagem.</string>
     <string name="support_subject_prefix">[ToolNexa]</string>
-    <string name="support_no_email_app">Não foi encontrada uma aplicação de email.</string>
+    <string name="support_no_email_app">Não foi possível abrir uma aplicação de email.</string>
     <string-array name="support_types">
         <item>Suporte técnico</item><item>Reclamação</item><item>Sugestão</item><item>Problema de pagamento</item><item>Problema de conta</item>
     </string-array>

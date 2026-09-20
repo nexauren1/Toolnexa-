@@ -118,6 +118,7 @@ class HistoryActivity : Activity() {
         )
 
         setContentView(root)
+        I18n.localizeWindow(this)
 
         val entries = NexaurenHistory.list(this)
 

@@ -232,6 +232,7 @@ class CategoryActivity : Activity() {
         )
 
         setContentView(root)
+        I18n.localizeWindow(this)
 
         val tools =
             CategoryCatalog.toolsFor(
