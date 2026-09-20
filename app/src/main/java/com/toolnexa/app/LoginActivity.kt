@@ -22,6 +22,7 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 class LoginActivity : ComponentActivity() {
 
