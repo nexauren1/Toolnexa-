@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "642951133054",
+    "project_id": "toolnexa-6ac6c",
+    "storage_bucket": "toolnexa-6ac6c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:642951133054:android:fabfc0e9a8607efcb6e52f",
+        "android_client_info": {
+          "package_name": "com.toolnexa.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "642951133054-l26bsqm8jubg8rrf16in9ui6i6anj4hf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.toolnexa.app",
+            "certificate_hash": "98f1b97aca71cb4824097991347e1e11f8941124"
+          }
+        },
+        {
+          "client_id": "642951133054-f1vj6pgjuq1vkk08fmom8qlnok4gjuvp.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPTA39g10_xqBbeGY0ftJyd20k2fAncdU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "642951133054-f1vj6pgjuq1vkk08fmom8qlnok4gjuvp.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

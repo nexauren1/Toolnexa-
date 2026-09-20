@@ -9,7 +9,11 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.text.Editable
+import android.text.InputType
+import android.text.TextWatcher
 import android.widget.Button
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -20,11 +24,13 @@ import android.widget.Space
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.core.content.FileProvider
+import com.google.firebase.auth.FirebaseAuth
 import java.io.File
 import kotlin.math.roundToInt
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
 
     private lateinit var root: FrameLayout
     private lateinit var content: LinearLayout
@@ -38,7 +44,16 @@ class MainActivity : Activity() {
     }
 
     private var selectedImage: Uri? = null
+    private var selectedResizeImage: Uri? = null
     private var qualityValue = 82
+
+    private val auth by lazy {
+        FirebaseAuth.getInstance()
+    }
+
+    private val analytics by lazy {
+        AnalyticsTracker(this)
+    }
 
     private val blue by lazy {
         getColor(R.color.toolnexa_blue)
@@ -66,9 +81,13 @@ class MainActivity : Activity() {
         window.navigationBarColor = surface
         window.decorView.systemUiVisibility =
             View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+        window.setSoftInputMode(
+            android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        )
 
         buildShell()
         updateManager = UpdateManager(this)
+        analytics.screen("home")
 
         showHome()
         updateManager.checkForUpdate()
@@ -287,102 +306,50 @@ class MainActivity : Activity() {
         drawer.addView(version)
     }
 
+
     private fun showHome() {
         toolbarTitle.text = "Início"
         content.removeAllViews()
+        analytics.screen("home")
 
         content.addView(space(18))
         content.addView(
             title(
-                "Ferramentas que simplesmente funcionam",
+                "Ferramentas simples, resultados claros",
                 27f
             )
         )
         content.addView(
             bodyText(
-                "O ToolNexa reúne utilidades rápidas em uma experiência limpa, simples e preparada para crescer."
+                "Escolha uma ferramenta, processe o ficheiro e veja o resultado antes de guardar."
             )
         )
-        content.addView(space(20))
+        content.addView(space(14))
 
-        val hero = card()
-        hero.setPadding(
-            dp(20),
-            dp(22),
-            dp(20),
-            dp(22)
-        )
-
-        val badge = TextView(this)
-        badge.text = "TOOL 01  •  IMAGEM"
-        badge.textSize = 12f
-        badge.typeface =
-            android.graphics.Typeface.DEFAULT_BOLD
-        badge.setTextColor(blue)
-        hero.addView(badge)
-
-        hero.addView(
-            title(
-                "Image Compressor",
-                22f
-            )
-        )
-        hero.addView(
-            bodyText(
-                "Reduza o tamanho de uma imagem sem complicação e salve o resultado na galeria."
-            )
-        )
-
-        val open = Button(this)
-        open.text = "Abrir ferramenta"
-        stylePrimary(open)
-        open.setOnClickListener {
-            showImageCompressor()
-        }
-
-        hero.addView(
-            open,
-            LinearLayout.LayoutParams(-1, dp(52))
-        )
-
-        content.addView(
-            hero,
-            LinearLayout.LayoutParams(
-                -1,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(
-                    dp(16),
-                    0,
-                    dp(16),
-                    0
-                )
-            }
-        )
+        addHomeToolsGrid()
 
         content.addView(space(18))
 
-        val status = card()
-        status.setPadding(
+        val info = card()
+        info.setPadding(
             dp(18),
             dp(18),
             dp(18),
             dp(18)
         )
-        status.addView(
-            title(
-                "Primeira versão",
-                18f
-            )
+        info.addView(
+            title("ToolNexa", 18f)
         )
-        status.addView(
+        info.addView(
             bodyText(
-                "Android nativo • sem conta nesta v1 • atualizações por GitHub Release"
+                "Versão " +
+                    BuildConfig.VERSION_NAME +
+                    " • Firebase Analytics ativo • conta com Google e e-mail"
             )
         )
 
         content.addView(
-            status,
+            info,
             LinearLayout.LayoutParams(
                 -1,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -398,50 +365,253 @@ class MainActivity : Activity() {
         content.addView(space(30))
     }
 
+    private fun addHomeToolsGrid() {
+        val search = EditText(this)
+        search.hint = "Pesquisar ferramenta"
+        search.setSingleLine(true)
+        search.textSize = 15f
+        search.setTextColor(textColor)
+        search.setHintTextColor(muted)
+        search.setPadding(
+            dp(16),
+            dp(12),
+            dp(16),
+            dp(12)
+        )
+        search.background = GradientDrawable().apply {
+            setColor(surface)
+            setStroke(dp(1), border)
+            cornerRadius = dp(14).toFloat()
+        }
+
+        content.addView(
+            search,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(54)
+            ).apply {
+                setMargins(
+                    dp(16),
+                    0,
+                    dp(16),
+                    dp(14)
+                )
+            }
+        )
+
+        val grid = LinearLayout(this)
+        grid.orientation = LinearLayout.VERTICAL
+        content.addView(
+            grid,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        fun render(query: String) {
+            grid.removeAllViews()
+
+            val tools = listOf(
+                ToolDefinition(
+                    "Image Compressor",
+                    "Imagem",
+                    "Reduza o tamanho da imagem com qualidade ajustável.",
+                    R.drawable.ic_tool_compress
+                ),
+                ToolDefinition(
+                    "Image Resizer",
+                    "Imagem",
+                    "Redimensione a imagem e veja a nova prévia.",
+                    R.drawable.ic_tool_resize
+                )
+            ).filter {
+                it.name.contains(query.trim(), true) ||
+                    it.category.contains(query.trim(), true)
+            }
+
+            if (tools.isEmpty()) {
+                grid.addView(
+                    bodyText(
+                        "Nenhuma ferramenta encontrada."
+                    )
+                )
+                return
+            }
+
+            for (index in tools.indices step 2) {
+                val row = LinearLayout(this)
+                row.orientation = LinearLayout.HORIZONTAL
+
+                addToolGridCard(
+                    row,
+                    tools[index]
+                )
+
+                if (index + 1 < tools.size) {
+                    addToolGridCard(
+                        row,
+                        tools[index + 1]
+                    )
+                } else {
+                    row.addView(
+                        Space(this),
+                        LinearLayout.LayoutParams(
+                            0,
+                            dp(150),
+                            1f
+                        ).apply {
+                            setMargins(
+                                dp(6),
+                                0,
+                                dp(6),
+                                0
+                            )
+                        }
+                    )
+                }
+
+                grid.addView(
+                    row,
+                    LinearLayout.LayoutParams(
+                        -1,
+                        dp(150)
+                    )
+                )
+            }
+        }
+
+        search.addTextChangedListener(
+            object : TextWatcher {
+                override fun beforeTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    count: Int,
+                    after: Int
+                ) = Unit
+
+                override fun onTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    before: Int,
+                    count: Int
+                ) {
+                    analytics.event(
+                        "tool_search",
+                        "query" to (s?.toString() ?: "")
+                    )
+                    render(s?.toString() ?: "")
+                }
+
+                override fun afterTextChanged(
+                    s: Editable?
+                ) = Unit
+            }
+        )
+
+        render("")
+    }
+
+    private fun addToolGridCard(
+        row: LinearLayout,
+        tool: ToolDefinition
+    ) {
+        val item = card()
+        item.setPadding(
+            dp(14),
+            dp(13),
+            dp(14),
+            dp(12)
+        )
+
+        val icon = ImageView(this)
+        icon.setImageResource(tool.icon)
+        icon.setColorFilter(blue)
+        icon.contentDescription = tool.name
+
+        item.addView(
+            icon,
+            LinearLayout.LayoutParams(
+                dp(34),
+                dp(34)
+            )
+        )
+
+        val name = TextView(this)
+        name.text = tool.name
+        name.textSize = 15f
+        name.typeface =
+            android.graphics.Typeface.DEFAULT_BOLD
+        name.setTextColor(textColor)
+        name.setPadding(0, dp(5), 0, 0)
+        item.addView(name)
+
+        val desc = TextView(this)
+        desc.text = tool.description
+        desc.textSize = 12f
+        desc.setTextColor(muted)
+        item.addView(desc)
+
+        item.setOnClickListener {
+            analytics.event(
+                "tool_open",
+                "tool_name" to tool.name
+            )
+
+            when (tool.name) {
+                "Image Compressor" ->
+                    showImageCompressor()
+
+                "Image Resizer" ->
+                    showImageResizer()
+            }
+        }
+
+        row.addView(
+            item,
+            LinearLayout.LayoutParams(
+                0,
+                dp(150),
+                1f
+            ).apply {
+                setMargins(
+                    dp(6),
+                    dp(0),
+                    dp(6),
+                    dp(0)
+                )
+            }
+        )
+    }
+
+
     private fun showTools() {
         toolbarTitle.text = "Ferramentas"
         content.removeAllViews()
+        analytics.screen("tools")
 
         content.addView(space(18))
         content.addView(
-            title(
-                "Todas as ferramentas",
-                25f
-            )
+            title("Todas as ferramentas", 25f)
         )
         content.addView(
             bodyText(
-                "A primeira ferramenta já está pronta. Mais ferramentas entrarão sem mudar a base do aplicativo."
+                "Pesquise e abra qualquer ferramenta disponível no ToolNexa."
             )
         )
-        content.addView(space(12))
-
-        toolRow(
-            "Image Compressor",
-            "Comprime imagens e salva uma cópia otimizada.",
-            "IMAGEM"
-        ) {
-            showImageCompressor()
-        }
-
-        content.addView(space(12))
-        content.addView(
-            bodyText(
-                "Próximas categorias: PDF, texto, arquivos, áudio e mais."
-            )
-        )
+        addHomeToolsGrid()
+        content.addView(space(28))
     }
+
 
     private fun showImageCompressor() {
         toolbarTitle.text = "Image Compressor"
         content.removeAllViews()
+        analytics.screen("image_compressor")
 
         content.addView(space(18))
         content.addView(
-            title(
-                "Comprimir imagem",
-                25f
-            )
+            title("Comprimir imagem", 25f)
         )
         content.addView(
             bodyText(
@@ -453,6 +623,7 @@ class MainActivity : Activity() {
         picker.text = "Escolher imagem"
         stylePrimary(picker)
         picker.setOnClickListener {
+            analytics.event("image_picker_open")
             pickImage()
         }
 
@@ -476,6 +647,12 @@ class MainActivity : Activity() {
         preview.scaleType =
             ImageView.ScaleType.CENTER_INSIDE
         preview.setBackgroundColor(Color.WHITE)
+        preview.setPadding(
+            dp(8),
+            dp(8),
+            dp(8),
+            dp(8)
+        )
 
         content.addView(
             preview,
@@ -526,6 +703,13 @@ class MainActivity : Activity() {
                         "Qualidade: " +
                             qualityValue +
                             "%"
+
+                    if (fromUser) {
+                        analytics.event(
+                            "compression_quality",
+                            "value" to qualityValue.toString()
+                        )
+                    }
                 }
 
                 override fun onStartTrackingTouch(
@@ -563,13 +747,22 @@ class MainActivity : Activity() {
             val uri = selectedImage
 
             if (uri == null) {
-                toast(
-                    "Escolha uma imagem primeiro."
+                analytics.event(
+                    "compression_validation_error"
                 )
+                toast("Escolha uma imagem primeiro.")
                 return@setOnClickListener
             }
 
+            analytics.event(
+                "compression_start",
+                "quality" to qualityValue.toString()
+            )
             compressButton.isEnabled = false
+
+            val dialog = showProcessingDialog(
+                "Processando imagem..."
+            )
 
             Thread {
                 val result =
@@ -579,13 +772,22 @@ class MainActivity : Activity() {
                     )
 
                 runOnUiThread {
+                    dialog.dismiss()
                     compressButton.isEnabled = true
 
                     if (result == null) {
+                        analytics.event(
+                            "compression_failed"
+                        )
                         toast(
                             "Não foi possível comprimir esta imagem."
                         )
                     } else {
+                        analytics.event(
+                            "compression_success",
+                            "output_bytes" to
+                                result.compressedBytes.toString()
+                        )
                         showCompressionResult(result)
                     }
                 }
@@ -648,8 +850,32 @@ class MainActivity : Activity() {
 
         resultCard.addView(
             title(
-                "Resultado",
+                "Pré-visualização do resultado",
                 19f
+            )
+        )
+
+        val preview = ImageView(this)
+        preview.scaleType =
+            ImageView.ScaleType.CENTER_INSIDE
+        preview.setBackgroundColor(Color.WHITE)
+        preview.setPadding(
+            dp(8),
+            dp(8),
+            dp(8),
+            dp(8)
+        )
+        preview.setImageBitmap(
+            BitmapFactory.decodeFile(
+                result.file.absolutePath
+            )
+        )
+
+        resultCard.addView(
+            preview,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(220)
             )
         )
 
@@ -674,6 +900,10 @@ class MainActivity : Activity() {
         stylePrimary(save)
 
         save.setOnClickListener {
+            analytics.event(
+                "compression_save"
+            )
+
             val uri =
                 compressor.saveToGallery(
                     result.file
@@ -696,6 +926,9 @@ class MainActivity : Activity() {
         share.text = "Compartilhar"
         styleSecondary(share)
         share.setOnClickListener {
+            analytics.event(
+                "compression_share"
+            )
             shareFile(result.file)
         }
 
@@ -717,48 +950,407 @@ class MainActivity : Activity() {
         )
     }
 
+    private fun showImageResizer() {
+        toolbarTitle.text = "Image Resizer"
+        content.removeAllViews()
+        analytics.screen("image_resizer")
+
+        content.addView(space(18))
+        content.addView(
+            title("Redimensionar imagem", 25f)
+        )
+        content.addView(
+            bodyText(
+                "Defina a largura final. A altura é calculada automaticamente para manter a proporção."
+            )
+        )
+
+        val picker = Button(this)
+        picker.text = "Escolher imagem"
+        stylePrimary(picker)
+        picker.setOnClickListener {
+            analytics.event("resize_picker_open")
+            pickResizeImage()
+        }
+
+        content.addView(
+            picker,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(52)
+            ).apply {
+                setMargins(
+                    dp(16),
+                    dp(18),
+                    dp(16),
+                    0
+                )
+            }
+        )
+
+        val preview = ImageView(this)
+        preview.id = android.R.id.custom
+        preview.scaleType =
+            ImageView.ScaleType.CENTER_INSIDE
+        preview.setBackgroundColor(Color.WHITE)
+
+        content.addView(
+            preview,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(220)
+            ).apply {
+                setMargins(
+                    dp(16),
+                    dp(18),
+                    dp(16),
+                    0
+                )
+            }
+        )
+
+        val widthInput = EditText(this)
+        widthInput.hint = "Largura em pixels"
+        widthInput.inputType =
+            InputType.TYPE_CLASS_NUMBER
+        widthInput.setSingleLine(true)
+        widthInput.setText("1280")
+        widthInput.textSize = 15f
+        widthInput.setTextColor(textColor)
+        widthInput.setHintTextColor(muted)
+        widthInput.setPadding(
+            dp(16),
+            dp(12),
+            dp(16),
+            dp(12)
+        )
+        widthInput.background =
+            GradientDrawable().apply {
+                setColor(surface)
+                setStroke(dp(1), border)
+                cornerRadius =
+                    dp(14).toFloat()
+            }
+
+        content.addView(
+            widthInput,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(54)
+            ).apply {
+                setMargins(
+                    dp(16),
+                    dp(18),
+                    dp(16),
+                    0
+                )
+            }
+        )
+
+        val resizeButton = Button(this)
+        resizeButton.text = "Redimensionar agora"
+        stylePrimary(resizeButton)
+        resizeButton.setOnClickListener {
+            val uri = selectedResizeImage
+
+            if (uri == null) {
+                analytics.event(
+                    "resize_validation_error"
+                )
+                toast("Escolha uma imagem primeiro.")
+                return@setOnClickListener
+            }
+
+            val targetWidth =
+                widthInput.text.toString()
+                    .trim()
+                    .toIntOrNull()
+
+            if (
+                targetWidth == null ||
+                targetWidth < 16 ||
+                targetWidth > 10000
+            ) {
+                analytics.event(
+                    "resize_invalid_width"
+                )
+                toast(
+                    "Use uma largura entre 16 e 10000 px."
+                )
+                return@setOnClickListener
+            }
+
+            analytics.event(
+                "resize_start",
+                "width" to targetWidth.toString()
+            )
+            resizeButton.isEnabled = false
+
+            val dialog = showProcessingDialog(
+                "Redimensionando imagem..."
+            )
+
+            Thread {
+                val result =
+                    ImageResizer(this).resize(
+                        uri,
+                        targetWidth
+                    )
+
+                runOnUiThread {
+                    dialog.dismiss()
+                    resizeButton.isEnabled = true
+
+                    if (result == null) {
+                        analytics.event(
+                            "resize_failed"
+                        )
+                        toast(
+                            "Não foi possível redimensionar esta imagem."
+                        )
+                    } else {
+                        analytics.event(
+                            "resize_success",
+                            "width" to result.width.toString(),
+                            "height" to result.height.toString()
+                        )
+                        showResizeResult(result)
+                    }
+                }
+            }.start()
+        }
+
+        content.addView(
+            resizeButton,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(52)
+            ).apply {
+                setMargins(
+                    dp(16),
+                    dp(18),
+                    dp(16),
+                    0
+                )
+            }
+        )
+
+        content.addView(space(30))
+    }
+
+    private fun showResizeResult(
+        result: ResizeResult
+    ) {
+        val card = card()
+        card.setPadding(
+            dp(18),
+            dp(18),
+            dp(18),
+            dp(18)
+        )
+
+        card.addView(
+            title(
+                "Resultado",
+                19f
+            )
+        )
+
+        val preview = ImageView(this)
+        preview.scaleType =
+            ImageView.ScaleType.CENTER_INSIDE
+        preview.setBackgroundColor(Color.WHITE)
+        preview.setImageBitmap(
+            BitmapFactory.decodeFile(
+                result.file.absolutePath
+            )
+        )
+
+        card.addView(
+            preview,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(220)
+            )
+        )
+
+        card.addView(
+            bodyText(
+                "Nova dimensão: " +
+                    result.width +
+                    " × " +
+                    result.height +
+                    "\nAntes: " +
+                    formatBytes(
+                        result.originalBytes
+                    ) +
+                    "\nDepois: " +
+                    formatBytes(
+                        result.resizedBytes
+                    )
+            )
+        )
+
+        val save = Button(this)
+        save.text = "Salvar na galeria"
+        stylePrimary(save)
+        save.setOnClickListener {
+            analytics.event(
+                "resize_save"
+            )
+
+            val uri =
+                ImageResizer(this)
+                    .saveToGallery(result.file)
+
+            if (uri != null) {
+                toast(
+                    "Imagem salva em Pictures/ToolNexa."
+                )
+            } else {
+                toast(
+                    "Não foi possível salvar a imagem."
+                )
+            }
+        }
+        card.addView(save)
+
+        val share = Button(this)
+        share.text = "Compartilhar"
+        styleSecondary(share)
+        share.setOnClickListener {
+            analytics.event(
+                "resize_share"
+            )
+            shareFile(result.file)
+        }
+        card.addView(share)
+
+        content.addView(
+            card,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(
+                    dp(16),
+                    dp(18),
+                    dp(16),
+                    0
+                )
+            }
+        )
+
+        analytics.event("resize_result_preview")
+    }
+
+
     private fun showAccount() {
         toolbarTitle.text = "Conta"
         content.removeAllViews()
+        analytics.screen("account")
+
+        val user = auth.currentUser
 
         content.addView(space(18))
 
-        val account = card()
-        account.setPadding(
+        if (user == null) {
+            val account = card()
+            account.setPadding(
+                dp(20),
+                dp(22),
+                dp(20),
+                dp(22)
+            )
+
+            account.addView(
+                title("A tua conta ToolNexa", 24f)
+            )
+            account.addView(
+                bodyText(
+                    "Entra com Google ou e-mail para sincronizar a tua identidade no ToolNexa."
+                )
+            )
+
+            val login = Button(this)
+            login.text = "Entrar / Criar conta"
+            stylePrimary(login)
+            login.setOnClickListener {
+                analytics.event("login_screen_open")
+                startActivityForResult(
+                    Intent(
+                        this,
+                        LoginActivity::class.java
+                    ),
+                    REQUEST_LOGIN
+                )
+            }
+            account.addView(login)
+
+            content.addView(
+                account,
+                LinearLayout.LayoutParams(
+                    -1,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(
+                        dp(16),
+                        0,
+                        dp(16),
+                        0
+                    )
+                }
+            )
+            return
+        }
+
+        analytics.setUser(user)
+
+        val profile = card()
+        profile.setPadding(
             dp(20),
             dp(22),
             dp(20),
             dp(22)
         )
 
-        account.addView(
+        val avatar = ImageView(this)
+        avatar.setImageResource(
+            android.R.drawable.ic_menu_myplaces
+        )
+        avatar.setColorFilter(blue)
+
+        profile.addView(
+            avatar,
+            LinearLayout.LayoutParams(
+                dp(54),
+                dp(54)
+            )
+        )
+
+        profile.addView(
             title(
-                "Conta ToolNexa",
+                user.displayName ?: "Utilizador ToolNexa",
                 24f
             )
         )
-        account.addView(
+
+        profile.addView(
             bodyText(
-                "A conta ainda não está ativa nesta versão. O sistema foi deixado preparado para receber Firebase Authentication em uma atualização futura."
+                user.email ?: "Sem e-mail disponível"
             )
         )
 
         val status = TextView(this)
-        status.text = "CONVIDADO"
+        status.text = "CONTA ATIVA"
         status.textSize = 12f
         status.typeface =
             android.graphics.Typeface.DEFAULT_BOLD
         status.setTextColor(blue)
-        account.addView(status)
-
-        val login = Button(this)
-        login.text = "Login / Registo — em breve"
-        styleSecondary(login)
-        login.isEnabled = false
-        account.addView(login)
+        profile.addView(status)
 
         content.addView(
-            account,
+            profile,
             LinearLayout.LayoutParams(
                 -1,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -766,6 +1358,109 @@ class MainActivity : Activity() {
                 setMargins(
                     dp(16),
                     0,
+                    dp(16),
+                    0
+                )
+            }
+        )
+
+        val data = card()
+        data.setPadding(
+            dp(18),
+            dp(18),
+            dp(18),
+            dp(18)
+        )
+
+        val providers =
+            user.providerData
+                .filter { it.providerId.isNotBlank() }
+                .joinToString(", ") {
+                    when (it.providerId) {
+                        "google.com" -> "Google"
+                        "password" -> "E-mail / senha"
+                        else -> it.providerId
+                    }
+                }
+                .ifBlank { "—" }
+
+        fun dateText(
+            timestamp: Long?
+        ): String {
+            if (timestamp == null || timestamp <= 0L) {
+                return "—"
+            }
+
+            return java.text.SimpleDateFormat(
+                "dd/MM/yyyy HH:mm",
+                java.util.Locale.getDefault()
+            ).format(
+                java.util.Date(timestamp)
+            )
+        }
+
+        data.addView(
+            title("Dados da conta", 18f)
+        )
+        data.addView(
+            bodyText(
+                "UID: " + user.uid +
+                    "\nNome: " +
+                    (user.displayName ?: "—") +
+                    "\nE-mail: " +
+                    (user.email ?: "—") +
+                    "\nTelefone: " +
+                    (user.phoneNumber ?: "—") +
+                    "\nProvedores: " +
+                    providers +
+                    "\nE-mail verificado: " +
+                    if (user.isEmailVerified) "Sim" else "Não" +
+                    "\nCriada em: " +
+                    dateText(
+                        user.metadata?.creationTimestamp
+                    ) +
+                    "\nÚltimo acesso: " +
+                    dateText(
+                        user.metadata?.lastSignInTimestamp
+                    )
+            )
+        )
+
+        content.addView(
+            data,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(
+                    dp(16),
+                    dp(14),
+                    dp(16),
+                    0
+                )
+            }
+        )
+
+        val logout = Button(this)
+        logout.text = "Terminar sessão"
+        styleSecondary(logout)
+        logout.setOnClickListener {
+            analytics.event("logout")
+            auth.signOut()
+            analytics.clearUser()
+            toast("Sessão terminada.")
+            showAccount()
+        }
+
+        content.addView(
+            logout,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(52)
+            ).apply {
+                setMargins(
+                    dp(16),
+                    dp(16),
                     dp(16),
                     0
                 )
@@ -805,6 +1500,10 @@ class MainActivity : Activity() {
             )
 
         auto.setOnCheckedChangeListener { _, checked ->
+            analytics.event(
+                "auto_update_toggle",
+                "enabled" to checked.toString()
+            )
             prefs.edit()
                 .putBoolean(
                     "auto_update_check",
@@ -819,6 +1518,7 @@ class MainActivity : Activity() {
         updateNow.text = "Verificar agora"
         styleSecondary(updateNow)
         updateNow.setOnClickListener {
+            analytics.event("update_check_manual")
             updateManager.checkForUpdate(
                 showErrors = true
             )
@@ -1005,6 +1705,10 @@ class MainActivity : Activity() {
         row.background = selectable()
 
         row.setOnClickListener {
+            analytics.event(
+                "navigation_click",
+                "destination" to label
+            )
             action()
         }
 
@@ -1061,6 +1765,7 @@ class MainActivity : Activity() {
     }
 
     private fun pickImage() {
+        analytics.event("image_picker_start")
         val intent =
             Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 type = "image/*"
@@ -1096,14 +1801,35 @@ class MainActivity : Activity() {
         )
 
         if (
-            requestCode != REQUEST_PICK_IMAGE ||
             resultCode != RESULT_OK
         ) {
             return
         }
 
+        if (
+            requestCode == REQUEST_LOGIN
+        ) {
+            analytics.event("login_returned_to_app")
+            showAccount()
+            return
+        }
+
+        if (
+            requestCode != REQUEST_PICK_IMAGE &&
+            requestCode != REQUEST_PICK_RESIZE_IMAGE
+        ) {
+            return
+        }
+
         val uri = data?.data ?: return
-        selectedImage = uri
+
+        if (requestCode == REQUEST_PICK_RESIZE_IMAGE) {
+            selectedResizeImage = uri
+            analytics.event("resize_image_selected")
+        } else {
+            selectedImage = uri
+            analytics.event("image_selected")
+        }
 
         try {
             contentResolver.takePersistableUriPermission(
@@ -1111,6 +1837,36 @@ class MainActivity : Activity() {
                 Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
         } catch (_: Exception) {
+        }
+
+        if (
+            requestCode == REQUEST_PICK_RESIZE_IMAGE
+        ) {
+            showImageResizer()
+
+            val preview =
+                root.findViewById<ImageView>(
+                    android.R.id.custom
+                )
+
+            Thread {
+                val bitmap =
+                    compressor.decodeSampled(uri)
+
+                runOnUiThread {
+                    if (bitmap != null) {
+                        preview?.setImageBitmap(bitmap)
+                    }
+                    toast(
+                        if (bitmap != null) {
+                            "Imagem selecionada."
+                        } else {
+                            "Não foi possível ler a imagem."
+                        }
+                    )
+                }
+            }.start()
+            return
         }
 
         if (
@@ -1146,7 +1902,149 @@ class MainActivity : Activity() {
         }.start()
     }
 
+    private fun pickResizeImage() {
+        val intent =
+            Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                type = "image/*"
+                addCategory(Intent.CATEGORY_OPENABLE)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+            }
+
+        startActivityForResult(
+            intent,
+            REQUEST_PICK_RESIZE_IMAGE
+        )
+    }
+
+    private fun showProcessingDialog(
+        message: String
+    ): android.app.AlertDialog {
+        val layout = LinearLayout(this)
+        layout.orientation = LinearLayout.HORIZONTAL
+        layout.gravity = Gravity.CENTER_VERTICAL
+        layout.setPadding(
+            dp(24),
+            dp(20),
+            dp(24),
+            dp(20)
+        )
+
+        val gear = TextView(this)
+        gear.text = "⚙"
+        gear.textSize = 32f
+        gear.setTextColor(blue)
+        gear.gravity = Gravity.CENTER
+
+        val label = TextView(this)
+        label.text = message
+        label.textSize = 16f
+        label.setTextColor(textColor)
+        label.setPadding(dp(18), 0, 0, 0)
+
+        layout.addView(
+            gear,
+            LinearLayout.LayoutParams(
+                dp(48),
+                dp(48)
+            )
+        )
+        layout.addView(
+            label,
+            LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+            )
+        )
+
+        val dialog =
+            android.app.AlertDialog.Builder(this)
+                .setView(layout)
+                .setCancelable(false)
+                .create()
+
+        gear.animate()
+            .rotationBy(360f)
+            .setDuration(850)
+            .setInterpolator(
+                android.view.animation.LinearInterpolator()
+            )
+            .setListener(
+                object : android.animation.Animator.AnimatorListener {
+                    override fun onAnimationStart(
+                        animation: android.animation.Animator
+                    ) = Unit
+
+                    override fun onAnimationEnd(
+                        animation: android.animation.Animator
+                    ) {
+                        if (dialog.isShowing) {
+                            gear.rotation = 0f
+                            gear.animate()
+                                .rotationBy(360f)
+                                .setDuration(850)
+                                .setListener(this)
+                                .start()
+                        }
+                    }
+
+                    override fun onAnimationCancel(
+                        animation: android.animation.Animator
+                    ) = Unit
+
+                    override fun onAnimationRepeat(
+                        animation: android.animation.Animator
+                    ) = Unit
+                }
+            )
+
+        dialog.setOnShowListener {
+            gear.animate()
+                .rotationBy(360f)
+                .setDuration(850)
+                .setInterpolator(
+                    android.view.animation.LinearInterpolator()
+                )
+                .setListener(
+                    object : android.animation.Animator.AnimatorListener {
+                        override fun onAnimationStart(
+                            animation: android.animation.Animator
+                        ) = Unit
+
+                        override fun onAnimationEnd(
+                            animation: android.animation.Animator
+                        ) {
+                            if (dialog.isShowing) {
+                                gear.rotation = 0f
+                                gear.animate()
+                                    .rotationBy(360f)
+                                    .setDuration(850)
+                                    .setInterpolator(
+                                        android.view.animation.LinearInterpolator()
+                                    )
+                                    .start()
+                            }
+                        }
+
+                        override fun onAnimationCancel(
+                            animation: android.animation.Animator
+                        ) = Unit
+
+                        override fun onAnimationRepeat(
+                            animation: android.animation.Animator
+                        ) = Unit
+                    }
+                )
+                .start()
+        }
+
+        dialog.show()
+        return dialog
+    }
+
     private fun shareFile(file: File) {
+        analytics.event("share_started")
         val uri = FileProvider.getUriForFile(
             this,
             "com.toolnexa.app.fileprovider",
@@ -1342,5 +2240,9 @@ class MainActivity : Activity() {
     companion object {
         private const val REQUEST_PICK_IMAGE =
             401
+        private const val REQUEST_PICK_RESIZE_IMAGE =
+            402
+        private const val REQUEST_LOGIN =
+            403
     }
 }

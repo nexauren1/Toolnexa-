@@ -89,7 +89,9 @@ jobs:
         run: |
           NOTES="ToolNexa Android v$VERSION
 
-          First public app build. Includes Image Compressor, navigation menu, account placeholder, settings and GitHub Release update flow."
+          ToolNexa Android v$VERSION
+
+Adds Firebase Authentication with Google and email/password, Firebase Analytics, Image Resizer, tool search/grid, account details and in-tool result previews."
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" toolnexa.apk --clobber
