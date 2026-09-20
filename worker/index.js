@@ -29,7 +29,7 @@ export default {
           ok: true,
           service: "ToolNexa API",
           worker: "toolnexa",
-          api_version: "1.12.3",
+          api_version: "1.12.4",
           paypal: env.PAYPAL_ENV || "sandbox",
           workers_ai: !!env.AI,
           images_binding: !!env.IMAGES,
@@ -232,6 +232,15 @@ function json(data, status = 200) {
       }
     }
   );
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function nowSeconds() {
