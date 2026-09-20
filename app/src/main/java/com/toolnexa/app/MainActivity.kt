@@ -2061,14 +2061,28 @@ class MainActivity : ComponentActivity() {
 
                 dialog.dismiss()
 
-                // Refresh translated views without recreating the Activity.
-                I18n.localizeWindow(this)
+                // Rebuild the UI in-place. This avoids Activity recreation
+                // and prevents the black/empty screen on affected devices.
+                refreshAfterLanguageChange()
             }
             .setNegativeButton(
                 I18n.t(this, "Cancelar"),
                 null
             )
             .show()
+    }
+
+    private fun refreshAfterLanguageChange() {
+        try {
+            buildShell()
+            showHome()
+            I18n.localizeWindow(this)
+        } catch (error: Exception) {
+            analytics.event(
+                "language_refresh_failed",
+                "error" to error.javaClass.simpleName
+            )
+        }
     }
 
     private fun showAbout() {
