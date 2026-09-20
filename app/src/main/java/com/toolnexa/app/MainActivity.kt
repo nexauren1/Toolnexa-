@@ -398,6 +398,14 @@ class MainActivity : ComponentActivity() {
         }
 
         drawerItem(
+            "Planos",
+            R.drawable.ic_tool_plans
+        ) {
+            showPlans()
+            closeDrawer()
+        }
+
+        drawerItem(
             "Definições",
             android.R.drawable.ic_menu_preferences
         ) {
@@ -985,6 +993,12 @@ class MainActivity : ComponentActivity() {
                     "Imagem",
                     "Converta imagens para JPG, PNG ou WebP.",
                     R.drawable.ic_tool_convert
+                ),
+                ToolDefinition(
+                    "Background Remover",
+                    "Imagem",
+                    "Remova o fundo com IA e preserve transparência.",
+                    R.drawable.ic_tool_background
                 )
             ).filter {
                 it.name.contains(query.trim(), true) ||
@@ -1128,6 +1142,9 @@ class MainActivity : ComponentActivity() {
 
                 "Image Converter" ->
                     showImageConverter()
+
+                "Background Remover" ->
+                    showBackgroundRemover()
             }
         }
 
@@ -1221,6 +1238,29 @@ class MainActivity : ComponentActivity() {
             )
         )
     }
+    private fun showBackgroundRemover() {
+        analytics.event(
+            "tool_open_backend",
+            "tool" to "background_remover"
+        )
+        startActivity(
+            Intent(
+                this,
+                BackgroundRemoverActivity::class.java
+            )
+        )
+    }
+
+    private fun showPlans() {
+        analytics.event("plans_open")
+        startActivity(
+            Intent(
+                this,
+                PlansActivity::class.java
+            )
+        )
+    }
+
 
     private fun showImageConverter() {
         analytics.event("tool_open_workflow", "tool" to "converter")
