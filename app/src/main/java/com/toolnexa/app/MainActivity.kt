@@ -399,10 +399,10 @@ class MainActivity : ComponentActivity() {
             textSize = 11f
             setTextColor(blue)
             setPadding(dp(9), dp(5), dp(9), dp(5))
-            background = roundedBackground(
-                android.graphics.Color.parseColor("#EAF0FF"),
-                10
-            )
+            background = GradientDrawable().apply {
+                setColor(android.graphics.Color.parseColor("#EAF0FF"))
+                cornerRadius = dp(10).toFloat()
+            }
         }
         row.addView(badgeView)
         box.addView(row)
@@ -436,10 +436,13 @@ class MainActivity : ComponentActivity() {
         )
         content.addView(space(14))
 
-        addSectionCard(
+        addCategoryCard(
             "Imagem",
-            "Otimização, tamanho e conversão de imagens"
-        )
+            "Otimização, tamanho e conversão de imagens",
+            R.drawable.ic_tool_compress
+        ) {
+            showCategory("Imagem")
+        }
         addHomeToolsGrid()
 
         addSectionCard(
@@ -552,6 +555,12 @@ class MainActivity : ComponentActivity() {
                     "Image Resizer",
                     "Imagem",
                     "Redimensione a imagem e veja a nova prévia.",
+                    R.drawable.ic_tool_resize
+                ),
+                ToolDefinition(
+                    "Image Converter",
+                    "Imagem",
+                    "Converta imagens para JPG, PNG ou WebP.",
                     R.drawable.ic_tool_resize
                 )
             ).filter {
@@ -693,6 +702,9 @@ class MainActivity : ComponentActivity() {
 
                 "Image Resizer" ->
                     showImageResizer()
+
+                "Image Converter" ->
+                    showImageConverter()
             }
         }
 
@@ -713,6 +725,78 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+
+    private fun addCategoryCard(
+        name: String,
+        description: String,
+        icon: Int,
+        action: () -> Unit
+    ) {
+        val box = card()
+        box.setPadding(dp(16), dp(14), dp(16), dp(14))
+        box.alpha = 0f
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val image = ImageView(this).apply {
+            setImageResource(icon)
+            setColorFilter(blue)
+            contentDescription = name
+        }
+        row.addView(
+            image,
+            LinearLayout.LayoutParams(dp(44), dp(44))
+        )
+        val texts = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), 0, 0, 0)
+        }
+        texts.addView(title(name, 18f))
+        texts.addView(bodyText(description))
+        row.addView(
+            texts,
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+        val arrow = TextView(this).apply {
+            text = "›"
+            textSize = 30f
+            setTextColor(blue)
+        }
+        row.addView(arrow)
+        box.addView(row)
+        box.setOnClickListener {
+            analytics.event("category_open", "category" to name)
+            action()
+        }
+        content.addView(
+            box,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(dp(16), dp(8), dp(16), dp(8))
+            }
+        )
+        box.animate().alpha(1f).setDuration(260).start()
+    }
+
+    private fun showCategory(category: String) {
+        startActivity(
+            Intent(this, CategoryActivity::class.java).apply {
+                putExtra("category", category)
+            }
+        )
+    }
+
+    private fun showImageConverter() {
+        analytics.event("tool_open_workflow", "tool" to "converter")
+        startActivity(
+            Intent(this, ToolWorkflowActivity::class.java).apply {
+                putExtra("tool", "converter")
+            }
+        )
+    }
 
     private fun showTools() {
         toolbarTitle.text = "Ferramentas"
