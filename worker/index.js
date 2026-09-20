@@ -1070,14 +1070,27 @@ function paypalSetupError(
   status,
   details
 ) {
+  const reason =
+    paypalFailureMessage(
+      details,
+      ""
+    );
+
+  const visibleMessage =
+    reason
+      ? publicMessage +
+        " Motivo: " +
+        reason
+      : publicMessage;
+
   const error =
     new Error(
-      publicMessage
+      visibleMessage
     );
 
   error.code = code;
   error.publicMessage =
-    publicMessage;
+    visibleMessage;
   error.status = 502;
 
   console.error(
@@ -1090,6 +1103,56 @@ function paypalSetupError(
   );
 
   return error;
+}
+
+function paypalFailureMessage(
+  payload,
+  fallback
+) {
+  if (!payload) {
+    return fallback;
+  }
+
+  if (
+    typeof payload.message ===
+    "string" &&
+    payload.message.trim()
+  ) {
+    return payload.message.trim();
+  }
+
+  const details =
+    Array.isArray(
+      payload.details
+    )
+      ? payload.details
+      : [];
+
+  const descriptions =
+    details
+      .map(
+        item =>
+          item?.description ||
+          item?.issue ||
+          ""
+      )
+      .filter(Boolean);
+
+  if (descriptions.length) {
+    return descriptions.join(
+      " "
+    );
+  }
+
+  if (
+    typeof payload.name ===
+    "string" &&
+    payload.name.trim()
+  ) {
+    return payload.name.trim();
+  }
+
+  return fallback;
 }
 
 async function createSubscription(
@@ -1195,8 +1258,20 @@ async function createSubscription(
           "paypal_create_subscription_failed",
         status:
           response.status,
+        message:
+          paypalFailureMessage(
+            payload,
+            "O PayPal Sandbox recusou a criação da subscrição."
+          ),
+        paypal_error:
+          payload?.name ||
+          null,
+        paypal_debug_id:
+          payload?.debug_id ||
+          null,
         details:
-          payload
+          payload?.details ||
+          []
       },
       502
     );
