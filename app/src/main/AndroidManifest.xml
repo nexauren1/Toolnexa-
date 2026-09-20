@@ -26,6 +26,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".SupportActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".CategoryActivity"
             android:exported="false" />
 
