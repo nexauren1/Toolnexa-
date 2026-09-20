@@ -1,7 +1,10 @@
 package com.toolnexa.app
 
+import android.app.LocaleManager
 import android.content.Context
 import android.content.res.Configuration
+import android.os.Build
+import android.os.LocaleList
 import java.util.Locale
 
 object LanguageManager {
@@ -25,19 +28,27 @@ object LanguageManager {
         context: Context
     ) {
         val code =
-            context
-                .getSharedPreferences(
-                    "toolnexa_language",
-                    Context.MODE_PRIVATE
-                )
-                .getString(
-                    "language",
-                    ""
-                )
-                ?.trim()
-                .orEmpty()
+            current(context)
 
         if (code.isBlank()) {
+            return
+        }
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            val manager =
+                context.getSystemService(
+                    LocaleManager::class.java
+                )
+
+            val currentTags =
+                manager.applicationLocales
+                    .toLanguageTags()
+
+            if (currentTags != code) {
+                manager.applicationLocales =
+                    LocaleList.forLanguageTags(code)
+            }
+
             return
         }
 
@@ -52,10 +63,9 @@ object LanguageManager {
             )
 
         configuration.setLocale(locale)
-        configuration.setLayoutDirection(
-            locale
-        )
+        configuration.setLayoutDirection(locale)
 
+        @Suppress("DEPRECATION")
         context.resources.updateConfiguration(
             configuration,
             context.resources.displayMetrics
@@ -66,6 +76,22 @@ object LanguageManager {
         context: Context,
         code: String
     ) {
+        if (!supported.contains(code)) {
+            return
+        }
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            val manager =
+                context.getSystemService(
+                    LocaleManager::class.java
+                )
+
+            manager.applicationLocales =
+                LocaleList.forLanguageTags(code)
+
+            return
+        }
+
         context
             .getSharedPreferences(
                 "toolnexa_language",
@@ -81,14 +107,44 @@ object LanguageManager {
 
     fun current(
         context: Context
-    ): String =
-        context
+    ): String {
+        if (Build.VERSION.SDK_INT >= 33) {
+            val tags =
+                context
+                    .getSystemService(
+                        LocaleManager::class.java
+                    )
+                    .applicationLocales
+                    .toLanguageTags()
+
+            val first =
+                tags
+                    .split(",")
+                    .firstOrNull()
+                    ?.trim()
+                    ?.lowercase()
+                    ?.substringBefore("-")
+                    .orEmpty()
+
+            if (supported.contains(first)) {
+                return first
+            }
+        }
+
+        return context
             .getSharedPreferences(
                 "toolnexa_language",
                 Context.MODE_PRIVATE
             )
             .getString(
                 "language",
-                "pt"
-            ) ?: "pt"
+                PORTUGUESE
+            )
+            ?.trim()
+            ?.lowercase()
+            ?.takeIf {
+                supported.contains(it)
+            }
+            ?: PORTUGUESE
+    }
 }
