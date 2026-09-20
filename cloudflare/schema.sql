@@ -114,12 +114,11 @@ INSERT INTO plans (
 );
 
 -- O Free não precisa de PayPal.
--- Para ativar a assinatura Pro, coloque aqui o
--- verdadeiro Plan ID criado no PayPal Sandbox:
---
--- UPDATE plans
--- SET paypal_plan_id = 'P-xxxxxxxxxxxxxxxxxxxx'
--- WHERE plan_id = 'PRO';
+-- O Pro começa com os IDs do PayPal vazios.
+-- O Worker cria automaticamente o produto e o plano mensal
+-- no PayPal Sandbox na primeira tentativa de assinatura e
+-- grava os IDs gerados em paypal_product_id e paypal_plan_id.
+-- Não é necessário preencher um P-... manualmente.
 
 SELECT
     plan_id,
