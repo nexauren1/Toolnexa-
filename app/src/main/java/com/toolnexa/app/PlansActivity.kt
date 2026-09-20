@@ -3,12 +3,21 @@ package com.toolnexa.app
 import android.app.Activity
 import android.os.Bundle
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.app.AlertDialog
+import android.net.Uri
+import com.google.firebase.auth.FirebaseAuth
+import java.io.IOException
 import android.graphics.drawable.GradientDrawable
 
 class PlansActivity : Activity() {
+
+    private val auth by lazy {
+        FirebaseAuth.getInstance()
+    }
 
     private val bg by lazy {
         getColor(R.color.toolnexa_bg)
@@ -103,6 +112,38 @@ class PlansActivity : Activity() {
             addView(title(name, 21f))
             addView(body(price))
             addView(body(description))
+
+            if (name == "Pro") {
+                val subscribe =
+                    Button(this@PlansActivity).apply {
+                        text = "Assinar Pro"
+                        minHeight = 54
+                        setTextColor(
+                            android.graphics.Color.WHITE
+                        )
+                        background =
+                            GradientDrawable().apply {
+                                setColor(
+                                    getColor(
+                                        R.color.toolnexa_blue
+                                    )
+                                )
+                                cornerRadius = 14f
+                            }
+                    }
+
+                subscribe.setOnClickListener {
+                    startProSubscription()
+                }
+
+                addView(
+                    subscribe,
+                    LinearLayout.LayoutParams(
+                        -1,
+                        54
+                    )
+                )
+            }
         }
 
     private fun title(
