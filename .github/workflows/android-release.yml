@@ -51,7 +51,7 @@ jobs:
           test -n "$TOOLNEXA_STORE_PASSWORD"
           test -n "$TOOLNEXA_KEY_ALIAS"
           mkdir -p app/signing
-          printf '%s' "$TOOLNEXA_KEYSTORE_BASE64" | base64 --decode > app/signing/toolnexa-upload.jks
+          printf '%s' "$TOOLNEXA_KEYSTORE_BASE64" | base64 --decode > app/signing/toolnexa-upload.p12
           test -s app/signing/toolnexa-upload.p12
           cat >> app/build.gradle.kts <<'EOF'
 
