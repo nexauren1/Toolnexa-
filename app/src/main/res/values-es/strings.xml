@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ToolNexa</string>
+    <string name="app_description">Herramientas útiles en una sola aplicación.</string>
+    <string name="support_back">‹  ToolNexa</string>
+    <string name="support_title">Soporte, sugerencias y reclamaciones</string>
+    <string name="support_description">Elige el tipo de contacto, la herramienta y el problema específico. Al tocar Enviar, se abre tu aplicación de correo con el informe preparado para revisarlo antes de enviarlo.</string>
+    <string name="support_type_label">Tipo de contacto</string><string name="support_tool_label">Herramienta o área</string><string name="support_problem_label">Problema</string><string name="support_message_label">Mensaje</string>
+    <string name="support_message_hint">Explica el problema, la idea o la sugerencia...</string>
+    <string name="support_diagnostics">Incluir diagnóstico técnico (modelo, Android, versión de la app e idioma)</string>
+    <string name="support_privacy_note">No se incluyen contraseñas, tokens de autenticación, claves privadas ni otros secretos. El correo se abre para revisarlo antes de enviarlo.</string>
+    <string name="support_send">Enviar al soporte</string><string name="support_message_required">Escribe tu mensaje.</string><string name="support_subject_prefix">[ToolNexa]</string><string name="support_no_email_app">No se encontró una aplicación de correo.</string>
+    <string-array name="support_types"><item>Soporte técnico</item><item>Reclamación</item><item>Sugerencia</item><item>Problema de pago</item><item>Problema de cuenta</item></string-array>
+    <string-array name="support_tools"><item>General</item><item>Background Remover</item><item>Image Compressor</item><item>Image Resizer</item><item>Image Converter</item><item>Planes / PayPal</item><item>Inicio de sesión / Cuenta</item><item>Historial</item><item>Otra herramienta</item></string-array>
+    <string-array name="support_problems"><item>Ningún problema específico</item><item>La app se cierra / falla</item><item>Pantalla blanca</item><item>La función no funciona</item><item>La IA no funciona</item><item>Resultado incorrecto</item><item>No puedo guardar o compartir</item><item>Problema de inicio de sesión / cuenta</item><item>Problema de pago / plan</item><item>Lento o se bloquea</item><item>Otro</item></string-array>
+</resources>
