@@ -2,6 +2,7 @@ package com.toolnexa.app
 
 import android.app.AlertDialog
 import android.os.Bundle
+import android.os.CountDownTimer
 import android.text.InputType
 import android.view.Gravity
 import android.view.ViewGroup
@@ -20,6 +21,10 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.auth.PhoneAuthCredential
+import com.google.firebase.auth.PhoneAuthOptions
+import com.google.firebase.auth.PhoneAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -43,8 +48,19 @@ class LoginActivity : ComponentActivity() {
     private lateinit var nameInput: EditText
     private lateinit var primaryButton: Button
     private lateinit var forgotButton: Button
+    private lateinit var phoneInput: EditText
+    private lateinit var phoneButton: Button
+    private lateinit var phoneCodeInput: EditText
+    private lateinit var phoneVerifyButton: Button
+    private lateinit var phoneResendButton: Button
+    private lateinit var phoneChangeButton: Button
 
     private var registerMode = false
+    private var verificationId: String? = null
+    private var resendToken: PhoneAuthProvider.ForceResendingToken? = null
+    private var lastPhoneNumber: String? = null
+    private var phoneLoginCompleted = false
+    private var resendTimer: CountDownTimer? = null
 
     private val blue by lazy {
         getColor(R.color.toolnexa_blue)
@@ -200,6 +216,140 @@ class LoginActivity : ComponentActivity() {
                     dp(8),
                     0,
                     0
+                )
+            }
+        )
+
+        val phoneDivider = TextView(this)
+        phoneDivider.text = "ou usa o telefone"
+        phoneDivider.textSize = 13f
+        phoneDivider.gravity = Gravity.CENTER
+        phoneDivider.setTextColor(muted)
+        phoneDivider.setPadding(0, dp(12), 0, dp(12))
+        body.addView(
+            phoneDivider,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(52)
+            )
+        )
+
+        phoneInput = edit(
+            "Telefone (+258 84 123 4567)",
+            InputType.TYPE_CLASS_PHONE
+        )
+        body.addView(phoneInput)
+
+        val phoneHint = TextView(this)
+        phoneHint.text =
+            "Receberás um código por SMS. Podem aplicar-se taxas da tua operadora."
+        phoneHint.textSize = 12f
+        phoneHint.setTextColor(muted)
+        phoneHint.setPadding(
+            dp(2),
+            dp(0),
+            dp(2),
+            dp(8)
+        )
+        body.addView(phoneHint)
+
+        phoneButton = Button(this)
+        phoneButton.text = "Enviar código SMS"
+        stylePrimary(phoneButton)
+        phoneButton.setOnClickListener {
+            sendPhoneCode()
+        }
+        body.addView(
+            phoneButton,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(52)
+            ).apply {
+                setMargins(
+                    0,
+                    dp(2),
+                    0,
+                    dp(8)
+                )
+            }
+        )
+
+        phoneCodeInput = edit(
+            "Código de 6 dígitos",
+            InputType.TYPE_CLASS_NUMBER
+        )
+        phoneCodeInput.inputType =
+            InputType.TYPE_CLASS_NUMBER
+        phoneCodeInput.visibility =
+            android.view.View.GONE
+        body.addView(phoneCodeInput)
+
+        phoneVerifyButton = Button(this)
+        phoneVerifyButton.text = "Confirmar código"
+        stylePrimary(phoneVerifyButton)
+        phoneVerifyButton.visibility =
+            android.view.View.GONE
+        phoneVerifyButton.setOnClickListener {
+            verifyPhoneCode()
+        }
+        body.addView(
+            phoneVerifyButton,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(52)
+            ).apply {
+                setMargins(
+                    0,
+                    0,
+                    0,
+                    dp(8)
+                )
+            }
+        )
+
+        phoneResendButton = Button(this)
+        phoneResendButton.text = "Reenviar código"
+        styleSecondary(phoneResendButton)
+        phoneResendButton.visibility =
+            android.view.View.GONE
+        phoneResendButton.setOnClickListener {
+            resendPhoneCode()
+        }
+        body.addView(
+            phoneResendButton,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(48)
+            ).apply {
+                setMargins(
+                    0,
+                    0,
+                    0,
+                    dp(8)
+                )
+            }
+        )
+
+        phoneChangeButton = Button(this)
+        phoneChangeButton.text = "Trocar número"
+        styleSecondary(phoneChangeButton)
+        phoneChangeButton.visibility =
+            android.view.View.GONE
+        phoneChangeButton.setOnClickListener {
+            resetPhoneUi()
+            analytics.event("auth_phone_change")
+        }
+        body.addView(
+            phoneChangeButton,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(48)
+            ).apply {
+                setMargins(
+                    0,
+                    0,
+                    0,
+                    dp(10)
                 )
             }
         )
@@ -456,6 +606,414 @@ class LoginActivity : ComponentActivity() {
                     toast("Não foi possível enviar o e-mail de recuperação.")
                 }
             }
+    }
+
+    private fun sendPhoneCode() {
+        val phone = normalizePhoneNumber(
+            phoneInput.text.toString()
+        )
+
+        if (phone == null) {
+            toast(
+                "Use o formato internacional, por exemplo +258841234567."
+            )
+            analytics.event(
+                "auth_phone_validation_error"
+            )
+            return
+        }
+
+        lastPhoneNumber = phone
+        phoneLoginCompleted = false
+
+        val dialog = showProcessing(
+            "A enviar o código por SMS..."
+        )
+        phoneButton.isEnabled = false
+        phoneInput.isEnabled = false
+        auth.setLanguageCode("pt")
+
+        val callbacks =
+            object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+
+                override fun onVerificationCompleted(
+                    credential: PhoneAuthCredential
+                ) {
+                    if (phoneLoginCompleted) {
+                        return
+                    }
+
+                    phoneLoginCompleted = true
+                    signInWithPhoneAuthCredential(
+                        credential,
+                        dialog
+                    )
+                }
+
+                override fun onVerificationFailed(
+                    error: com.google.firebase.FirebaseException
+                ) {
+                    dialog.dismiss()
+                    phoneButton.isEnabled = true
+                    phoneInput.isEnabled = true
+                    phoneLoginCompleted = false
+
+                    analytics.event(
+                        "auth_phone_failed",
+                        "error" to
+                            error.javaClass.simpleName
+                    )
+                    toast(
+                        phoneAuthErrorMessage(error)
+                    )
+                }
+
+                override fun onCodeSent(
+                    id: String,
+                    token: PhoneAuthProvider.ForceResendingToken
+                ) {
+                    verificationId = id
+                    resendToken = token
+
+                    dialog.dismiss()
+                    phoneButton.isEnabled = true
+
+                    if (!phoneLoginCompleted) {
+                        showPhoneCodeUi()
+                        analytics.event(
+                            "auth_phone_code_sent"
+                        )
+                        toast(
+                            "Código enviado por SMS."
+                        )
+                        startResendCooldown()
+                    }
+                }
+
+                override fun onCodeAutoRetrievalTimeOut(
+                    id: String
+                ) {
+                    verificationId = id
+                    analytics.event(
+                        "auth_phone_auto_retrieval_timeout"
+                    )
+                }
+            }
+
+        val options =
+            PhoneAuthOptions.newBuilder(auth)
+                .setPhoneNumber(phone)
+                .setTimeout(
+                    60L,
+                    java.util.concurrent.TimeUnit.SECONDS
+                )
+                .setActivity(this)
+                .setCallbacks(callbacks)
+                .build()
+
+        PhoneAuthProvider.verifyPhoneNumber(
+            options
+        )
+    }
+
+    private fun verifyPhoneCode() {
+        val code = phoneCodeInput.text
+            .toString()
+            .trim()
+
+        val id = verificationId
+
+        if (id.isNullOrBlank()) {
+            toast(
+                "Pede primeiro um novo código SMS."
+            )
+            analytics.event(
+                "auth_phone_session_missing"
+            )
+            return
+        }
+
+        if (!code.matches(Regex("\\d{6}"))) {
+            toast(
+                "Introduz o código de 6 dígitos."
+            )
+            analytics.event(
+                "auth_phone_code_validation_error"
+            )
+            return
+        }
+
+        val dialog = showProcessing(
+            "A verificar o código..."
+        )
+        phoneVerifyButton.isEnabled = false
+
+        val credential =
+            PhoneAuthProvider.getCredential(
+                id,
+                code
+            )
+
+        signInWithPhoneAuthCredential(
+            credential,
+            dialog
+        )
+    }
+
+    private fun resendPhoneCode() {
+        val phone = lastPhoneNumber
+        val token = resendToken
+
+        if (phone.isNullOrBlank() || token == null) {
+            toast(
+                "Não é possível reenviar o código agora."
+            )
+            return
+        }
+
+        phoneLoginCompleted = false
+
+        val dialog = showProcessing(
+            "A reenviar o código SMS..."
+        )
+        phoneResendButton.isEnabled = false
+        analytics.event("auth_phone_resend")
+
+        val callbacks =
+            object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+
+                override fun onVerificationCompleted(
+                    credential: PhoneAuthCredential
+                ) {
+                    if (phoneLoginCompleted) {
+                        return
+                    }
+
+                    phoneLoginCompleted = true
+                    signInWithPhoneAuthCredential(
+                        credential,
+                        dialog
+                    )
+                }
+
+                override fun onVerificationFailed(
+                    error: com.google.firebase.FirebaseException
+                ) {
+                    dialog.dismiss()
+                    phoneResendButton.isEnabled = true
+                    analytics.event(
+                        "auth_phone_resend_failed",
+                        "error" to
+                            error.javaClass.simpleName
+                    )
+                    toast(
+                        phoneAuthErrorMessage(error)
+                    )
+                }
+
+                override fun onCodeSent(
+                    id: String,
+                    newToken: PhoneAuthProvider.ForceResendingToken
+                ) {
+                    verificationId = id
+                    resendToken = newToken
+                    dialog.dismiss()
+
+                    if (!phoneLoginCompleted) {
+                        analytics.event(
+                            "auth_phone_resend_sent"
+                        )
+                        toast(
+                            "Novo código enviado por SMS."
+                        )
+                        startResendCooldown()
+                    }
+                }
+            }
+
+        val options =
+            PhoneAuthOptions.newBuilder(auth)
+                .setPhoneNumber(phone)
+                .setTimeout(
+                    60L,
+                    java.util.concurrent.TimeUnit.SECONDS
+                )
+                .setActivity(this)
+                .setCallbacks(callbacks)
+                .setForceResendingToken(token)
+                .build()
+
+        PhoneAuthProvider.verifyPhoneNumber(
+            options
+        )
+    }
+
+    private fun showPhoneCodeUi() {
+        phoneInput.isEnabled = false
+        phoneButton.visibility =
+            android.view.View.GONE
+        phoneCodeInput.visibility =
+            android.view.View.VISIBLE
+        phoneVerifyButton.visibility =
+            android.view.View.VISIBLE
+        phoneResendButton.visibility =
+            android.view.View.VISIBLE
+        phoneChangeButton.visibility =
+            android.view.View.VISIBLE
+        phoneCodeInput.requestFocus()
+    }
+
+    private fun resetPhoneUi() {
+        resendTimer?.cancel()
+        resendTimer = null
+        verificationId = null
+        resendToken = null
+        lastPhoneNumber = null
+        phoneLoginCompleted = false
+
+        phoneInput.text?.clear()
+        phoneCodeInput.text?.clear()
+
+        phoneInput.isEnabled = true
+        phoneButton.isEnabled = true
+        phoneButton.visibility =
+            android.view.View.VISIBLE
+        phoneCodeInput.visibility =
+            android.view.View.GONE
+        phoneVerifyButton.visibility =
+            android.view.View.GONE
+        phoneResendButton.visibility =
+            android.view.View.GONE
+        phoneChangeButton.visibility =
+            android.view.View.GONE
+    }
+
+    private fun startResendCooldown() {
+        resendTimer?.cancel()
+
+        phoneResendButton.isEnabled = false
+        resendTimer =
+            object : CountDownTimer(
+                30_000L,
+                1_000L
+            ) {
+                override fun onTick(
+                    millisUntilFinished: Long
+                ) {
+                    val seconds =
+                        (
+                            millisUntilFinished / 1_000L
+                        ).toInt()
+
+                    phoneResendButton.text =
+                        "Reenviar em ${seconds}s"
+                }
+
+                override fun onFinish() {
+                    phoneResendButton.text =
+                        "Reenviar código"
+                    phoneResendButton.isEnabled =
+                        true
+                }
+            }.start()
+    }
+
+    private fun normalizePhoneNumber(
+        raw: String
+    ): String? {
+        val value = raw
+            .trim()
+            .replace(" ", "")
+            .replace("-", "")
+            .replace("(", "")
+            .replace(")", "")
+
+        return if (
+            value.matches(
+                Regex("^\\+[1-9]\\d{7,14}$")
+            )
+        ) {
+            value
+        } else {
+            null
+        }
+    }
+
+    private fun phoneAuthErrorMessage(
+        error: Exception?
+    ): String {
+        val code =
+            (error as? FirebaseAuthException)
+                ?.errorCode
+                ?.uppercase()
+                ?: ""
+
+        return when {
+            code.contains("INVALID_PHONE") ->
+                "O número de telefone não é válido."
+
+            code.contains("INVALID_VERIFICATION_CODE") ->
+                "O código SMS está incorreto."
+
+            code.contains("SESSION_EXPIRED") ->
+                "O código expirou. Pede um novo código."
+
+            code.contains("TOO_MANY_REQUESTS") ||
+                code.contains("QUOTA_EXCEEDED") ->
+                "Muitas tentativas. Tenta novamente mais tarde."
+
+            code.contains("MISSING_ACTIVITY") ->
+                "Não foi possível validar o aplicativo para o SMS."
+
+            else ->
+                error?.localizedMessage
+                    ?: "Não foi possível enviar ou validar o código SMS."
+        }
+    }
+
+    private fun signInWithPhoneAuthCredential(
+        credential: PhoneAuthCredential,
+        dialog: AlertDialog
+    ) {
+        auth.signInWithCredential(
+            credential
+        ).addOnCompleteListener { result ->
+            dialog.dismiss()
+            phoneVerifyButton.isEnabled = true
+
+            if (result.isSuccessful) {
+                phoneLoginCompleted = true
+                auth.currentUser?.let {
+                    analytics.setUser(it)
+                }
+                analytics.event(
+                    "auth_phone_success"
+                )
+                toast(
+                    "Login por telefone efetuado com sucesso."
+                )
+                setResult(
+                    RESULT_OK
+                )
+                finish()
+            } else {
+                analytics.event(
+                    "auth_phone_code_failed",
+                    "error" to
+                        (
+                            result.exception
+                                ?.javaClass
+                                ?.simpleName
+                                ?: "unknown"
+                        )
+                )
+                toast(
+                    phoneAuthErrorMessage(
+                        result.exception
+                    )
+                )
+            }
+        }
     }
 
     private fun launchGoogleSignIn() {
@@ -799,6 +1357,12 @@ class LoginActivity : ComponentActivity() {
             message,
             Toast.LENGTH_SHORT
         ).show()
+    }
+
+    override fun onDestroy() {
+        resendTimer?.cancel()
+        resendTimer = null
+        super.onDestroy()
     }
 
     private fun dp(
