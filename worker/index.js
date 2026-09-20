@@ -29,7 +29,7 @@ export default {
           ok: true,
           service: "ToolNexa API",
           worker: "toolnexa",
-          api_version: "1.13.0",
+          api_version: "1.14.1",
           paypal: env.PAYPAL_ENV || "sandbox",
           workers_ai: !!env.AI,
           images_binding: !!env.IMAGES,
@@ -452,6 +452,9 @@ async function aiBackground(
               Math.random() *
                 2147483647
             )
+        },
+        {
+          rejectIfBusy: false
         }
       );
 
@@ -465,13 +468,23 @@ async function aiBackground(
       );
     }
 
-    return json({
-      ok: true,
-      data_uri:
-        "data:image/jpeg;base64," +
-        result.image,
-      prompt: rawPrompt
-    });
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        data_uri:
+          "data:image/jpeg;charset=utf-8;base64," +
+          result.image,
+        prompt: rawPrompt
+      }),
+      {
+        status: 200,
+        headers: {
+          ...JSON_HEADERS,
+          "x-toolnexa-engine":
+            "workers-ai-flux-1-schnell"
+        }
+      }
+    );
   } catch (error) {
     console.error(
       "ToolNexa AI background error",
