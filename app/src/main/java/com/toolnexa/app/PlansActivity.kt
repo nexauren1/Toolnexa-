@@ -2,17 +2,16 @@ package com.toolnexa.app
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import android.net.Uri
 import android.widget.Toast
 import com.google.firebase.auth.FirebaseAuth
-import java.io.IOException
-import android.graphics.drawable.GradientDrawable
 
 class PlansActivity : Activity() {
 
@@ -42,8 +41,10 @@ class PlansActivity : Activity() {
 
     private var currentPlanView: TextView? = null
     private var subscriptionView: TextView? = null
+    private var plansContainer: LinearLayout? = null
     private var subscribeButton: Button? = null
     private var loadingAccount = false
+    private var loadingPlans = false
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -53,6 +54,7 @@ class PlansActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refreshAccount()
+        loadPlansFromServer()
     }
 
     private fun showPlans() {
@@ -61,10 +63,17 @@ class PlansActivity : Activity() {
                 orientation =
                     LinearLayout.VERTICAL
                 setBackgroundColor(bg)
-                setPadding(18, 24, 18, 30)
+                setPadding(
+                    18,
+                    24,
+                    18,
+                    30
+                )
             }
 
-        val scroll = ScrollView(this)
+        val scroll =
+            ScrollView(this)
+
         scroll.addView(root)
         setContentView(scroll)
 
@@ -77,7 +86,7 @@ class PlansActivity : Activity() {
 
         root.addView(
             body(
-                "Escolha o nível de utilização que corresponde ao que precisa."
+                "Os planos e preços são carregados do sistema de billing do ToolNexa."
             )
         )
 
@@ -85,12 +94,14 @@ class PlansActivity : Activity() {
             LinearLayout(this).apply {
                 orientation =
                     LinearLayout.VERTICAL
+
                 setPadding(
                     18,
                     18,
                     18,
                     18
                 )
+
                 background =
                     GradientDrawable().apply {
                         setColor(surface)
@@ -98,8 +109,7 @@ class PlansActivity : Activity() {
                             1,
                             border
                         )
-                        cornerRadius =
-                            18f
+                        cornerRadius = 18f
                     }
             }
 
@@ -111,13 +121,19 @@ class PlansActivity : Activity() {
         )
 
         currentPlanView =
-            body("Plano atual: a verificar...")
+            body(
+                "Plano atual: a verificar..."
+            )
+
         accountCard.addView(
             currentPlanView
         )
 
         subscriptionView =
-            body("Estado da subscrição: a verificar...")
+            body(
+                "Estado da subscrição: a verificar..."
+            )
+
         accountCard.addView(
             subscriptionView
         )
@@ -125,8 +141,10 @@ class PlansActivity : Activity() {
         val refreshButton =
             Button(this).apply {
                 text = "Atualizar estado"
+
                 setOnClickListener {
                     refreshAccount()
+                    loadPlansFromServer()
                 }
             }
 
@@ -153,56 +171,224 @@ class PlansActivity : Activity() {
         )
 
         root.addView(
-            planCard(
-                "Free",
-                "Grátis",
-                "Acesso às ferramentas disponíveis no nível Free."
+            title(
+                "Planos disponíveis",
+                22f
             )
         )
 
+        plansContainer =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.VERTICAL
+            }
+
         root.addView(
-            planCard(
-                "Pro",
-                "US$ 5 / mês",
-                "Experiência Pro do ToolNexa. O pagamento será processado pelo sistema de subscrição conectado ao backend."
+            plansContainer,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
             )
         )
 
-        root.addView(
+        showPlansLoading()
+    }
+
+    private fun showPlansLoading() {
+        plansContainer?.removeAllViews()
+
+        plansContainer?.addView(
             body(
-                "Estado de pagamento: Sandbox durante esta fase de desenvolvimento."
+                "A carregar os planos..."
+            )
+        )
+    }
+
+    private fun loadPlansFromServer() {
+        if (loadingPlans) {
+            return
+        }
+
+        loadingPlans = true
+        showPlansLoading()
+
+        Thread {
+            try {
+                val plans =
+                    CloudflareApi.loadPlans()
+
+                runOnUiThread {
+                    loadingPlans = false
+
+                    if (plans.isEmpty()) {
+                        showPlansError(
+                            "Nenhum plano ativo foi encontrado no billing."
+                        )
+                        return@runOnUiThread
+                    }
+
+                    renderPlans(
+                        plans
+                    )
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    loadingPlans = false
+
+                    showPlansError(
+                        error.message
+                            ?: "Não foi possível carregar os planos."
+                    )
+                }
+            }
+        }.start()
+    }
+
+    private fun renderPlans(
+        plans: List<CloudflareApi.PlanInfo>
+    ) {
+        plansContainer?.removeAllViews()
+        subscribeButton = null
+
+        plans.forEach { plan ->
+            val isPro =
+                plan.code.equals(
+                    "pro",
+                    ignoreCase = true
+                )
+
+            val interval =
+                plan.interval
+                    .takeIf {
+                        it.isNotBlank()
+                    }
+                    ?.let {
+                        " / $it"
+                    }
+                    ?: ""
+
+            val price =
+                if (
+                    plan.priceUsd
+                        .isBlank()
+                ) {
+                    "Preço não definido"
+                } else {
+                    "US$ " +
+                        plan.priceUsd +
+                        interval
+                }
+
+            val description =
+                if (isPro) {
+                    "Acesso ao plano Pro do ToolNexa."
+                } else {
+                    "Plano " +
+                        plan.name +
+                        " disponibilizado pelo billing."
+                }
+
+            plansContainer?.addView(
+                planCard(
+                    plan,
+                    price,
+                    description
+                ),
+                LinearLayout.LayoutParams(
+                    -1,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = 14
+                }
+            )
+        }
+    }
+
+    private fun showPlansError(
+        message: String
+    ) {
+        plansContainer?.removeAllViews()
+
+        plansContainer?.addView(
+            body(
+                "Não foi possível carregar os planos."
+            )
+        )
+
+        plansContainer?.addView(
+            body(
+                message
             )
         )
     }
 
     private fun planCard(
-        name: String,
+        plan: CloudflareApi.PlanInfo,
         price: String,
         description: String
     ): LinearLayout =
         LinearLayout(this).apply {
             orientation =
                 LinearLayout.VERTICAL
-            setPadding(18, 18, 18, 18)
+
+            setPadding(
+                18,
+                18,
+                18,
+                18
+            )
+
             background =
                 GradientDrawable().apply {
                     setColor(surface)
-                    setStroke(1, border)
+                    setStroke(
+                        1,
+                        border
+                    )
                     cornerRadius = 18f
                 }
 
-            addView(title(name, 21f))
-            addView(body(price))
-            addView(body(description))
+            addView(
+                title(
+                    plan.name.ifBlank {
+                        plan.code
+                    },
+                    21f
+                )
+            )
 
-            if (name == "Pro") {
+            addView(
+                body(
+                    price
+                )
+            )
+
+            addView(
+                body(
+                    description
+                )
+            )
+
+            if (
+                plan.code.equals(
+                    "pro",
+                    ignoreCase = true
+                )
+            ) {
                 subscribeButton =
-                    Button(this@PlansActivity).apply {
-                        text = "Assinar Pro"
-                        minHeight = 54
+                    Button(
+                        this@PlansActivity
+                    ).apply {
+                        text =
+                            "Assinar Pro"
+
+                        minHeight =
+                            54
+
                         setTextColor(
                             android.graphics.Color.WHITE
                         )
+
                         background =
                             GradientDrawable().apply {
                                 setColor(
@@ -210,8 +396,10 @@ class PlansActivity : Activity() {
                                         R.color.toolnexa_blue
                                     )
                                 )
-                                cornerRadius = 14f
+                                cornerRadius =
+                                    14f
                             }
+
                         setOnClickListener {
                             startProSubscription()
                         }
@@ -238,10 +426,13 @@ class PlansActivity : Activity() {
         if (user == null) {
             currentPlanView?.text =
                 "Plano atual: Free"
+
             subscriptionView?.text =
                 "Estado da subscrição: sessão não iniciada"
+
             subscribeButton?.isEnabled =
                 false
+
             return
         }
 
@@ -249,6 +440,7 @@ class PlansActivity : Activity() {
 
         currentPlanView?.text =
             "Plano atual: a verificar..."
+
         subscriptionView?.text =
             "Estado da subscrição: a verificar..."
 
@@ -281,9 +473,9 @@ class PlansActivity : Activity() {
                             currentPlanView?.text =
                                 "Plano atual: " +
                                     account.planName +
-                                    " (" +
+                                    " (US$ " +
                                     account.priceUsd +
-                                    " USD)"
+                                    ")"
 
                             subscriptionView?.text =
                                 "Estado da subscrição: " +
@@ -320,7 +512,8 @@ class PlansActivity : Activity() {
         subscriptionView?.text =
             message?.takeIf {
                 it.isNotBlank()
-            } ?: "Verifique a internet e tente novamente."
+            }
+                ?: "Verifique a internet e tente novamente."
     }
 
     private fun startProSubscription() {
@@ -411,13 +604,16 @@ class PlansActivity : Activity() {
                 setColor(
                     android.graphics.Color.TRANSPARENT
                 )
+
                 setStroke(
                     1,
                     getColor(
                         R.color.toolnexa_blue
                     )
                 )
-                cornerRadius = 14f
+
+                cornerRadius =
+                    14f
             }
 
         button.stateListAnimator =
@@ -441,10 +637,21 @@ class PlansActivity : Activity() {
         TextView(this).apply {
             text = value
             textSize = size
+
             typeface =
-                android.graphics.Typeface.DEFAULT_BOLD
-            setTextColor(textColor)
-            setPadding(0, 6, 0, 8)
+                android.graphics.Typeface
+                    .DEFAULT_BOLD
+
+            setTextColor(
+                textColor
+            )
+
+            setPadding(
+                0,
+                6,
+                0,
+                8
+            )
         }
 
     private fun body(
@@ -453,7 +660,16 @@ class PlansActivity : Activity() {
         TextView(this).apply {
             text = value
             textSize = 14f
-            setTextColor(muted)
-            setPadding(0, 4, 0, 12)
+
+            setTextColor(
+                muted
+            )
+
+            setPadding(
+                0,
+                4,
+                0,
+                12
+            )
         }
 }
