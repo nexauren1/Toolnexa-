@@ -17,8 +17,8 @@ object CategoryCatalog {
                 "Imagem",
                 "Compressão, tamanho e formatos",
                 android.R.drawable.ic_menu_gallery,
-                Color.parseColor("#111827"),
-                Color.parseColor("#EEF1F5")
+                Color.parseColor("#2563EB"),
+                Color.parseColor("#E8F0FF")
             ),
             CategoryDefinition(
                 "Vídeo",
@@ -38,8 +38,8 @@ object CategoryCatalog {
                 "Código",
                 "Ferramentas para escrever e tratar código",
                 android.R.drawable.ic_menu_edit,
-                Color.parseColor("#2563EB"),
-                Color.parseColor("#E8F0FF")
+                Color.parseColor("#111827"),
+                Color.parseColor("#EEF1F5")
             ),
             CategoryDefinition(
                 "Dev",
