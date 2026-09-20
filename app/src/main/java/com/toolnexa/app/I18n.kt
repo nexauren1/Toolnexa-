@@ -1192,49 +1192,6 @@ object I18n {
             }
         }
 
-        listOf(
-            "Tamanho: " to mapOf(
-                "en" to "Size: ",
-                "es" to "Tamaño: ",
-                "fr" to "Taille : ",
-                "ar" to "الحجم: "
-            ),
-            "Original: " to mapOf(
-                "en" to "Original: ",
-                "es" to "Original: ",
-                "fr" to "Original : ",
-                "ar" to "الأصلي: "
-            ),
-            "Dimensões: " to mapOf(
-                "en" to "Dimensions: ",
-                "es" to "Dimensiones: ",
-                "fr" to "Dimensions : ",
-                "ar" to "الأبعاد: "
-            ),
-            "Qualidade: " to mapOf(
-                "en" to "Quality: ",
-                "es" to "Calidad: ",
-                "fr" to "Qualité : ",
-                "ar" to "الجودة: "
-            ),
-            "UID: " to mapOf(
-                "en" to "UID: ",
-                "es" to "UID: ",
-                "fr" to "UID : ",
-                "ar" to "المعرّف: "
-            ),
-            "Plano atual: " to mapOf(
-                "en" to "Current plan: ",
-                "es" to "Plan actual: ",
-                "fr" to "Forfait actuel : ",
-                "ar" to "الخطة الحالية: "
-            ),
-            "Estado da subscrição: " to mapOf(
-                "en" to "Subscription status: ",
-                "es" to "Estado de la suscripción: ",
-                "fr" to "État de l’abonnement : ",
-                "ar" to "حالة الاشتراك: "
-            )
         return listOf(
             "Tamanho: " to mapOf(
                 "en" to "Size: ",
