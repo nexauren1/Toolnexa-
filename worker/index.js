@@ -118,6 +118,48 @@ export default {
 
       if (
         url.pathname ===
+          "/api/paypal/setup-pro" &&
+        request.method === "POST"
+      ) {
+        await requireFirebaseUser(
+          request,
+          env
+        );
+
+        await ensureBillingSchema(
+          env.DB
+        );
+
+        const paypalPlanId =
+          await ensurePaypalProPlan(
+            env
+          );
+
+        if (!paypalPlanId) {
+          return json(
+            {
+              ok: false,
+              error:
+                "paypal_plan_setup_in_progress",
+              message:
+                "A configuração do plano Pro já está em andamento. Tente novamente em alguns segundos."
+            },
+            409
+          );
+        }
+
+        return json({
+          ok: true,
+          plan_code: "pro",
+          paypal_plan_id:
+            paypalPlanId,
+          message:
+            "Plano ToolNexa Pro criado e guardado no D1."
+        });
+      }
+
+      if (
+        url.pathname ===
           "/api/paypal/create-subscription" &&
         request.method === "POST"
       ) {
@@ -238,6 +280,10 @@ async function ensureBillingSchema(db) {
         "plan_code TEXT NOT NULL, firebase_uid TEXT, " +
         "status TEXT, payer_email TEXT, created_at TEXT NOT NULL, " +
         "updated_at TEXT NOT NULL, raw_json TEXT)"
+      ),
+      db.prepare(
+        "CREATE TABLE IF NOT EXISTS paypal_setup_lock (" +
+        "lock_key TEXT PRIMARY KEY, created_at TEXT NOT NULL)"
       ),
       db.prepare(
         "CREATE TABLE IF NOT EXISTS paypal_webhook_events (" +
@@ -473,6 +519,273 @@ async function aiBackground(
   }
 }
 
+async function ensurePaypalProPlan(
+  env
+) {
+  await ensureBillingSchema(
+    env.DB
+  );
+
+  const configuredId =
+    env.PAYPAL_PRO_PLAN_ID;
+
+  if (configuredId) {
+    await env.DB
+      .prepare(
+        "UPDATE plans SET paypal_plan_id = ?, " +
+        "updated_at = CURRENT_TIMESTAMP " +
+        "WHERE code = 'pro'"
+      )
+      .bind(configuredId)
+      .run();
+
+    return configuredId;
+  }
+
+  const existing =
+    await env.DB
+      .prepare(
+        "SELECT paypal_plan_id FROM plans " +
+        "WHERE code = 'pro' LIMIT 1"
+      )
+      .first();
+
+  if (existing?.paypal_plan_id) {
+    return existing.paypal_plan_id;
+  }
+
+  const lockResult =
+    await env.DB
+      .prepare(
+        "INSERT OR IGNORE INTO paypal_setup_lock " +
+        "(lock_key, created_at) VALUES (?, ?)"
+      )
+      .bind(
+        "paypal-pro-plan",
+        new Date().toISOString()
+      )
+      .run();
+
+  if (!lockResult.meta?.changes) {
+    return null;
+  }
+
+  try {
+    const recheck =
+      await env.DB
+        .prepare(
+          "SELECT paypal_plan_id FROM plans " +
+          "WHERE code = 'pro' LIMIT 1"
+        )
+        .first();
+
+    if (recheck?.paypal_plan_id) {
+      return recheck.paypal_plan_id;
+    }
+
+    const accessToken =
+      await paypalAccessToken(
+        env.PAYPAL_CLIENT_ID,
+        env.PAYPAL_CLIENT_SECRET
+      );
+
+    const productResponse =
+      await fetch(
+        PAYPAL_BASE +
+          "/v1/catalogs/products",
+        {
+          method: "POST",
+          headers: {
+            "accept":
+              "application/json",
+            "content-type":
+              "application/json",
+            "authorization":
+              "Bearer " +
+              accessToken,
+            "PayPal-Request-Id":
+              crypto.randomUUID()
+          },
+          body: JSON.stringify({
+            name:
+              "ToolNexa Pro",
+            description:
+              "ToolNexa Pro monthly subscription.",
+            type:
+              "SERVICE",
+            category:
+              "SOFTWARE"
+          })
+        }
+      );
+
+    const productPayload =
+      await productResponse
+        .json()
+        .catch(
+          () => ({})
+        );
+
+    if (!productResponse.ok) {
+      throw paypalSetupError(
+        "paypal_product_create_failed",
+        "Não foi possível criar o produto Pro no PayPal Sandbox.",
+        productResponse.status,
+        productPayload
+      );
+    }
+
+    const productId =
+      productPayload.id;
+
+    if (!productId) {
+      throw paypalSetupError(
+        "paypal_product_id_missing",
+        "O PayPal não devolveu o ID do produto Pro.",
+        502,
+        productPayload
+      );
+    }
+
+    const planResponse =
+      await fetch(
+        PAYPAL_BASE +
+          "/v1/billing/plans",
+        {
+          method: "POST",
+          headers: {
+            "accept":
+              "application/json",
+            "content-type":
+              "application/json",
+            "authorization":
+              "Bearer " +
+              accessToken,
+            "PayPal-Request-Id":
+              crypto.randomUUID()
+          },
+          body: JSON.stringify({
+            product_id:
+              productId,
+            name:
+              "ToolNexa Pro",
+            description:
+              "ToolNexa Pro — US$5 por mês.",
+            billing_cycles: [
+              {
+                frequency: {
+                  interval_unit:
+                    "MONTH",
+                  interval_count:
+                    1
+                },
+                tenure_type:
+                  "REGULAR",
+                sequence:
+                  1,
+                total_cycles:
+                  0,
+                pricing_scheme: {
+                  fixed_price: {
+                    value:
+                      "5.00",
+                    currency_code:
+                      "USD"
+                  }
+                }
+              }
+            ],
+            payment_preferences: {
+              auto_bill_outstanding:
+                true,
+              payment_failure_threshold:
+                1
+            }
+          })
+        }
+      );
+
+    const planPayload =
+      await planResponse
+        .json()
+        .catch(
+          () => ({})
+        );
+
+    if (!planResponse.ok) {
+      throw paypalSetupError(
+        "paypal_plan_create_failed",
+        "O produto foi criado, mas o plano Pro não pôde ser criado no PayPal Sandbox.",
+        planResponse.status,
+        planPayload
+      );
+    }
+
+    const paypalPlanId =
+      planPayload.id;
+
+    if (!paypalPlanId) {
+      throw paypalSetupError(
+        "paypal_plan_id_missing",
+        "O PayPal não devolveu o Plan ID do Pro.",
+        502,
+        planPayload
+      );
+    }
+
+    await env.DB
+      .prepare(
+        "UPDATE plans SET paypal_plan_id = ?, " +
+        "updated_at = CURRENT_TIMESTAMP " +
+        "WHERE code = 'pro'"
+      )
+      .bind(
+        paypalPlanId
+      )
+      .run();
+
+    return paypalPlanId;
+  } finally {
+    await env.DB
+      .prepare(
+        "DELETE FROM paypal_setup_lock " +
+        "WHERE lock_key = ?"
+      )
+      .bind(
+        "paypal-pro-plan"
+      )
+      .run();
+  }
+}
+
+function paypalSetupError(
+  code,
+  publicMessage,
+  status,
+  details
+) {
+  const error =
+    new Error(
+      publicMessage
+    );
+
+  error.code = code;
+  error.publicMessage =
+    publicMessage;
+  error.status = 502;
+
+  console.error(
+    "PayPal automatic plan setup error",
+    {
+      code,
+      status,
+      details
+    }
+  );
+
+  return error;
+}
+
 async function createSubscription(
   request,
   env,
@@ -482,7 +795,7 @@ async function createSubscription(
     env.DB
   );
 
-  const plan =
+  let plan =
     await env.DB
       .prepare(
         "SELECT code, name, price_usd, paypal_plan_id " +
@@ -490,20 +803,27 @@ async function createSubscription(
       )
       .first();
 
-  const paypalPlanId =
+  let paypalPlanId =
     env.PAYPAL_PRO_PLAN_ID ||
     plan?.paypal_plan_id;
+
+  if (!paypalPlanId) {
+    paypalPlanId =
+      await ensurePaypalProPlan(
+        env
+      );
+  }
 
   if (!paypalPlanId) {
     return json(
       {
         ok: false,
         error:
-          "paypal_plan_not_configured",
+          "paypal_plan_setup_in_progress",
         message:
-          "O plano Pro do PayPal Sandbox ainda precisa do seu PayPal Plan ID."
+          "O plano Pro está sendo configurado no PayPal Sandbox. Tente novamente em alguns segundos."
       },
-      503
+      409
     );
   }
 
