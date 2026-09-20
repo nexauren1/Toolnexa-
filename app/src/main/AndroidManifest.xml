@@ -30,6 +30,14 @@
             android:exported="false" />
 
         <activity
+            android:name=".HistoryActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".StorageActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".ToolWorkflowActivity"
             android:exported="false" />
 

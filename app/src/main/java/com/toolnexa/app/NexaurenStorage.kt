@@ -26,8 +26,14 @@ object NexaurenStorage {
 
         return try {
             val uri = Uri.parse(raw)
+            val documentUri =
+                DocumentsContract.buildDocumentUriUsingTree(
+                    uri,
+                    DocumentsContract.getTreeDocumentId(uri)
+                )
+
             context.contentResolver.query(
-                uri,
+                documentUri,
                 arrayOf(
                     DocumentsContract.Document.COLUMN_DISPLAY_NAME
                 ),

@@ -26,7 +26,8 @@ class ImageResizer(
 
     fun resize(
         uri: Uri,
-        targetWidth: Int
+        targetWidth: Int,
+        quality: Int = 90
     ): ResizeResult? {
         val safeWidth = targetWidth.coerceIn(16, 4096)
         val source =
@@ -72,7 +73,7 @@ class ImageResizer(
             if (
                 !resized.compress(
                     Bitmap.CompressFormat.JPEG,
-                    90,
+                    quality.coerceIn(10, 100),
                     stream
                 )
             ) {

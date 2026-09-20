@@ -245,7 +245,11 @@ class ToolWorkflowActivity : Activity() {
             try {
                 val result = when (tool) {
                     "compressor" -> compressor.compress(uri, compressionQuality)
-                    "resizer" -> resizer.resize(uri, resizeWidth)
+                    "resizer" -> resizer.resize(
+                        uri,
+                        resizeWidth,
+                        resizeQuality
+                    )
                     else -> converter.convert(
                         uri,
                         converterFormat,
@@ -329,19 +333,25 @@ class ToolWorkflowActivity : Activity() {
     private fun saveResult(file: File) {
         analytics.event("tool_save_start", "tool" to tool)
 
-        val saved = NexaurenStorage.save(
-            this,
-            "Imagem",
+        val toolFolder =
             when (tool) {
                 "compressor" -> "Compressor"
                 "resizer" -> "Resizer"
                 else -> "Converter"
-            },
-            file,
+            }
+
+        val fileName =
             "ToolNexa-" +
                 System.currentTimeMillis() +
                 "." +
                 file.extension
+
+        val saved = NexaurenStorage.save(
+            this,
+            "Imagem",
+            toolFolder,
+            file,
+            fileName
         )
 
         if (saved != null) {
@@ -353,6 +363,14 @@ class ToolWorkflowActivity : Activity() {
                         ?: "Nexauren X"
                     )
             )
+            NexaurenHistory.add(
+                this,
+                toolFolder,
+                saved,
+                fileName,
+                file.length()
+            )
+
             toast(
                 "Arquivo salvo na pasta " +
                     (NexaurenStorage.rootName(this)

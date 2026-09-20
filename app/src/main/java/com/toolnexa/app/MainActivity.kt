@@ -104,6 +104,24 @@ class MainActivity : ComponentActivity() {
         updateManager = UpdateManager(this)
         analytics.screen("home")
 
+        if (auth.currentUser == null) {
+            analytics.event(
+                "auth_guard_blocked_main"
+            )
+            startActivity(
+                Intent(
+                    this,
+                    LoginActivity::class.java
+                )
+            )
+            finish()
+            return
+        }
+
+        analytics.setUser(
+            auth.currentUser!!
+        )
+
         showHome()
         setupNotifications()
         updateManager.checkForUpdate()
@@ -325,6 +343,22 @@ class MainActivity : ComponentActivity() {
         }
 
         drawerItem(
+            "Histórico",
+            android.R.drawable.ic_menu_recent_history
+        ) {
+            showHistory()
+            closeDrawer()
+        }
+
+        drawerItem(
+            "Nexauren X",
+            android.R.drawable.ic_menu_save
+        ) {
+            showStorage()
+            closeDrawer()
+        }
+
+        drawerItem(
             "Conta",
             android.R.drawable.ic_menu_myplaces
         ) {
@@ -372,6 +406,99 @@ class MainActivity : ComponentActivity() {
                 setMargins(dp(16), dp(8), dp(16), dp(8))
             }
         )
+    }
+
+    private fun addFeatureCardAction(
+        titleText: String,
+        description: String,
+        badge: String,
+        action: () -> Unit
+    ) {
+        val box = card()
+        box.setPadding(
+            dp(16),
+            dp(16),
+            dp(16),
+            dp(16)
+        )
+        box.alpha = 0f
+        box.translationY = dp(8).toFloat()
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val texts = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        texts.addView(
+            title(titleText, 17f)
+        )
+        texts.addView(
+            bodyText(description)
+        )
+
+        row.addView(
+            texts,
+            LinearLayout.LayoutParams(
+                0,
+                -2,
+                1f
+            )
+        )
+
+        val badgeView = TextView(this).apply {
+            text = badge
+            textSize = 11f
+            setTextColor(blue)
+            setPadding(
+                dp(9),
+                dp(5),
+                dp(9),
+                dp(5)
+            )
+            background = GradientDrawable().apply {
+                setColor(
+                    Color.parseColor("#EAF0FF")
+                )
+                cornerRadius =
+                    dp(10).toFloat()
+            }
+        }
+
+        row.addView(badgeView)
+        box.addView(row)
+
+        box.setOnClickListener {
+            analytics.event(
+                "feature_open",
+                "feature" to titleText
+            )
+            action()
+        }
+
+        content.addView(
+            box,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(
+                    dp(16),
+                    dp(6),
+                    dp(16),
+                    dp(6)
+                )
+            }
+        )
+
+        box.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(260)
+            .start()
     }
 
     private fun addFeatureCard(
@@ -445,20 +572,29 @@ class MainActivity : ComponentActivity() {
         }
         addHomeToolsGrid()
 
-        addSectionCard(
-            "Em breve",
-            "Novas ferramentas para documentos e produtividade"
-        )
-        addFeatureCard(
-            "Conversor de imagens",
-            "JPG, PNG e WebP com preview e preservação de qualidade.",
-            "Planeado"
-        )
-        addFeatureCard(
+        addFeatureCardAction(
+            "Image Converter",
+            "JPG, PNG e WebP com pré-visualização do resultado.",
+            "Abrir"
+        ) {
+            showImageConverter()
+        }
+
+        addFeatureCardAction(
             "Histórico",
-            "Aceda rapidamente aos resultados guardados no Nexauren X.",
-            "Planeado"
-        )
+            "Veja resultados guardados recentemente.",
+            "Abrir"
+        ) {
+            showHistory()
+        }
+
+        addFeatureCardAction(
+            "Nexauren X",
+            "Defina uma pasta uma vez e use-a automaticamente nos próximos resultados.",
+            "Gerir"
+        ) {
+            showStorage()
+        }
 
         content.addView(space(18))
 
@@ -561,7 +697,7 @@ class MainActivity : ComponentActivity() {
                     "Image Converter",
                     "Imagem",
                     "Converta imagens para JPG, PNG ou WebP.",
-                    R.drawable.ic_tool_resize
+                    R.drawable.ic_tool_convert
                 )
             ).filter {
                 it.name.contains(query.trim(), true) ||
@@ -786,6 +922,26 @@ class MainActivity : ComponentActivity() {
             Intent(this, CategoryActivity::class.java).apply {
                 putExtra("category", category)
             }
+        )
+    }
+
+    private fun showHistory() {
+        analytics.event("history_open")
+        startActivity(
+            Intent(
+                this,
+                HistoryActivity::class.java
+            )
+        )
+    }
+
+    private fun showStorage() {
+        analytics.event("storage_open")
+        startActivity(
+            Intent(
+                this,
+                StorageActivity::class.java
+            )
         )
     }
 
