@@ -319,7 +319,7 @@ class ToolWorkflowActivity : Activity() {
         }.start()
         val delta = if (original > 0) ((original - output).toDouble() / original * 100).roundToInt() else 0
         addText("Dimensões: " + width + " × " + height + " px\nOriginal: " + formatBytes(original) + "\nResultado: " + formatBytes(output) + "\nVariação: " + delta + "%")
-        val save = button("Guardar em Nexauren X", true)
+        val save = button("Salvar", true)
         save.setOnClickListener { saveResult(file) }
         add(save)
         val share = button("Partilhar", false)
@@ -331,67 +331,52 @@ class ToolWorkflowActivity : Activity() {
     }
 
     private fun saveResult(file: File) {
-        analytics.event("tool_save_start", "tool" to tool)
-
-        val toolFolder =
-            when (tool) {
-                "compressor" -> "Compressor"
-                "resizer" -> "Resizer"
-                else -> "Converter"
-            }
-
-        val fileName =
-            "ToolNexa-" +
-                System.currentTimeMillis() +
-                "." +
-                file.extension
-
-        val saved = NexaurenStorage.save(
-            this,
-            "Imagem",
-            toolFolder,
-            file,
-            fileName
-        )
-
-        if (saved != null) {
+        if (!NexaurenStorage.hasRoot(this)) {
             analytics.event(
-                "tool_save_success",
-                "tool" to tool,
-                "folder" to (
-                    NexaurenStorage.rootName(this)
-                        ?: "Nexauren X"
-                    )
-            )
-            NexaurenHistory.add(
-                this,
-                toolFolder,
-                saved,
-                fileName,
-                file.length()
-            )
-
-            toast(
-                "Arquivo salvo na pasta " +
-                    (NexaurenStorage.rootName(this)
-                        ?: "Nexauren X")
-            )
-        } else {
-            analytics.event(
-                "tool_save_folder_needed",
+                "tool_save_blocked_no_directory",
                 "tool" to tool
             )
-            chooseRootFolder()
+
+            AlertDialog.Builder(this)
+                .setTitle("Diretório não definido")
+                .setMessage(
+                    "Escolha o diretório em Definições antes de salvar."
+                )
+                .setNegativeButton(
+                    "Agora não",
+                    null
+                )
+                .setPositiveButton(
+                    "Abrir Definições"
+                ) { _, _ ->
+                    analytics.event(
+                        "tool_open_settings_for_storage",
+                        "tool" to tool
+                    )
+                    finish()
+                    startActivity(
+                        Intent(
+                            this,
+                            MainActivity::class.java
+                        ).apply {
+                            putExtra(
+                                "open_screen",
+                                "settings"
+                            )
+                        }
+                    )
+                }
+                .show()
+
+            return
         }
-    }
 
-    private fun chooseRootFolder() {
-        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-        }, REQUEST_FOLDER)
-    }
+        analytics.event(
+            "tool_save_start",
+            "tool" to tool
+        )
 
-    private fun shareResult(file: File) {
+        val toolFolde    private fun shareResult(file: File) {
         val uri = NexaurenStorage.fileProviderUri(this, file)
         startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
             type = "image/*"

@@ -12,10 +12,72 @@ object NexaurenStorage {
     private const val ROOT_URI = "root_uri"
 
     fun setRoot(context: Context, uri: Uri) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString(ROOT_URI, uri.toString())
+        context.getSharedPreferences(
+            PREFS,
+            Context.MODE_PRIVATE
+        ).edit()
+            .putString(
+                ROOT_URI,
+                uri.toString()
+            )
             .apply()
+    }
+
+    fun clearRoot(context: Context) {
+        context.getSharedPreferences(
+            PREFS,
+            Context.MODE_PRIVATE
+        ).edit()
+            .remove(ROOT_URI)
+            .apply()
+    }
+
+    fun prepareRoot(
+        context: Context,
+        uri: Uri
+    ): Boolean {
+        return try {
+            setRoot(context, uri)
+            ensureNexaurenFolder(context) != null
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun rootUri(
+        context: Context
+    ): Uri? {
+        val raw =
+            context.getSharedPreferences(
+                PREFS,
+                Context.MODE_PRIVATE
+            ).getString(
+                ROOT_URI,
+                null
+            ) ?: return null
+
+        return try {
+            Uri.parse(raw)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun ensureNexaurenFolder(
+        context: Context
+    ): Uri? {
+        val root =
+            rootUri(context) ?: return null
+
+        return try {
+            findOrCreateDirectory(
+                context,
+                root,
+                "Nexauren X"
+            )
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun rootName(context: Context): String? {
@@ -62,47 +124,47 @@ object NexaurenStorage {
         file: File,
         displayName: String
     ): Uri? {
-        val rawRoot = context.getSharedPreferences(
-            PREFS,
-            Context.MODE_PRIVATE
-        ).getString(ROOT_URI, null) ?: return null
+        val nexauren =
+            ensureNexaurenFolder(context)
+                ?: return null
 
         return try {
-            val root = Uri.parse(rawRoot)
-            val nexauren = findOrCreateDirectory(
-                context,
-                root,
-                "Nexauren X"
-            )
-            val categoryDir = findOrCreateDirectory(
-                context,
-                nexauren,
-                safeName(category)
-            )
-            val toolDir = findOrCreateDirectory(
-                context,
-                categoryDir,
-                safeName(tool)
-            )
+            val categoryDir =
+                findOrCreateDirectory(
+                    context,
+                    nexauren,
+                    safeName(category)
+                )
 
-            val mime = when (file.extension.lowercase()) {
-                "png" -> "image/png"
-                "webp" -> "image/webp"
-                else -> "image/jpeg"
-            }
+            val toolDir =
+                findOrCreateDirectory(
+                    context,
+                    categoryDir,
+                    safeName(tool)
+                )
 
-            val target = DocumentsContract.createDocument(
-                context.contentResolver,
-                toolDir,
-                mime,
-                safeName(displayName)
-            ) ?: return null
-
-            context.contentResolver.openOutputStream(target)?.use { output ->
-                file.inputStream().use { input ->
-                    input.copyTo(output)
+            val mime =
+                when (file.extension.lowercase()) {
+                    "png" -> "image/png"
+                    "webp" -> "image/webp"
+                    else -> "image/jpeg"
                 }
-            } ?: return null
+
+            val target =
+                DocumentsContract.createDocument(
+                    context.contentResolver,
+                    toolDir,
+                    mime,
+                    safeName(displayName)
+                ) ?: return null
+
+            context.contentResolver
+                .openOutputStream(target)
+                ?.use { output ->
+                    file.inputStream().use { input ->
+                        input.copyTo(output)
+                    }
+                } ?: return null
 
             target
         } catch (_: Exception) {

@@ -122,7 +122,14 @@ class MainActivity : ComponentActivity() {
             auth.currentUser!!
         )
 
-        showHome()
+        if (
+            intent.getStringExtra("open_screen") ==
+                "settings"
+        ) {
+            showSettings()
+        } else {
+            showHome()
+        }
         setupNotifications()
         updateManager.checkForUpdate()
     }
@@ -335,10 +342,10 @@ class MainActivity : ComponentActivity() {
         }
 
         drawerItem(
-            "Ferramentas",
+            "Categorias",
             android.R.drawable.ic_menu_manage
         ) {
-            showTools()
+            showCategories()
             closeDrawer()
         }
 
@@ -347,14 +354,6 @@ class MainActivity : ComponentActivity() {
             android.R.drawable.ic_menu_recent_history
         ) {
             showHistory()
-            closeDrawer()
-        }
-
-        drawerItem(
-            "Nexauren X",
-            android.R.drawable.ic_menu_save
-        ) {
-            showStorage()
             closeDrawer()
         }
 
@@ -550,51 +549,21 @@ class MainActivity : ComponentActivity() {
         analytics.screen("home")
 
         content.addView(space(18))
+
         content.addView(
             title(
-                "Ferramentas simples, resultados claros",
-                27f
+                "Encontre a ferramenta certa",
+                28f
             )
         )
+
         content.addView(
             bodyText(
-                "Escolha uma ferramenta, processe o ficheiro e veja o resultado antes de guardar."
+                "Explore por categoria. As ferramentas ficam organizadas dentro da área onde fazem sentido."
             )
         )
-        content.addView(space(14))
 
-        addCategoryCard(
-            "Imagem",
-            "Otimização, tamanho e conversão de imagens",
-            R.drawable.ic_tool_compress
-        ) {
-            showCategory("Imagem")
-        }
-        addHomeToolsGrid()
-
-        addFeatureCardAction(
-            "Image Converter",
-            "JPG, PNG e WebP com pré-visualização do resultado.",
-            "Abrir"
-        ) {
-            showImageConverter()
-        }
-
-        addFeatureCardAction(
-            "Histórico",
-            "Veja resultados guardados recentemente.",
-            "Abrir"
-        ) {
-            showHistory()
-        }
-
-        addFeatureCardAction(
-            "Nexauren X",
-            "Defina uma pasta uma vez e use-a automaticamente nos próximos resultados.",
-            "Gerir"
-        ) {
-            showStorage()
-        }
+        addCategoryBrowser()
 
         content.addView(space(18))
 
@@ -605,14 +574,16 @@ class MainActivity : ComponentActivity() {
             dp(18),
             dp(18)
         )
+
         info.addView(
             title("ToolNexa", 18f)
         )
+
         info.addView(
             bodyText(
                 "Versão " +
                     BuildConfig.VERSION_NAME +
-                    " • Firebase Analytics ativo • conta com Google e e-mail"
+                    " • conta protegida • Analytics ativo"
             )
         )
 
@@ -626,11 +597,295 @@ class MainActivity : ComponentActivity() {
                     dp(16),
                     0,
                     dp(16),
-                    0
+                    dp(16)
                 )
             }
         )
-        content.addView(space(30))
+    }
+
+    private fun addCategoryBrowser() {
+        val search = EditText(this)
+        search.hint = "Pesquisar categoria"
+        search.setSingleLine(true)
+        search.textSize = 15f
+        search.setTextColor(textColor)
+        search.setHintTextColor(muted)
+        search.setPadding(
+            dp(16),
+            dp(12),
+            dp(16),
+            dp(12)
+        )
+        search.background =
+            GradientDrawable().apply {
+                setColor(surface)
+                setStroke(
+                    dp(1),
+                    border
+                )
+                cornerRadius =
+                    dp(14).toFloat()
+            }
+
+        content.addView(
+            search,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(54)
+            ).apply {
+                setMargins(
+                    dp(16),
+                    0,
+                    dp(16),
+                    dp(12)
+                )
+            }
+        )
+
+        val grid = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        content.addView(
+            grid,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        fun render(query: String) {
+            grid.removeAllViews()
+
+            val filtered =
+                CategoryCatalog.all.filter {
+                    it.name.contains(
+                        query.trim(),
+                        true
+                    ) ||
+                        it.description.contains(
+                            query.trim(),
+                            true
+                        )
+                }
+
+            if (filtered.isEmpty()) {
+                grid.addView(
+                    bodyText(
+                        "Nenhuma categoria encontrada."
+                    )
+                )
+                return
+            }
+
+            for (index in filtered.indices step 2) {
+                val row =
+                    LinearLayout(this).apply {
+                        orientation =
+                            LinearLayout.HORIZONTAL
+                    }
+
+                addCatalogCategoryCard(
+                    row,
+                    filtered[index]
+                )
+
+                if (index + 1 < filtered.size) {
+                    addCatalogCategoryCard(
+                        row,
+                        filtered[index + 1]
+                    )
+                } else {
+                    row.addView(
+                        Space(this),
+                        LinearLayout.LayoutParams(
+                            0,
+                            dp(154),
+                            1f
+                        ).apply {
+                            setMargins(
+                                dp(6),
+                                0,
+                                dp(6),
+                                0
+                            )
+                        }
+                    )
+                }
+
+                grid.addView(
+                    row,
+                    LinearLayout.LayoutParams(
+                        -1,
+                        dp(154)
+                    )
+                )
+            }
+        }
+
+        search.addTextChangedListener(
+            object : TextWatcher {
+                override fun beforeTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    count: Int,
+                    after: Int
+                ) = Unit
+
+                override fun onTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    before: Int,
+                    count: Int
+                ) {
+                    analytics.event(
+                        "category_search",
+                        "query" to (
+                            s?.toString() ?: ""
+                        )
+                    )
+                    render(
+                        s?.toString() ?: ""
+                    )
+                }
+
+                override fun afterTextChanged(
+                    s: Editable?
+                ) = Unit
+            }
+        )
+
+        render("")
+    }
+
+    private fun addCatalogCategoryCard(
+        row: LinearLayout,
+        category: CategoryDefinition
+    ) {
+        val item = card()
+        item.setPadding(
+            dp(14),
+            dp(14),
+            dp(12),
+            dp(12)
+        )
+        item.alpha = 0f
+        item.translationY = dp(8).toFloat()
+
+        val iconBox =
+            LinearLayout(this).apply {
+                gravity = Gravity.CENTER
+                background =
+                    GradientDrawable().apply {
+                        setColor(
+                            category.softColor
+                        )
+                        cornerRadius =
+                            dp(14).toFloat()
+                    }
+            }
+
+        val icon =
+            ImageView(this).apply {
+                setImageResource(
+                    category.icon
+                )
+                setColorFilter(
+                    category.accent
+                )
+                contentDescription =
+                    category.name
+            }
+
+        iconBox.addView(
+            icon,
+            LinearLayout.LayoutParams(
+                dp(42),
+                dp(42)
+            )
+        )
+
+        item.addView(
+            iconBox,
+            LinearLayout.LayoutParams(
+                dp(54),
+                dp(54)
+            )
+        )
+
+        item.addView(
+            title(
+                category.name,
+                16f
+            )
+        )
+
+        item.addView(
+            TextView(this).apply {
+                text =
+                    category.description
+                textSize = 12f
+                setTextColor(muted)
+                setPadding(
+                    0,
+                    0,
+                    0,
+                    dp(5)
+                )
+            }
+        )
+
+        val count =
+            CategoryCatalog.toolsFor(
+                category.name
+            ).size
+
+        item.addView(
+            TextView(this).apply {
+                text =
+                    if (count == 0) {
+                        "Preparada"
+                    } else {
+                        "$count ferramenta(s)"
+                    }
+                textSize = 11f
+                typeface =
+                    android.graphics.Typeface.DEFAULT_BOLD
+                setTextColor(
+                    category.accent
+                )
+            }
+        )
+
+        item.setOnClickListener {
+            analytics.event(
+                "category_open",
+                "category" to category.name
+            )
+            showCategory(category.name)
+        }
+
+        row.addView(
+            item,
+            LinearLayout.LayoutParams(
+                0,
+                dp(154),
+                1f
+            ).apply {
+                setMargins(
+                    dp(6),
+                    dp(6),
+                    dp(6),
+                    dp(6)
+                )
+            }
+        )
+
+        item.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(230)
+            .start()
     }
 
     private fun addHomeToolsGrid() {
@@ -935,16 +1190,6 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private fun showStorage() {
-        analytics.event("storage_open")
-        startActivity(
-            Intent(
-                this,
-                StorageActivity::class.java
-            )
-        )
-    }
-
     private fun showImageConverter() {
         analytics.event("tool_open_workflow", "tool" to "converter")
         startActivity(
@@ -954,24 +1199,26 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private fun showTools() {
-        toolbarTitle.text = "Ferramentas"
+    private fun showCategories() {
+        toolbarTitle.text = "Categorias"
         content.removeAllViews()
-        analytics.screen("tools")
+        analytics.screen("categories")
 
         content.addView(space(18))
+
         content.addView(
-            title("Todas as ferramentas", 25f)
+            title("Todas as categorias", 26f)
         )
+
         content.addView(
             bodyText(
-                "Pesquise e abra qualquer ferramenta disponível no ToolNexa."
+                "Escolha uma categoria para ver apenas as ferramentas que pertencem a ela."
             )
         )
-        addHomeToolsGrid()
-        content.addView(space(28))
-    }
 
+        addCategoryBrowser()
+        content.addView(space(24))
+    }
 
     private fun showImageCompressor() {
         analytics.event("tool_open_workflow", "tool" to "compressor")
@@ -1221,8 +1468,94 @@ class MainActivity : ComponentActivity() {
 
         content.addView(space(18))
 
-        val card = card()
-        card.setPadding(
+        val storageCard = card()
+        storageCard.setPadding(
+            dp(18),
+            dp(18),
+            dp(18),
+            dp(18)
+        )
+
+        storageCard.addView(
+            title("Diretório de salvamento", 19f)
+        )
+
+        val current = NexaurenStorage.rootName(
+            this
+        ) ?: "Nenhum diretório selecionado"
+
+        storageCard.addView(
+            TextView(this).apply {
+                text = current
+                textSize = 16f
+                typeface =
+                    android.graphics.Typeface.DEFAULT_BOLD
+                setTextColor(textColor)
+                setPadding(
+                    0,
+                    dp(4),
+                    0,
+                    dp(8)
+                )
+            }
+        )
+
+        storageCard.addView(
+            bodyText(
+                "Selecione um diretório uma única vez. O ToolNexa criará automaticamente a pasta Nexauren X e, depois, as pastas de categoria e ferramenta."
+            )
+        )
+
+        val choose = Button(this).apply {
+            text =
+                if (
+                    NexaurenStorage.hasRoot(this@MainActivity)
+                ) {
+                    "Alterar diretório"
+                } else {
+                    "Selecionar diretório"
+                }
+        }
+        stylePrimary(choose)
+
+        choose.setOnClickListener {
+            analytics.event(
+                "settings_storage_picker_open"
+            )
+
+            startActivityForResult(
+                Intent(
+                    Intent.ACTION_OPEN_DOCUMENT_TREE
+                ).apply {
+                    addFlags(
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                            Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                            Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                    )
+                },
+                REQUEST_SETTINGS_FOLDER
+            )
+        }
+
+        storageCard.addView(choose)
+
+        content.addView(
+            storageCard,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(
+                    dp(16),
+                    0,
+                    dp(16),
+                    14
+                )
+            }
+        )
+
+        val updateCard = card()
+        updateCard.setPadding(
             dp(18),
             dp(14),
             dp(18),
@@ -1259,22 +1592,24 @@ class MainActivity : ComponentActivity() {
                 .apply()
         }
 
-        card.addView(auto)
+        updateCard.addView(auto)
 
         val updateNow = Button(this)
         updateNow.text = "Verificar agora"
         styleSecondary(updateNow)
         updateNow.setOnClickListener {
-            analytics.event("update_check_manual")
+            analytics.event(
+                "update_check_manual"
+            )
             updateManager.checkForUpdate(
                 showErrors = true
             )
         }
 
-        card.addView(updateNow)
+        updateCard.addView(updateNow)
 
         content.addView(
-            card,
+            updateCard,
             LinearLayout.LayoutParams(
                 -1,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -1283,12 +1618,10 @@ class MainActivity : ComponentActivity() {
                     dp(16),
                     0,
                     dp(16),
-                    0
+                    14
                 )
             }
         )
-
-        content.addView(space(14))
 
         val appearance = card()
         appearance.setPadding(
@@ -1304,9 +1637,10 @@ class MainActivity : ComponentActivity() {
                 18f
             )
         )
+
         appearance.addView(
             bodyText(
-                "A identidade atual usa tema claro e superfícies claras para manter a experiência legível."
+                "Tema claro, superfícies suaves, microanimações e alto contraste para uma experiência confortável."
             )
         )
 
@@ -1551,6 +1885,64 @@ class MainActivity : ComponentActivity() {
         if (
             resultCode != RESULT_OK
         ) {
+            return
+        }
+
+        if (
+            requestCode == REQUEST_SETTINGS_FOLDER &&
+            resultCode == RESULT_OK &&
+            data?.data != null
+        ) {
+            val uri = data.data!!
+
+            try {
+                val flags =
+                    data.flags and
+                        (
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                            )
+
+                if (flags != 0) {
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        flags
+                    )
+                }
+            } catch (_: Exception) {
+            }
+
+            val prepared =
+                NexaurenStorage.prepareRoot(
+                    this,
+                    uri
+                )
+
+            if (prepared) {
+                analytics.event(
+                    "settings_storage_ready",
+                    "folder" to (
+                        NexaurenStorage.rootName(
+                            this
+                        ) ?: "Nexauren X"
+                        )
+                )
+                toast(
+                    "Diretório pronto para salvar."
+                )
+            } else {
+                NexaurenStorage.clearRoot(
+                    this
+                )
+                analytics.event(
+                    "settings_storage_failed"
+                )
+                toast(
+                    "Não foi possível preparar este diretório."
+                )
+            }
+
+            showSettings()
             return
         }
 
@@ -1951,5 +2343,7 @@ class MainActivity : ComponentActivity() {
             402
         private const val REQUEST_LOGIN =
             403
+        private const val REQUEST_SETTINGS_FOLDER =
+            404
     }
 }
