@@ -29,6 +29,7 @@ export default {
           ok: true,
           service: "ToolNexa API",
           worker: "toolnexa",
+          api_version: "1.12.0",
           paypal: env.PAYPAL_ENV || "sandbox",
           workers_ai: !!env.AI,
           images_binding: !!env.IMAGES,
@@ -259,6 +260,13 @@ async function ensureBillingSchema(db) {
       "subscription_id TEXT NOT NULL UNIQUE, plan_id TEXT NOT NULL, paypal_plan_id TEXT NOT NULL, " +
       "status TEXT NOT NULL DEFAULT 'APPROVAL_PENDING', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, " +
       "approved_at INTEGER, current_period_end INTEGER, next_billing_time INTEGER, payer_id TEXT)"
+    ),
+    db.prepare(
+      "CREATE TABLE IF NOT EXISTS paypal_plan_provision_lock (" +
+      "id INTEGER PRIMARY KEY CHECK (id = 1), locked_until INTEGER NOT NULL DEFAULT 0)"
+    ),
+    db.prepare(
+      "INSERT OR IGNORE INTO paypal_plan_provision_lock (id, locked_until) VALUES (1, 0)"
     )
   ]);
 
@@ -908,23 +916,55 @@ async function entitlement(
 async function listPlans(
   env
 ) {
-  await ensureBillingSchema(
-    env.DB
-  );
+  const fallbackPlans = [
+    {
+      id: "FREE",
+      name: "Free",
+      priceUsd: 0,
+      durationDays: null,
+      billingInterval: "NONE",
+      description:
+        "Acesso gratuito às ferramentas disponíveis no plano Free.",
+      includes: [
+        "Ferramentas Free",
+        "Recursos gratuitos do ToolNexa"
+      ],
+      active: true,
+      hasPayPalPlan: false
+    },
+    {
+      id: "PRO",
+      name: "Pro",
+      priceUsd: 5,
+      durationDays: 30,
+      billingInterval: "MONTH",
+      description:
+        "Mais ferramentas e recursos do ToolNexa por assinatura mensal.",
+      includes: [
+        "Tudo do Free",
+        "Ferramentas Pro",
+        "Novos recursos Pro"
+      ],
+      active: true,
+      hasPayPalPlan: false
+    }
+  ];
 
-  const result =
-    await env.DB
-      .prepare(
-        "SELECT plan_id, name, price_usd, duration_days, billing_interval, description, " +
-        "includes, paypal_product_id, paypal_plan_id, active FROM plans " +
-        "WHERE active = 1 ORDER BY CASE plan_id WHEN 'FREE' THEN 1 WHEN 'PRO' THEN 2 ELSE 3 END"
-      )
-      .all();
+  try {
+    await ensureBillingSchema(
+      env.DB
+    );
 
-  return json({
-    ok:
-      true,
-    plans:
+    const result =
+      await env.DB
+        .prepare(
+          "SELECT plan_id, name, price_usd, duration_days, billing_interval, description, " +
+          "includes, paypal_product_id, paypal_plan_id, active FROM plans " +
+          "WHERE active = 1 ORDER BY CASE plan_id WHEN 'FREE' THEN 1 WHEN 'PRO' THEN 2 ELSE 3 END"
+        )
+        .all();
+
+    const plans =
       (result.results || [])
         .map(
           plan => ({
@@ -959,8 +999,47 @@ async function listPlans(
                 plan.paypal_plan_id
               )
           })
-        )
-  });
+        );
+
+    if (plans.length > 0) {
+      return json({
+        ok:
+          true,
+        plans,
+        billingReady:
+          true
+      });
+    }
+
+    return json({
+      ok:
+        true,
+      plans:
+        fallbackPlans,
+      billingReady:
+        false,
+      warning:
+        "O catálogo do billing ainda não foi inicializado."
+    });
+  } catch (
+    error
+  ) {
+    console.error(
+      "ToolNexa plan catalog fallback",
+      error
+    );
+
+    return json({
+      ok:
+        true,
+      plans:
+        fallbackPlans,
+      billingReady:
+        false,
+      warning:
+        "Os planos foram carregados no modo de recuperação. O billing será validado no momento da assinatura."
+    });
+  }
 }
 
 async function createSubscription(
@@ -1493,75 +1572,196 @@ async function createPayPalBillingPlan(
   return data.id;
 }
 
+async function acquirePayPalProvisionLock(
+  db
+) {
+  const now =
+    nowSeconds();
+
+  const result =
+    await db.prepare(
+      "UPDATE paypal_plan_provision_lock SET locked_until = ? " +
+      "WHERE id = 1 AND locked_until < ?"
+    )
+      .bind(
+        now + 60,
+        now
+      )
+      .run();
+
+  return Number(
+    result?.meta?.changes ||
+    0
+  ) > 0;
+}
+
+async function releasePayPalProvisionLock(
+  db
+) {
+  await db.prepare(
+    "UPDATE paypal_plan_provision_lock SET locked_until = 0 WHERE id = 1"
+  ).run();
+}
+
 async function ensurePayPalBillingPlan(
   env,
   plan
 ) {
-  const savedPlanId =
+  const firstSaved =
     String(
       plan.paypal_plan_id ||
       ""
     ).trim();
 
   if (
-    savedPlanId
+    firstSaved
   ) {
-    return savedPlanId;
+    return firstSaved;
   }
 
-  const accessToken =
-    await paypalAccessToken(
-      env.PAYPAL_CLIENT_ID,
-      env.PAYPAL_CLIENT_SECRET
+  let locked =
+    await acquirePayPalProvisionLock(
+      env.DB
     );
 
-  let productId =
-    String(
-      plan.paypal_product_id ||
-      ""
-    ).trim();
+  if (!locked) {
+    for (
+      let attempt = 0;
+      attempt < 10;
+      attempt += 1
+    ) {
+      await new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            400
+          )
+      );
 
-  if (!productId) {
-    productId =
-      await createPayPalProduct(
-        env,
+      const latest =
+        await getPlan(
+          env.DB,
+          plan.plan_id
+        );
+
+      const latestPlanId =
+        String(
+          latest?.paypal_plan_id ||
+          ""
+        ).trim();
+
+      if (
+        latestPlanId
+      ) {
+        return latestPlanId;
+      }
+
+      locked =
+        await acquirePayPalProvisionLock(
+          env.DB
+        );
+
+      if (
+        locked
+      ) {
+        break;
+      }
+    }
+  }
+
+  if (!locked) {
+    const error =
+      new Error(
+        "O provisionamento do plano PayPal está ocupado. Tente novamente em alguns segundos."
+      );
+    error.code =
+      "paypal_setup_busy";
+    error.publicMessage =
+      error.message;
+    error.status = 503;
+    throw error;
+  }
+
+  try {
+    const latest =
+      await getPlan(
+        env.DB,
+        plan.plan_id
+      );
+
+    const savedPlanId =
+      String(
+        latest?.paypal_plan_id ||
+        ""
+      ).trim();
+
+    if (
+      savedPlanId
+    ) {
+      return savedPlanId;
+    }
+
+    const currentPlan =
+      latest || plan;
+
+    const accessToken =
+      await paypalAccessToken(
+        env.PAYPAL_CLIENT_ID,
+        env.PAYPAL_CLIENT_SECRET
+      );
+
+    let productId =
+      String(
+        currentPlan.paypal_product_id ||
+        ""
+      ).trim();
+
+    if (!productId) {
+      productId =
+        await createPayPalProduct(
+          env,
+          accessToken,
+          currentPlan
+        );
+
+      await env.DB.prepare(
+        "UPDATE plans SET " +
+        "paypal_product_id = ?, updated_at = ? " +
+        "WHERE plan_id = ?"
+      )
+        .bind(
+          productId,
+          nowSeconds(),
+          currentPlan.plan_id
+        )
+        .run();
+    }
+
+    const paypalPlanId =
+      await createPayPalBillingPlan(
         accessToken,
-        plan
+        currentPlan,
+        productId
       );
 
     await env.DB.prepare(
       "UPDATE plans SET " +
-      "paypal_product_id = ?, updated_at = ? " +
+      "paypal_plan_id = ?, updated_at = ? " +
       "WHERE plan_id = ?"
     )
       .bind(
-        productId,
+        paypalPlanId,
         nowSeconds(),
-        plan.plan_id
+        currentPlan.plan_id
       )
       .run();
-  }
 
-  const paypalPlanId =
-    await createPayPalBillingPlan(
-      accessToken,
-      plan,
-      productId
+    return paypalPlanId;
+  } finally {
+    await releasePayPalProvisionLock(
+      env.DB
     );
-
-  await env.DB.prepare(
-    "UPDATE plans SET " +
-    "paypal_plan_id = ?, updated_at = ? " +
-    "WHERE plan_id = ?"
-  )
-    .bind(
-      paypalPlanId,
-      nowSeconds(),
-      plan.plan_id
-    )
-    .run();
-
-  return paypalPlanId;
+  }
 }
 
 async function getPayPalSubscription(
@@ -1969,12 +2169,16 @@ function paypalReturnPage(
 
   const link =
     safeId
-      ? "<a href='" +
+      ? "<p>A abrir o ToolNexa...</p>" +
+        "<a href='" +
         escapeHtml(
           deepLink
         ) +
         "' style='display:inline-block;padding:14px 18px;border-radius:12px;" +
-        "background:#2563eb;color:#fff;text-decoration:none'>Voltar ao ToolNexa</a>"
+        "background:#2563eb;color:#fff;text-decoration:none'>Voltar ao ToolNexa</a>" +
+        "<script>setTimeout(function(){window.location.href=" +
+        JSON.stringify(deepLink) +
+        "},300);</script>"
       : "<p>Assinatura não identificada.</p>";
 
   return new Response(
