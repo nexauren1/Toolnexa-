@@ -33,6 +33,7 @@ export default {
           paypal: env.PAYPAL_ENV || "sandbox",
           workers_ai: !!env.AI,
           images_binding: !!env.IMAGES,
+          database_binding: !!env.DB,
           paypal_plan_configured:
             !!(
               env.PAYPAL_PRO_PLAN_ID
@@ -49,20 +50,36 @@ export default {
         url.pathname === "/api/plans" &&
         request.method === "GET"
       ) {
-        await ensureBillingSchema(env.DB);
+        if (!env.DB) {
+          return json(
+            {
+              ok: false,
+              error: "billing_database_missing",
+              message:
+                "O banco de billing do ToolNexa não está ligado ao Worker."
+            },
+            503
+          );
+        }
 
-        const result = await env.DB
-          .prepare(
-            "SELECT code, name, price_usd, " +
-            "billing_interval, paypal_plan_id, active " +
-            "FROM plans WHERE active = 1 " +
-            "ORDER BY sort_order"
-          )
-          .all();
+        await ensureBillingSchema(
+          env.DB
+        );
+
+        const result =
+          await env.DB
+            .prepare(
+              "SELECT code, name, price_usd, " +
+              "billing_interval, paypal_plan_id, active " +
+              "FROM plans WHERE active = 1 " +
+              "ORDER BY sort_order, code"
+            )
+            .all();
 
         return json({
           ok: true,
-          plans: result.results || []
+          plans:
+            result.results || []
         });
       }
 
@@ -258,6 +275,23 @@ function json(data, status = 200) {
 
 async function ensureBillingSchema(db) {
   if (!billingSchemaPromise) {
+    if (!db) {
+      const error =
+        new Error(
+          "D1 billing database is missing."
+        );
+
+      error.code =
+        "billing_database_missing";
+
+      error.publicMessage =
+        "O banco de billing do ToolNexa não está ligado ao Worker.";
+
+      error.status = 503;
+
+      throw error;
+    }
+
     billingSchemaPromise = db.batch([
       db.prepare(
         "CREATE TABLE IF NOT EXISTS plans (" +
@@ -307,7 +341,104 @@ async function ensureBillingSchema(db) {
     });
   }
 
+  await billingSchemaPromise;
+  await migrateBillingSchema(db);
+
   return billingSchemaPromise;
+}
+
+async function migrateBillingSchema(db) {
+  const plansInfo =
+    await db
+      .prepare(
+        "PRAGMA table_info(plans)"
+      )
+      .all();
+
+  const planColumns =
+    new Set(
+      (plansInfo.results || [])
+        .map(
+          column =>
+            column.name
+        )
+    );
+
+  if (!planColumns.has("paypal_plan_id")) {
+    await db.prepare(
+      "ALTER TABLE plans ADD COLUMN paypal_plan_id TEXT"
+    ).run();
+  }
+
+  if (!planColumns.has("active")) {
+    await db.prepare(
+      "ALTER TABLE plans ADD COLUMN active INTEGER NOT NULL DEFAULT 1"
+    ).run();
+  }
+
+  if (!planColumns.has("sort_order")) {
+    await db.prepare(
+      "ALTER TABLE plans ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"
+    ).run();
+  }
+
+  const subscriptionsInfo =
+    await db
+      .prepare(
+        "PRAGMA table_info(paypal_subscriptions)"
+      )
+      .all();
+
+  const subscriptionColumns =
+    new Set(
+      (subscriptionsInfo.results || [])
+        .map(
+          column =>
+            column.name
+        )
+    );
+
+  if (!subscriptionColumns.has("firebase_uid")) {
+    await db.prepare(
+      "ALTER TABLE paypal_subscriptions ADD COLUMN firebase_uid TEXT"
+    ).run();
+  }
+
+  if (!subscriptionColumns.has("plan_code")) {
+    await db.prepare(
+      "ALTER TABLE paypal_subscriptions ADD COLUMN plan_code TEXT"
+    ).run();
+  }
+
+  if (!subscriptionColumns.has("status")) {
+    await db.prepare(
+      "ALTER TABLE paypal_subscriptions ADD COLUMN status TEXT"
+    ).run();
+  }
+
+  if (!subscriptionColumns.has("payer_email")) {
+    await db.prepare(
+      "ALTER TABLE paypal_subscriptions ADD COLUMN payer_email TEXT"
+    ).run();
+  }
+
+  if (!subscriptionColumns.has("created_at")) {
+    await db.prepare(
+      "ALTER TABLE paypal_subscriptions ADD COLUMN created_at TEXT"
+    ).run();
+  }
+
+  if (!subscriptionColumns.has("updated_at")) {
+    await db.prepare(
+      "ALTER TABLE paypal_subscriptions ADD COLUMN updated_at TEXT"
+    ).run();
+  }
+
+  if (!subscriptionColumns.has("raw_json")) {
+    await db.prepare(
+      "ALTER TABLE paypal_subscriptions ADD COLUMN raw_json TEXT"
+    ).run();
+  }
 }
 
 async function backgroundRemover(
