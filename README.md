@@ -61,3 +61,11 @@ The project uses Android Gradle Plugin 9.4.0, Gradle 9.6.0 and Java 17.
 ## CI
 
 Pushes to main build the Android APK and publish/update the matching GitHub Release tag based on versionName.
+
+## Firebase — v1.1.0
+
+- Firebase Authentication with Google and email/password.
+- Firebase Analytics with screen views and app-action events.
+- Android package: `com.toolnexa.app`.
+- Google Sign-In uses the configured Firebase OAuth client and the ToolNexa signing certificate.
+- Image Compressor and Image Resizer include in-tool previews and processing states.
