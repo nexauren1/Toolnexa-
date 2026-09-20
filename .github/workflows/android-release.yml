@@ -20,7 +20,6 @@ jobs:
       TOOLNEXA_KEYSTORE_BASE64: ${{ secrets.TOOLNEXA_KEYSTORE_BASE64 }}
       TOOLNEXA_STORE_PASSWORD: ${{ secrets.TOOLNEXA_STORE_PASSWORD }}
       TOOLNEXA_KEY_ALIAS: ${{ secrets.TOOLNEXA_KEY_ALIAS }}
-      TOOLNEXA_KEY_PASSWORD: ${{ secrets.TOOLNEXA_KEY_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -51,17 +50,16 @@ jobs:
           set -euo pipefail
           test -n "$TOOLNEXA_STORE_PASSWORD"
           test -n "$TOOLNEXA_KEY_ALIAS"
-          test -n "$TOOLNEXA_KEY_PASSWORD"
           mkdir -p app/signing
           printf '%s' "$TOOLNEXA_KEYSTORE_BASE64" | base64 --decode > app/signing/toolnexa-upload.jks
-          test -s app/signing/toolnexa-upload.jks
+          test -s app/signing/toolnexa-upload.p12
           cat >> app/build.gradle.kts <<'EOF'
 
           android.signingConfigs.create("ciRelease") {
-              storeFile = file("signing/toolnexa-upload.jks")
+              storeFile = file("signing/toolnexa-upload.p12")
               storePassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
               keyAlias = System.getenv("TOOLNEXA_KEY_ALIAS")
-              keyPassword = System.getenv("TOOLNEXA_KEY_PASSWORD")
+              keyPassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
           }
 
           android.buildTypes.getByName("release").signingConfig =
@@ -71,7 +69,7 @@ jobs:
       - name: Build APK
         run: |
           set -euo pipefail
-          if [ -f app/signing/toolnexa-upload.jks ]; then
+          if [ -f app/signing/toolnexa-upload.p12 ]; then
             gradle :app:assembleRelease --stacktrace
             cp app/build/outputs/apk/release/app-release.apk toolnexa.apk
           else
