@@ -274,7 +274,7 @@ class CategoryActivity : Activity() {
         val search = EditText(this).apply {
             hint = "Pesquisar ferramenta"
             textSize = 15f
-            singleLine = true
+            setSingleLine(true)
             setTextColor(
                 getColor(R.color.toolnexa_text)
             )
