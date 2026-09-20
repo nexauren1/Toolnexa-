@@ -20,6 +20,7 @@ jobs:
       TOOLNEXA_KEYSTORE_BASE64: ${{ secrets.TOOLNEXA_KEYSTORE_BASE64 }}
       TOOLNEXA_STORE_PASSWORD: ${{ secrets.TOOLNEXA_STORE_PASSWORD }}
       TOOLNEXA_KEY_ALIAS: ${{ secrets.TOOLNEXA_KEY_ALIAS }}
+      TOOLNEXA_KEY_PASSWORD: ${{ secrets.TOOLNEXA_KEY_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -50,6 +51,9 @@ jobs:
           set -euo pipefail
           test -n "$TOOLNEXA_STORE_PASSWORD"
           test -n "$TOOLNEXA_KEY_ALIAS"
+          if [ -z "${TOOLNEXA_KEY_PASSWORD:-}" ]; then
+            export TOOLNEXA_KEY_PASSWORD="$TOOLNEXA_STORE_PASSWORD"
+          fi
           mkdir -p app/signing
           printf '%s' "$TOOLNEXA_KEYSTORE_BASE64" | base64 --decode > app/signing/toolnexa-upload.p12
           test -s app/signing/toolnexa-upload.p12
@@ -59,7 +63,8 @@ jobs:
               storeFile = file("signing/toolnexa-upload.p12")
               storePassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
               keyAlias = System.getenv("TOOLNEXA_KEY_ALIAS")
-              keyPassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
+              keyPassword = System.getenv("TOOLNEXA_KEY_PASSWORD")
+                    ?: System.getenv("TOOLNEXA_STORE_PASSWORD")
           }
 
           android.buildTypes.getByName("release").signingConfig =
@@ -104,7 +109,7 @@ jobs:
           set -euo pipefail
           NOTES="ToolNexa Android v$VERSION
 
-          Firebase Authentication with Google, e-mail/password and international phone SMS verification, Firebase Analytics, three-stage image tools, Nexauren X user storage and Firebase update notifications."
+          Firebase Authentication with Google, e-mail/password and international phone SMS verification, Firebase Analytics, image tools, Cloudflare Worker integration, Background Remover using Cloudflare Images / BiRefNet, Nexauren X user storage, and Firebase update notifications."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" toolnexa.apk --clobber
             gh release edit "$TAG" --title "ToolNexa Android v$VERSION" --notes "$NOTES"

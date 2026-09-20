@@ -41,6 +41,14 @@
             android:name=".ToolWorkflowActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".BackgroundRemoverActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".PlansActivity"
+            android:exported="false" />
+
         <service
             android:name=".ToolNexaMessagingService"
             android:exported="false">

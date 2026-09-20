@@ -668,24 +668,33 @@ class CategoryActivity : Activity() {
                 "tool_name" to tool.name
             )
 
-            startActivity(
-                Intent(
-                    this,
-                    ToolWorkflowActivity::class.java
-                ).apply {
-                    putExtra(
-                        "tool",
-                        when (tool.name) {
-                            "Image Compressor" ->
-                                "compressor"
-                            "Image Resizer" ->
-                                "resizer"
-                            else ->
-                                "converter"
-                        }
+            if (tool.name == "Background Remover") {
+                startActivity(
+                    Intent(
+                        this,
+                        BackgroundRemoverActivity::class.java
                     )
-                }
-            )
+                )
+            } else {
+                startActivity(
+                    Intent(
+                        this,
+                        ToolWorkflowActivity::class.java
+                    ).apply {
+                        putExtra(
+                            "tool",
+                            when (tool.name) {
+                                "Image Compressor" ->
+                                    "compressor"
+                                "Image Resizer" ->
+                                    "resizer"
+                                else ->
+                                    "converter"
+                            }
+                        )
+                    }
+                )
+            }
         }
 
         body.addView(
