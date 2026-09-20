@@ -25,6 +25,7 @@ class StorageActivity : Activity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
+        LanguageManager.apply(this)
         analytics.screen("storage")
         build()
     }
