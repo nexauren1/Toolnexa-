@@ -7,34 +7,30 @@ object LanguageManager {
 
     const val PORTUGUESE = "pt"
     const val ENGLISH = "en"
+
     val supported =
         listOf(
             PORTUGUESE,
             ENGLISH
         )
+
+    private const val PREFS =
+        "toolnexa_language"
+
+    private const val KEY =
+        "language"
+
+    /*
+     * ToolNexa uses its own I18n layer for runtime text.
+     * Do not mutate Resources or trigger Activity recreation here.
+     */
     fun apply(
         context: Context
     ) {
-        val code =
-            current(context)
-
-        val locale =
-            Locale.forLanguageTag(code)
-
-        Locale.setDefault(locale)
-
-        val configuration =
-            android.content.res.Configuration(
-                context.resources.configuration
+        Locale.setDefault(
+            Locale.forLanguageTag(
+                current(context)
             )
-
-        configuration.setLocale(locale)
-        configuration.setLayoutDirection(locale)
-
-        @Suppress("DEPRECATION")
-        context.resources.updateConfiguration(
-            configuration,
-            context.resources.displayMetrics
         )
     }
 
@@ -48,12 +44,12 @@ object LanguageManager {
 
         context
             .getSharedPreferences(
-                "toolnexa_language",
+                PREFS,
                 Context.MODE_PRIVATE
             )
             .edit()
             .putString(
-                "language",
+                KEY,
                 code
             )
             .apply()
@@ -64,15 +60,15 @@ object LanguageManager {
     ): String {
         return context
             .getSharedPreferences(
-                "toolnexa_language",
+                PREFS,
                 Context.MODE_PRIVATE
             )
             .getString(
-                "language",
+                KEY,
                 PORTUGUESE
             )
             ?.trim()
-            ?.lowercase()
+            ?.lowercase(Locale.ROOT)
             ?.takeIf {
                 supported.contains(it)
             }
