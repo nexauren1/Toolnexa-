@@ -27,11 +27,8 @@ object LanguageManager {
     fun apply(
         context: Context
     ) {
-        Locale.setDefault(
-            Locale.forLanguageTag(
-                current(context)
-            )
-        )
+        // Runtime translation is handled by I18n.
+        // Do not mutate the process-wide Locale while Activities run.
     }
 
     fun set(
@@ -52,7 +49,7 @@ object LanguageManager {
                 KEY,
                 code
             )
-            .apply()
+            .commit()
     }
 
     fun current(
