@@ -28,6 +28,7 @@ class HistoryActivity : Activity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
+        LanguageManager.apply(this)
         analytics.screen("history")
         build()
     }
