@@ -7,6 +7,7 @@ const JSON_HEADERS = {
 };
 
 let billingSchemaPromise = null;
+let billingMigrationPromise = null;
 let firebaseKeysCache = null;
 let firebaseKeysFetchedAt = 0;
 
@@ -342,7 +343,19 @@ async function ensureBillingSchema(db) {
   }
 
   await billingSchemaPromise;
-  await migrateBillingSchema(db);
+
+  if (!billingMigrationPromise) {
+    billingMigrationPromise =
+      migrateBillingSchema(
+        db
+      ).catch(error => {
+        billingMigrationPromise =
+          null;
+        throw error;
+      });
+  }
+
+  await billingMigrationPromise;
 
   return billingSchemaPromise;
 }
