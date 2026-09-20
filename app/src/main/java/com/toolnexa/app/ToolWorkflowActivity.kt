@@ -498,7 +498,16 @@ class ToolWorkflowActivity : Activity() {
         setContentView(root)
     }
 
-    private fun body(): LinearLayout? = (root?.getChildAt(1) as? ScrollView)?.getChildAt(0) as? LinearLayout
+    private fun body(): LinearLayout? {
+        val scroll =
+            root?.childrenSequence()
+                ?.filterIsInstance<ScrollView>()
+                ?.firstOrNull()
+
+        return scroll
+            ?.getChildAt(0)
+            as? LinearLayout
+    }
 
     private fun add(view: View, height: Int? = null) { body()?.addView(view, LinearLayout.LayoutParams(-1, height ?: ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(6), 0, dp(6)) }) }
     private fun addTitle(value: String) { add(TextView(this).apply { text = value; textSize = 27f; typeface = android.graphics.Typeface.DEFAULT_BOLD; setTextColor(textColor) }); addSpacer(2) }
