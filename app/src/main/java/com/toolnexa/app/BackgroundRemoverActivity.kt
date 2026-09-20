@@ -352,18 +352,55 @@ class BackgroundRemoverActivity : Activity() {
                             )
                         }
 
-                        runOnUiThread {
-                            dialog.dismiss()
-                            originalBitmap = source
-                            resultFile = file
-                            editorForeground = decodeEditorForeground(
-                                file
+                        val decodedForeground =
+                            try {
+                                decodeEditorForeground(
+                                    file
+                                )
+                            } catch (
+                                error: OutOfMemoryError
+                            ) {
+                                null
+                            }
+
+                        if (decodedForeground == null) {
+                            file.delete()
+                            throw IOException(
+                                "A imagem é grande demais para o editor deste dispositivo."
                             )
-                            baseForeground =
-                                editorForeground?.copy(
+                        }
+
+                        val baseCopy =
+                            try {
+                                decodedForeground.copy(
                                     Bitmap.Config.ARGB_8888,
                                     true
                                 )
+                            } catch (
+                                error: OutOfMemoryError
+                            ) {
+                                decodedForeground.recycleIfSafe()
+                                null
+                            }
+
+                        if (baseCopy == null) {
+                            decodedForeground.recycleIfSafe()
+                            file.delete()
+                            throw IOException(
+                                "Não há memória suficiente para abrir o editor."
+                            )
+                        }
+
+                        runOnUiThread {
+                            dialog.dismiss()
+                            originalBitmap =
+                                source
+                            resultFile =
+                                file
+                            editorForeground =
+                                decodedForeground
+                            baseForeground =
+                                baseCopy
 
                             analytics.event(
                                 "background_remover_process_success"
@@ -455,8 +492,24 @@ class BackgroundRemoverActivity : Activity() {
             LinearLayout.LayoutParams(-1, dp(330))
         )
 
-        BitmapFactory.decodeFile(file.absolutePath)
-            ?.let { image.setImageBitmap(it) }
+        Thread {
+            val preview =
+                loadScaledBitmap(
+                    file,
+                    EDITOR_PREVIEW_MAX
+                )
+
+            runOnUiThread {
+                if (
+                    !isFinishing &&
+                    preview != null
+                ) {
+                    image.setImageBitmap(
+                        preview
+                    )
+                }
+            }
+        }.start()
 
         add(resultCard)
 
@@ -524,15 +577,45 @@ class BackgroundRemoverActivity : Activity() {
             editorForeground == null ||
             baseForeground == null
         ) {
-            editorForeground =
-                resultFile?.let {
-                    decodeEditorForeground(it)
-                }
-            baseForeground =
-                editorForeground?.copy(
-                    Bitmap.Config.ARGB_8888,
-                    true
+            try {
+                editorForeground =
+                    resultFile?.let {
+                        decodeEditorForeground(
+                            it
+                        )
+                    }
+
+                baseForeground =
+                    editorForeground?.copy(
+                        Bitmap.Config.ARGB_8888,
+                        true
+                    )
+            } catch (
+                error: OutOfMemoryError
+            ) {
+                editorForeground
+                    ?.recycleIfSafe()
+                baseForeground
+                    ?.recycleIfSafe()
+
+                editorForeground = null
+                baseForeground = null
+
+                toast(
+                    "Este resultado é grande demais para abrir no editor."
                 )
+                return
+            }
+        }
+
+        if (
+            editorForeground == null ||
+            baseForeground == null
+        ) {
+            toast(
+                "Não foi possível preparar o editor."
+            )
+            return
         }
 
         resetEditorValues()
@@ -4194,8 +4277,25 @@ class BackgroundRemoverActivity : Activity() {
             }
         }
 
+        editorImage?.setImageDrawable(
+            null
+        )
+
+        editorForeground?.recycleIfSafe()
+        baseForeground?.recycleIfSafe()
+        customBackground?.recycleIfSafe()
         aiBackgroundPreview?.recycleIfSafe()
+        originalBitmap?.recycleIfSafe()
+
+        displayBitmap = null
+        editorForeground = null
+        baseForeground = null
+        customBackground = null
+        aiBackgroundPreview = null
+        originalBitmap = null
+
         aiBackgroundFile?.delete()
+        aiBackgroundFile = null
 
         super.onDestroy()
     }
@@ -4203,6 +4303,6 @@ class BackgroundRemoverActivity : Activity() {
     companion object {
         private const val REQUEST_PICK = 801
         private const val REQUEST_BACKGROUND = 802
-        private const val EDITOR_PREVIEW_MAX = 1280
+        private const val EDITOR_PREVIEW_MAX = 1024
     }
 }
