@@ -24,6 +24,7 @@ class CategoryActivity : Activity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
+        LanguageManager.apply(this)
 
         val categoryName =
             intent.getStringExtra("category")
