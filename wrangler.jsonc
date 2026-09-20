@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "toolnexa",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-20",
+  "ai": {
+    "binding": "AI"
+  },
+  "images": {
+    "binding": "IMAGES"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "toolnexa-db",
+      "database_id": "62b884fc-1469-4f18-b731-5a11d51226fc"
+    }
+  ],
+  "vars": {
+    "PAYPAL_ENV": "sandbox"
+  }
+}
