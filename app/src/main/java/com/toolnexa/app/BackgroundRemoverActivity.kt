@@ -1028,7 +1028,7 @@ class BackgroundRemoverActivity : Activity() {
         val progress =
             processingDialog()
 
-        user.getIdToken(false)
+        user.getIdToken(true)
             .addOnSuccessListener { tokenResult ->
                 val token =
                     tokenResult.token
