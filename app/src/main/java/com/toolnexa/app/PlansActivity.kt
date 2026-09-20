@@ -112,80 +112,211 @@ class PlansActivity : Activity() {
     }
 
     private fun showPlans() {
+        window.statusBarColor =
+            bg
+        window.navigationBarColor =
+            bg
+
         val root =
             LinearLayout(this).apply {
                 orientation =
                     LinearLayout.VERTICAL
-
-                setBackgroundColor(
-                    bg
-                )
-
-                setPadding(
-                    18,
-                    24,
-                    18,
-                    30
-                )
+                setBackgroundColor(bg)
             }
 
         val scroll =
-            ScrollView(this)
+            ScrollView(this).apply {
+                isFillViewport = true
+            }
 
-        scroll.addView(
-            root
-        )
+        val body =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.VERTICAL
+                setPadding(
+                    18,
+                    20,
+                    18,
+                    32
+                )
+            }
 
-        setContentView(
-            scroll
-        )
-
+        scroll.addView(body)
         root.addView(
-            title(
-                "Planos do ToolNexa",
-                29f
+            scroll,
+            LinearLayout.LayoutParams(
+                -1,
+                0,
+                1f
             )
         )
 
-        root.addView(
-            body(
-                "Os planos e preços são carregados do sistema de billing do ToolNexa."
+        setContentView(root)
+
+        val back =
+            TextView(this).apply {
+                text = "‹  ToolNexa"
+                textSize = 15f
+                typeface =
+                    android.graphics.Typeface
+                        .DEFAULT_BOLD
+                setTextColor(
+                    getColor(
+                        R.color.toolnexa_blue
+                    )
+                )
+                setPadding(
+                    0,
+                    2,
+                    0,
+                    10
+                )
+                setOnClickListener {
+                    finish()
+                }
+            }
+
+        body.addView(back)
+
+        val hero =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.VERTICAL
+                setPadding(
+                    20,
+                    20,
+                    20,
+                    20
+                )
+                background =
+                    GradientDrawable().apply {
+                        setColor(
+                            getColor(
+                                R.color.toolnexa_surface
+                            )
+                        )
+                        setStroke(
+                            1,
+                            getColor(
+                                R.color.toolnexa_blue
+                            )
+                        )
+                        cornerRadius =
+                            22f
+                    }
+            }
+
+        hero.addView(
+            TextView(this).apply {
+                text = "ToolNexa Pro"
+                textSize = 28f
+                typeface =
+                    android.graphics.Typeface
+                        .DEFAULT_BOLD
+                setTextColor(textColor)
+            }
+        )
+
+        hero.addView(
+            TextView(this).apply {
+                text =
+                    "Ferramentas mais completas, uma experiência mais fluida."
+                textSize = 15f
+                setTextColor(muted)
+                setPadding(
+                    0,
+                    7,
+                    0,
+                    12
+                )
+            }
+        )
+
+        val heroBadge =
+            TextView(this).apply {
+                text = "ASSINATURA MENSAL"
+                textSize = 10.5f
+                typeface =
+                    android.graphics.Typeface
+                        .DEFAULT_BOLD
+                setTextColor(
+                    getColor(
+                        R.color.toolnexa_blue
+                    )
+                )
+                setPadding(
+                    10,
+                    7,
+                    10,
+                    7
+                )
+                background =
+                    GradientDrawable().apply {
+                        setColor(
+                            android.graphics.Color.parseColor(
+                                "#EAF0FF"
+                            )
+                        )
+                        cornerRadius =
+                            12f
+                    }
+            }
+
+        hero.addView(
+            heroBadge,
+            LinearLayout.LayoutParams(
+                -2,
+                -2
             )
+        )
+
+        body.addView(
+            hero,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = 16
+            }
         )
 
         val accountCard =
             LinearLayout(this).apply {
                 orientation =
                     LinearLayout.VERTICAL
-
                 setPadding(
                     18,
+                    17,
                     18,
-                    18,
-                    18
+                    17
                 )
-
                 background =
                     GradientDrawable().apply {
-                        setColor(
-                            surface
-                        )
-
+                        setColor(surface)
                         setStroke(
                             1,
                             border
                         )
-
                         cornerRadius =
                             18f
                     }
             }
 
         accountCard.addView(
-            title(
-                "A sua conta",
-                20f
-            )
+            TextView(this).apply {
+                text = "O teu acesso"
+                textSize = 16f
+                typeface =
+                    android.graphics.Typeface
+                        .DEFAULT_BOLD
+                setTextColor(textColor)
+                setPadding(
+                    0,
+                    0,
+                    0,
+                    8
+                )
+            }
         )
 
         currentPlanView =
@@ -208,43 +339,65 @@ class PlansActivity : Activity() {
 
         val refreshButton =
             Button(this).apply {
-                text =
-                    "Atualizar estado"
-
-                setOnClickListener {
-                    refreshAccount()
-                    loadPlansFromServer()
-                }
+                text = "Atualizar estado"
+                isAllCaps = false
             }
 
-        styleSecondary(
-            refreshButton
-        )
+        styleSecondary(refreshButton)
+
+        refreshButton.setOnClickListener {
+            refreshAccount()
+            loadPlansFromServer()
+        }
 
         accountCard.addView(
             refreshButton,
             LinearLayout.LayoutParams(
                 -1,
-                52
+                50
             )
         )
 
-        root.addView(
+        body.addView(
             accountCard,
             LinearLayout.LayoutParams(
                 -1,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
-                bottomMargin =
-                    16
+                bottomMargin = 22
             }
         )
 
-        root.addView(
-            title(
-                "Planos disponíveis",
-                22f
-            )
+        body.addView(
+            TextView(this).apply {
+                text = "Escolhe o teu plano"
+                textSize = 22f
+                typeface =
+                    android.graphics.Typeface
+                        .DEFAULT_BOLD
+                setTextColor(textColor)
+                setPadding(
+                    0,
+                    0,
+                    0,
+                    5
+                )
+            }
+        )
+
+        body.addView(
+            TextView(this).apply {
+                text =
+                    "Começa grátis ou desbloqueia os recursos Pro."
+                textSize = 14f
+                setTextColor(muted)
+                setPadding(
+                    0,
+                    0,
+                    0,
+                    12
+                )
+            }
         )
 
         plansContainer =
@@ -253,12 +406,27 @@ class PlansActivity : Activity() {
                     LinearLayout.VERTICAL
             }
 
-        root.addView(
+        body.addView(
             plansContainer,
             LinearLayout.LayoutParams(
                 -1,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
+        )
+
+        body.addView(
+            TextView(this).apply {
+                text =
+                    "Pagamento processado de forma segura pelo PayPal. A tua identidade continua ligada ao Firebase."
+                textSize = 12f
+                setTextColor(muted)
+                setPadding(
+                    4,
+                    14,
+                    4,
+                    0
+                )
+            }
         )
 
         showPlansLoading()
@@ -410,8 +578,14 @@ class PlansActivity : Activity() {
         plan: CloudflareApi.PlanInfo,
         price: String,
         description: String
-    ): LinearLayout =
-        LinearLayout(this).apply {
+    ): LinearLayout {
+        val isPro =
+            plan.code.equals(
+                "PRO",
+                ignoreCase = true
+            )
+
+        return LinearLayout(this).apply {
             orientation =
                 LinearLayout.VERTICAL
 
@@ -424,60 +598,225 @@ class PlansActivity : Activity() {
 
             background =
                 GradientDrawable().apply {
-                    setColor(
-                        surface
-                    )
-
+                    setColor(surface)
                     setStroke(
-                        1,
-                        border
+                        if (isPro) 2 else 1,
+                        if (isPro) {
+                            getColor(
+                                R.color.toolnexa_blue
+                            )
+                        } else {
+                            border
+                        }
                     )
-
                     cornerRadius =
-                        18f
+                        20f
                 }
 
+            val top =
+                LinearLayout(
+                    this@PlansActivity
+                ).apply {
+                    orientation =
+                        LinearLayout.HORIZONTAL
+                    gravity =
+                        android.view.Gravity.CENTER_VERTICAL
+                }
+
+            top.addView(
+                TextView(
+                    this@PlansActivity
+                ).apply {
+                    text =
+                        plan.name.ifBlank {
+                            plan.code
+                        }
+                    textSize = 21f
+                    typeface =
+                        android.graphics.Typeface
+                            .DEFAULT_BOLD
+                    setTextColor(textColor)
+                },
+                LinearLayout.LayoutParams(
+                    0,
+                    -2,
+                    1f
+                )
+            )
+
+            top.addView(
+                TextView(
+                    this@PlansActivity
+                ).apply {
+                    text =
+                        if (isPro) {
+                            "PRO"
+                        } else {
+                            "FREE"
+                        }
+                    textSize = 10.5f
+                    typeface =
+                        android.graphics.Typeface
+                            .DEFAULT_BOLD
+                    setTextColor(
+                        if (isPro) {
+                            android.graphics.Color.WHITE
+                        } else {
+                            getColor(
+                                R.color.toolnexa_blue
+                            )
+                        }
+                    )
+                    setPadding(
+                        10,
+                        6,
+                        10,
+                        6
+                    )
+                    background =
+                        GradientDrawable().apply {
+                            setColor(
+                                if (isPro) {
+                                    getColor(
+                                        R.color.toolnexa_blue
+                                    )
+                                } else {
+                                    android.graphics.Color.parseColor(
+                                        "#EAF0FF"
+                                    )
+                                }
+                            )
+                            cornerRadius =
+                                11f
+                        }
+                }
+            )
+
             addView(
-                title(
-                    plan.name.ifBlank {
-                        plan.code
-                    },
-                    21f
+                top,
+                LinearLayout.LayoutParams(
+                    -1,
+                    48
                 )
             )
 
             addView(
-                body(
-                    price
-                )
+                TextView(
+                    this@PlansActivity
+                ).apply {
+                    text =
+                        if (isPro) {
+                            "Mais recursos para quem quer usar o ToolNexa a sério."
+                        } else {
+                            "O essencial para começar a explorar o ToolNexa."
+                        }
+                    textSize = 13.5f
+                    setTextColor(muted)
+                    setPadding(
+                        0,
+                        4,
+                        0,
+                        12
+                    )
+                }
             )
 
             addView(
-                body(
-                    description
-                )
+                TextView(
+                    this@PlansActivity
+                ).apply {
+                    text = price
+                    textSize = 27f
+                    typeface =
+                        android.graphics.Typeface
+                            .DEFAULT_BOLD
+                    setTextColor(textColor)
+                }
             )
 
-            if (
-                plan.code.equals(
-                    "PRO",
-                    ignoreCase = true
+            if (isPro) {
+                addView(
+                    TextView(
+                        this@PlansActivity
+                    ).apply {
+                        text =
+                            "Renovação automática mensal"
+                        textSize = 12f
+                        setTextColor(muted)
+                        setPadding(
+                            0,
+                            2,
+                            0,
+                            13
+                        )
+                    }
                 )
-            ) {
+            } else {
+                addView(
+                    TextView(
+                        this@PlansActivity
+                    ).apply {
+                        text =
+                            "Sem compromisso"
+                        textSize = 12f
+                        setTextColor(muted)
+                        setPadding(
+                            0,
+                            2,
+                            0,
+                            13
+                        )
+                    }
+                )
+            }
+
+            val features =
+                if (isPro) {
+                    listOf(
+                        "Tudo do plano Free",
+                        "Ferramentas e recursos Pro",
+                        "Novos recursos Pro",
+                        "Acesso contínuo enquanto ativo"
+                    )
+                } else {
+                    listOf(
+                        "Ferramentas Free",
+                        "Conta Firebase protegida",
+                        "Histórico do ToolNexa",
+                        "Atualizações do aplicativo"
+                    )
+                }
+
+            features.forEach { feature ->
+                addView(
+                    TextView(
+                        this@PlansActivity
+                    ).apply {
+                        text =
+                            "✓  " + feature
+                        textSize = 13.5f
+                        setTextColor(textColor)
+                        setPadding(
+                            0,
+                            3,
+                            0,
+                            7
+                        )
+                    }
+                )
+            }
+
+            if (isPro) {
                 subscribeButton =
                     Button(
                         this@PlansActivity
                     ).apply {
-                        text =
-                            "Assinar Pro"
-
-                        minHeight =
-                            54
-
+                        text = "Assinar Pro"
+                        isAllCaps = false
+                        minHeight = 54
                         setTextColor(
                             android.graphics.Color.WHITE
                         )
-
                         background =
                             GradientDrawable().apply {
                                 setColor(
@@ -485,11 +824,11 @@ class PlansActivity : Activity() {
                                         R.color.toolnexa_blue
                                     )
                                 )
-
                                 cornerRadius =
                                     14f
                             }
-
+                        stateListAnimator =
+                            null
                         setOnClickListener {
                             startProSubscription()
                         }
@@ -500,10 +839,34 @@ class PlansActivity : Activity() {
                     LinearLayout.LayoutParams(
                         -1,
                         54
-                    )
+                    ).apply {
+                        topMargin = 8
+                    }
+                )
+            } else {
+                addView(
+                    TextView(
+                        this@PlansActivity
+                    ).apply {
+                        text =
+                            "Plano atual sem mensalidade"
+                        textSize = 12f
+                        setTextColor(
+                            getColor(
+                                R.color.toolnexa_muted
+                            )
+                        )
+                        setPadding(
+                            0,
+                            10,
+                            0,
+                            0
+                        )
+                    }
                 )
             }
         }
+    }
 
     private fun refreshAccount() {
         if (
@@ -606,11 +969,21 @@ class PlansActivity : Activity() {
                         ?: "Sem subscrição"
                 )
 
-        subscribeButton?.isEnabled =
-            !account.planCode.equals(
+        val isPro =
+            account.planCode.equals(
                 "PRO",
                 ignoreCase = true
             )
+
+        subscribeButton?.apply {
+            isEnabled = !isPro
+            text =
+                if (isPro) {
+                    "Plano atual"
+                } else {
+                    "Assinar Pro"
+                }
+        }
     }
 
     private fun showAccountError(
