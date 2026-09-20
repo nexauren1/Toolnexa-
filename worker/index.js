@@ -1076,270 +1076,382 @@ async function createSubscription(
   env,
   user
 ) {
-  await ensureBillingSchema(
-    env.DB
-  );
+  let stage =
+    "database_schema";
 
-  const body =
-    await request
-      .json()
-      .catch(
-        () => ({})
-      );
-
-  const planId =
-    typeof body.planId === "string"
-      ? body.planId
-          .trim()
-          .toUpperCase()
-      : "PRO";
-
-  if (
-    planId !== "PRO"
-  ) {
-    return json(
-      {
-        error:
-          "Escolha um plano mensal válido."
-      },
-      400
-    );
-  }
-
-  const current =
-    await syncUserSubscription(
-      env.DB,
-      env,
-      user.uid
+  try {
+    await ensureBillingSchema(
+      env.DB
     );
 
-  if (
-    current.plan !== "FREE" &&
-    current.status === "ACTIVE" &&
-    Number(
-      current.expires_at ||
-      0
-    ) > nowSeconds()
-  ) {
-    return json(
-      {
-        error:
-          "Esta conta já tem um plano pago ativo.",
-        plan:
-          current.plan,
-        expiresAt:
-          Number(
-            current.expires_at
-          )
-      },
-      409
-    );
-  }
+    stage =
+      "request_body";
 
-  const plan =
-    await getPlan(
-      env.DB,
-      planId
-    );
+    const body =
+      await request
+        .json()
+        .catch(
+          () => ({})
+        );
 
-  if (
-    !plan
-  ) {
-    return json(
-      {
-        error:
-          "Plano não encontrado."
-      },
-      404
-    );
-  }
+    const planId =
+      typeof body.planId === "string"
+        ? body.planId
+            .trim()
+            .toUpperCase()
+        : "PRO";
 
-  let paypalPlanId =
-    String(
-      plan.paypal_plan_id ||
-      ""
-    ).trim();
-
-  if (!paypalPlanId) {
-    paypalPlanId =
-      await ensurePayPalBillingPlan(
-        env,
-        plan
-      );
-  }
-
-  const accessToken =
-    await paypalAccessToken(
-      env.PAYPAL_CLIENT_ID,
-      env.PAYPAL_CLIENT_SECRET
-    );
-
-  const origin =
-    new URL(
-      request.url
-    ).origin;
-
-  const payload = {
-    plan_id:
-      paypalPlanId,
-    ...(user.email
-      ? {
-          subscriber: {
-            email_address:
-              user.email
-          }
-        }
-      : {}),
-    application_context: {
-      brand_name:
-        "ToolNexa",
-      locale:
-        "pt-PT",
-      shipping_preference:
-        "NO_SHIPPING",
-      user_action:
-        "SUBSCRIBE_NOW",
-      return_url:
-        origin +
-        "/api/paypal/return",
-      cancel_url:
-        origin +
-        "/api/paypal/cancel"
-    }
-  };
-
-  const response =
-    await fetch(
-      PAYPAL_BASE +
-        "/v1/billing/subscriptions",
-      {
-        method:
-          "POST",
-        headers: {
-          authorization:
-            "Bearer " +
-            accessToken,
-          "content-type":
-            "application/json",
-          accept:
-            "application/json",
-          "paypal-request-id":
-            "toolnexa-subscription-" +
-            crypto.randomUUID()
+    if (
+      planId !== "PRO"
+    ) {
+      return json(
+        {
+          ok:
+            false,
+          error:
+            "invalid_plan",
+          message:
+            "Escolha um plano mensal válido."
         },
-        body:
-          JSON.stringify(
-            payload
-          )
+        400
+      );
+    }
+
+    stage =
+      "account_sync";
+
+    const current =
+      await syncUserSubscription(
+        env.DB,
+        env,
+        user.uid
+      );
+
+    if (
+      current.plan !== "FREE" &&
+      current.status === "ACTIVE" &&
+      Number(
+        current.expires_at ||
+        0
+      ) > nowSeconds()
+    ) {
+      return json(
+        {
+          ok:
+            false,
+          error:
+            "paid_plan_active",
+          message:
+            "Esta conta já tem um plano pago ativo.",
+          plan:
+            current.plan,
+          expiresAt:
+            Number(
+              current.expires_at
+            )
+        },
+        409
+      );
+    }
+
+    stage =
+      "load_plan";
+
+    const plan =
+      await getPlan(
+        env.DB,
+        planId
+      );
+
+    if (
+      !plan
+    ) {
+      return json(
+        {
+          ok:
+            false,
+          error:
+            "plan_not_found",
+          message:
+            "Plano não encontrado."
+        },
+        404
+      );
+    }
+
+    stage =
+      "paypal_plan_provisioning";
+
+    let paypalPlanId =
+      String(
+        plan.paypal_plan_id ||
+        ""
+      ).trim();
+
+    if (
+      !paypalPlanId
+    ) {
+      paypalPlanId =
+        await ensurePayPalBillingPlan(
+          env,
+          plan
+        );
+    }
+
+    if (
+      !paypalPlanId
+    ) {
+      const error =
+        new Error(
+          "O PayPal não devolveu um ID de plano válido."
+        );
+
+      error.code =
+        "paypal_plan_id_missing";
+      error.publicMessage =
+        error.message;
+      error.status =
+        502;
+
+      throw error;
+    }
+
+    stage =
+      "paypal_authentication";
+
+    const accessToken =
+      await paypalAccessToken(
+        env.PAYPAL_CLIENT_ID,
+        env.PAYPAL_CLIENT_SECRET
+      );
+
+    stage =
+      "paypal_subscription_creation";
+
+    const origin =
+      new URL(
+        request.url
+      ).origin;
+
+    const payload = {
+      plan_id:
+        paypalPlanId,
+      ...(user.email
+        ? {
+            subscriber: {
+              email_address:
+                user.email
+            }
+          }
+        : {}),
+      application_context: {
+        brand_name:
+          "ToolNexa",
+        locale:
+          "pt-PT",
+        shipping_preference:
+          "NO_SHIPPING",
+        user_action:
+          "SUBSCRIBE_NOW",
+        return_url:
+          origin +
+          "/api/paypal/return",
+        cancel_url:
+          origin +
+          "/api/paypal/cancel"
+      }
+    };
+
+    const response =
+      await fetch(
+        PAYPAL_BASE +
+          "/v1/billing/subscriptions",
+        {
+          method:
+            "POST",
+          headers: {
+            authorization:
+              "Bearer " +
+              accessToken,
+            "content-type":
+              "application/json",
+            accept:
+              "application/json",
+            "paypal-request-id":
+              "toolnexa-subscription-" +
+              crypto.randomUUID()
+          },
+          body:
+            JSON.stringify(
+              payload
+            )
+        }
+      );
+
+    const data =
+      await response
+        .json()
+        .catch(
+          () => ({})
+        );
+
+    if (
+      !response.ok
+    ) {
+      console.error(
+        "PayPal subscription creation failed",
+        response.status,
+        data
+      );
+
+      return json(
+        {
+          ok:
+            false,
+          error:
+            "paypal_create_subscription_failed",
+          message:
+            paypalFailureMessage(
+              data,
+              "O PayPal Sandbox recusou a criação da assinatura."
+            ),
+          paypal_error:
+            data?.name ||
+            null,
+          paypal_debug_id:
+            data?.debug_id ||
+            null,
+          details:
+            data?.details ||
+            []
+        },
+        502
+      );
+    }
+
+    const approvalUrl =
+      (data.links || [])
+        .find(
+          link =>
+            link.rel ===
+            "approve"
+        )
+        ?.href ||
+      null;
+
+    if (
+      !data.id ||
+      !approvalUrl
+    ) {
+      const error =
+        new Error(
+          "O PayPal devolveu uma assinatura incompleta."
+        );
+
+      error.code =
+        "paypal_incomplete_subscription";
+      error.publicMessage =
+        error.message;
+      error.status =
+        502;
+
+      throw error;
+    }
+
+    stage =
+      "database_persistence";
+
+    const timestamp =
+      nowSeconds();
+
+    await env.DB
+      .prepare(
+        "INSERT INTO paypal_subscriptions (" +
+        "firebase_uid, subscription_id, plan_id, paypal_plan_id, status, created_at, updated_at) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?)"
+      )
+      .bind(
+        user.uid,
+        data.id,
+        planId,
+        paypalPlanId,
+        data.status ||
+          "APPROVAL_PENDING",
+        timestamp,
+        timestamp
+      )
+      .run();
+
+    return json({
+      ok:
+        true,
+      subscriptionId:
+        data.id,
+      approvalUrl,
+      plan:
+        planId,
+      amount:
+        Number(
+          plan.price_usd
+        ),
+      currency:
+        "USD",
+      billingInterval:
+        plan.billing_interval
+    });
+  } catch (
+    error
+  ) {
+    console.error(
+      "ToolNexa create subscription failed",
+      {
+        stage,
+        error
       }
     );
 
-  const data =
-    await response
-      .json()
-      .catch(
-        () => ({})
-      );
-
-  if (
-    !response.ok
-  ) {
-    console.error(
-      "PayPal subscription creation failed",
-      response.status,
-      data
-    );
-
-    return json(
-      {
-        ok:
-          false,
-        error:
-          "paypal_create_subscription_failed",
-        message:
-          paypalFailureMessage(
-            data,
-            "O PayPal Sandbox recusou a criação da assinatura."
-          ),
-        paypal_error:
-          data?.name ||
-          null,
-        paypal_debug_id:
-          data?.debug_id ||
-          null,
-        details:
-          data?.details ||
-          []
-      },
-      502
-    );
-  }
-
-  const approvalUrl =
-    (data.links || [])
-      .find(
-        link =>
-          link.rel ===
-          "approve"
-      )
-      ?.href ||
-    null;
-
-  if (
-    !data.id ||
-    !approvalUrl
-  ) {
-    return json(
-      {
-        ok:
-          false,
-        error:
-          "paypal_incomplete_subscription",
-        message:
-          "O PayPal devolveu uma assinatura incompleta."
-      },
-      502
-    );
-  }
-
-  const timestamp =
-    nowSeconds();
-
-  await env.DB
-    .prepare(
-      "INSERT INTO paypal_subscriptions (" +
-      "firebase_uid, subscription_id, plan_id, paypal_plan_id, status, created_at, updated_at) " +
-      "VALUES (?, ?, ?, ?, ?, ?, ?)"
-    )
-    .bind(
-      user.uid,
-      data.id,
-      planId,
-      paypalPlanId,
-      data.status ||
-        "APPROVAL_PENDING",
-      timestamp,
-      timestamp
-    )
-    .run();
-
-  return json({
-    ok:
-      true,
-    subscriptionId:
-      data.id,
-    approvalUrl,
-    plan:
-      planId,
-    amount:
+    const status =
       Number(
-        plan.price_usd
-      ),
-    currency:
-      "USD",
-    billingInterval:
-      plan.billing_interval
-  });
+        error?.status
+      ) >= 400 &&
+      Number(
+        error?.status
+      ) <= 599
+        ? Number(
+            error.status
+          )
+        : 500;
+
+    const rawMessage =
+      error?.publicMessage ||
+      error?.message ||
+      "";
+
+    const message =
+      String(
+        rawMessage
+      ).length < 400 &&
+      String(
+        rawMessage
+      ).trim()
+        ? String(
+            rawMessage
+          ).trim()
+        : "Ocorreu um erro interno ao preparar a assinatura.";
+
+    return json(
+      {
+        ok:
+          false,
+        error:
+          error?.code ||
+          "paypal_subscription_setup_failed",
+        message,
+        stage
+      },
+      status
+    );
+  }
 }
 
 async function paypalAccessToken(
