@@ -2015,15 +2015,15 @@ class MainActivity : ComponentActivity() {
 
     private fun showLanguageDialog() {
         val codes =
-            LanguageManager.supported
+            listOf(
+                LanguageManager.PORTUGUESE,
+                LanguageManager.ENGLISH
+            )
 
         val labels =
             arrayOf(
-                I18n.t(this, "Português"),
-                I18n.t(this, "English"),
-                I18n.t(this, "Español"),
-                I18n.t(this, "Français"),
-                I18n.t(this, "العربية")
+                "Português",
+                "English"
             )
 
         val current =
@@ -2044,6 +2044,11 @@ class MainActivity : ComponentActivity() {
                 val code =
                     codes[which]
 
+                if (code == current) {
+                    dialog.dismiss()
+                    return@setSingleChoiceItems
+                }
+
                 LanguageManager.set(
                     this,
                     code
@@ -2056,14 +2061,9 @@ class MainActivity : ComponentActivity() {
 
                 dialog.dismiss()
 
-                /*
-                 * Android 13+ recreates the Activity automatically when
-                 * applicationLocales changes. On older Android versions,
-                 * manually recreate after saving the preference.
-                 */
-                if (
-                    android.os.Build.VERSION.SDK_INT < 33
-                ) {
+                // Controlled recreation avoids Android 13 locale
+                // callbacks recreating the Activity twice.
+                window.decorView.post {
                     recreate()
                 }
             }

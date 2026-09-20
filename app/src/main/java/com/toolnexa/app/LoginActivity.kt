@@ -524,6 +524,15 @@ class LoginActivity : ComponentActivity() {
 
     private fun openMain() {
         analytics.event("auth_session_ready")
+
+        // When login is opened from inside the app, return to the
+        // existing MainActivity instead of creating a second one.
+        if (!isTaskRoot) {
+            setResult(RESULT_OK)
+            finish()
+            return
+        }
+
         startActivity(
             Intent(
                 this,
@@ -1228,10 +1237,7 @@ class LoginActivity : ComponentActivity() {
                 toast(
                     "Login Google efetuado com sucesso."
                 )
-                setResult(
-                    RESULT_OK
-                )
-                finish()
+                openMain()
             } else {
                 analytics.event(
                     "auth_google_failed",
