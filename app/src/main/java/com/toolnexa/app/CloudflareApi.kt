@@ -329,6 +329,117 @@ object CloudflareApi {
         }
     }
 
+    fun loadAccount(
+        firebaseIdToken: String
+    ): AccountInfo {
+        val connection =
+            (URL(
+                BASE_URL +
+                    "/api/account"
+            ).openConnection()
+                as HttpURLConnection).apply {
+                connectTimeout = 15_000
+                readTimeout = 30_000
+                requestMethod = "GET"
+                setRequestProperty(
+                    "Authorization",
+                    "Bearer " +
+                        firebaseIdToken
+                )
+                setRequestProperty(
+                    "Accept",
+                    "application/json"
+                )
+            }
+
+        try {
+            val status =
+                connection.responseCode
+
+            val stream =
+                if (status in 200..299) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
+                }
+
+            val body =
+                stream
+                    ?.bufferedReader()
+                    ?.use {
+                        it.readText()
+                    }
+                    ?: ""
+
+            val root =
+                JSONObject(
+                    body.ifBlank {
+                        "{}"
+                    }
+                )
+
+            if (status !in 200..299) {
+                throw IOException(
+                    root.optString(
+                        "message",
+                        "Não foi possível verificar o plano."
+                    )
+                )
+            }
+
+            val account =
+                root.optJSONObject(
+                    "account"
+                ) ?: throw IOException(
+                    "Resposta de conta inválida."
+                )
+
+            val plan =
+                account.optJSONObject(
+                    "plan"
+                ) ?: throw IOException(
+                    "Plano não encontrado."
+                )
+
+            val subscription =
+                account.optJSONObject(
+                    "subscription"
+                )
+
+            return AccountInfo(
+                uid =
+                    account.optString(
+                        "uid"
+                    ),
+                planCode =
+                    plan.optString(
+                        "code",
+                        "free"
+                    ),
+                planName =
+                    plan.optString(
+                        "name",
+                        "Free"
+                    ),
+                priceUsd =
+                    plan.optString(
+                        "price_usd",
+                        "0.00"
+                    ),
+                subscriptionStatus =
+                    subscription
+                        ?.optString(
+                            "status"
+                        )
+                        ?.ifBlank {
+                            null
+                        }
+            )
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     private fun readError(
         connection: HttpURLConnection
     ): String {
@@ -394,6 +505,14 @@ object CloudflareApi {
         val priceUsd: String,
         val interval: String,
         val paypalPlanId: String?
+    )
+
+    data class AccountInfo(
+        val uid: String,
+        val planCode: String,
+        val planName: String,
+        val priceUsd: String,
+        val subscriptionStatus: String?
     )
 
     private const val MAX_UPLOAD_BYTES =
