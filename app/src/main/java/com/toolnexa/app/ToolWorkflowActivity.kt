@@ -25,6 +25,7 @@ class ToolWorkflowActivity : Activity() {
     private val analytics by lazy { AnalyticsTracker(this) }
     private val compressor by lazy { ImageCompressor(this) }
     private val resizer by lazy { ImageResizer(this) }
+    private val converter by lazy { ImageConverter(this) }
     private var tool = "compressor"
     private var selectedUri: Uri? = null
     private var resultFile: File? = null
@@ -32,6 +33,8 @@ class ToolWorkflowActivity : Activity() {
     private var compressionQuality = 82
     private var resizeWidth = 1080
     private var resizeQuality = 90
+    private var converterFormat = "JPG"
+    private var converterQuality = 92
     private var root: LinearLayout? = null
     private val blue by lazy { getColor(R.color.toolnexa_blue) }
     private val bg by lazy { getColor(R.color.toolnexa_bg) }
@@ -49,7 +52,13 @@ class ToolWorkflowActivity : Activity() {
 
     private fun showStage1() {
         buildBase("1 / 3  •  Escolher arquivo")
-        addTitle(if (tool == "compressor") "Image Compressor" else "Image Resizer")
+        addTitle(
+            when (tool) {
+                "compressor" -> "Image Compressor"
+                "resizer" -> "Image Resizer"
+                else -> "Image Converter"
+            }
+        )
         addText("Escolha uma imagem. O processamento é feito no próprio dispositivo.")
         val pick = button("Escolher imagem", true)
         pick.setOnClickListener {
@@ -91,7 +100,11 @@ class ToolWorkflowActivity : Activity() {
             val bitmap = compressor.decodeSampled(uri, 1600)
             runOnUiThread { if (bitmap != null) preview?.setImageBitmap(bitmap) }
         }.start()
-        if (tool == "compressor") addCompressorOptions() else addResizerOptions(uri)
+        when (tool) {
+            "compressor" -> addCompressorOptions()
+            "resizer" -> addResizerOptions(uri)
+            "converter" -> addConverterOptions()
+        }
         val process = button("Processar e ver resultado", true)
         process.setOnClickListener { processTool() }
         add(process)
@@ -147,6 +160,73 @@ class ToolWorkflowActivity : Activity() {
         addText("A proporção original é preservada pelo motor atual do Resizer.")
     }
 
+    private fun addConverterOptions() {
+        addText("Formato de saída")
+        val formats = listOf("JPG", "PNG", "WebP")
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        for (format in formats) {
+            val b = button(format, format == converterFormat)
+            b.setOnClickListener {
+                converterFormat = format
+                analytics.event(
+                    "convert_format_changed",
+                    "format" to format
+                )
+                showStage2()
+            }
+            row.addView(
+                b,
+                LinearLayout.LayoutParams(
+                    0,
+                    dp(48),
+                    1f
+                ).apply {
+                    setMargins(dp(3), 0, dp(3), 0)
+                }
+            )
+        }
+        add(row)
+
+        val label = TextView(this).apply {
+            text = "Qualidade: $converterQuality%"
+            textSize = 16f
+            setTextColor(textColor)
+        }
+        add(label)
+
+        val seek = SeekBar(this).apply {
+            max = 90
+            progress = converterQuality - 10
+            setOnSeekBarChangeListener(
+                object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(
+                        b: SeekBar?,
+                        p: Int,
+                        fromUser: Boolean
+                    ) {
+                        converterQuality = p + 10
+                        label.text =
+                            "Qualidade: $converterQuality%"
+                    }
+
+                    override fun onStartTrackingTouch(
+                        b: SeekBar?
+                    ) = Unit
+
+                    override fun onStopTrackingTouch(
+                        b: SeekBar?
+                    ) = Unit
+                }
+            )
+        }
+        add(seek)
+        addText(
+            "PNG preserva transparência. JPG e WebP usam qualidade ajustável."
+        )
+    }
+
     private fun processTool() {
         val uri = selectedUri ?: return
         if (tool == "resizer") {
@@ -154,10 +234,24 @@ class ToolWorkflowActivity : Activity() {
             resizeWidth = fields.firstOrNull()?.text?.toString()?.toIntOrNull()?.coerceIn(16, 4096) ?: 1080
         }
         analytics.event("tool_process_start", "tool" to tool)
-        val dialog = processing(if (tool == "compressor") "A comprimir..." else "A redimensionar...")
+        val dialog = processing(
+            when (tool) {
+                "compressor" -> "A comprimir..."
+                "resizer" -> "A redimensionar..."
+                else -> "A converter..."
+            }
+        )
         Thread {
             try {
-                val result = if (tool == "compressor") compressor.compress(uri, compressionQuality) else resizer.resize(uri, resizeWidth)
+                val result = when (tool) {
+                    "compressor" -> compressor.compress(uri, compressionQuality)
+                    "resizer" -> resizer.resize(uri, resizeWidth)
+                    else -> converter.convert(
+                        uri,
+                        converterFormat,
+                        converterQuality
+                    )
+                }
                 runOnUiThread {
                     dialog.dismiss()
                     if (result == null) {
@@ -165,26 +259,40 @@ class ToolWorkflowActivity : Activity() {
                         toast("Não foi possível processar o arquivo.")
                     } else {
                         analytics.event("tool_process_success", "tool" to tool)
-                        if (tool == "compressor") {
-                            val r = result as CompressionResult
-                            resultFile = r.file
-                            showStage3(
-                                r.file,
-                                r.originalBytes,
-                                r.compressedBytes,
-                                r.width,
-                                r.height
-                            )
-                        } else {
-                            val r = result as ResizeResult
-                            resultFile = r.file
-                            showStage3(
-                                r.file,
-                                r.originalBytes,
-                                r.resizedBytes,
-                                r.width,
-                                r.height
-                            )
+                        when (tool) {
+                            "compressor" -> {
+                                val r = result as CompressionResult
+                                resultFile = r.file
+                                showStage3(
+                                    r.file,
+                                    r.originalBytes,
+                                    r.compressedBytes,
+                                    r.width,
+                                    r.height
+                                )
+                            }
+                            "resizer" -> {
+                                val r = result as ResizeResult
+                                resultFile = r.file
+                                showStage3(
+                                    r.file,
+                                    r.originalBytes,
+                                    r.resizedBytes,
+                                    r.width,
+                                    r.height
+                                )
+                            }
+                            else -> {
+                                val r = result as ConversionResult
+                                resultFile = r.file
+                                showStage3(
+                                    r.file,
+                                    r.originalBytes,
+                                    r.convertedBytes,
+                                    r.width,
+                                    r.height
+                                )
+                            }
                         }
                     }
                 }
@@ -224,7 +332,11 @@ class ToolWorkflowActivity : Activity() {
         val saved = NexaurenStorage.save(
             this,
             "Imagem",
-            if (tool == "compressor") "Compressor" else "Resizer",
+            when (tool) {
+                "compressor" -> "Compressor"
+                "resizer" -> "Resizer"
+                else -> "Converter"
+            },
             file,
             "ToolNexa-" +
                 System.currentTimeMillis() +
