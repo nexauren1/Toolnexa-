@@ -2,10 +2,15 @@
 
 ToolNexa is a native Android utility app focused on practical tools with a clean, light and mobile-first experience.
 
-## v1.3.0
+## v1.8.0
 
 - Image Compressor
 - Image Resizer
+- Image Converter
+- Background Remover using Cloudflare Images / BiRefNet
+- Cloudflare Worker backend
+- D1 billing storage for PayPal Sandbox
+- Free and Pro ($5/month) plan catalog without credits
 - Searchable 2-column tool grid
 - Firebase Authentication with Google, e-mail/password and international phone SMS verification
 - Password recovery by e-mail
@@ -18,6 +23,21 @@ ToolNexa is a native Android utility app focused on practical tools with a clean
 - In-tool processing animation and result previews
 - Save to Pictures/ToolNexa and share generated files
 - GitHub Release update checker with visible download progress
+
+## Cloudflare
+
+- The native Android app calls the ToolNexa Worker at
+  `https://toolnexa.nexaurenstore.workers.dev`.
+- Workers AI and Cloudflare Images bindings are configured in `wrangler.jsonc`.
+- Background Remover uses foreground segmentation powered by BiRefNet.
+- D1 is reserved for billing and PayPal records. There is no user table and
+  no credit system in this architecture.
+
+## Plans
+
+- Free: $0/month.
+- Pro: $5/month.
+- PayPal remains in Sandbox during development.
 
 ## Firebase
 
