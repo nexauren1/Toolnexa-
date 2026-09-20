@@ -76,6 +76,7 @@ class PlansActivity : Activity() {
         super.onCreate(
             state
         )
+        LanguageManager.apply(this)
 
         showPlans()
         handlePaymentReturn(
