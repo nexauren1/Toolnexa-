@@ -59,6 +59,22 @@ export default {
       }
 
       if (
+        url.pathname === "/api/account" &&
+        request.method === "GET"
+      ) {
+        const user =
+          await requireFirebaseUser(
+            request,
+            env
+          );
+
+        return accountStatus(
+          env,
+          user
+        );
+      }
+
+      if (
         url.pathname ===
           "/api/tools/background-remover" &&
         request.method === "POST"
@@ -559,29 +575,381 @@ async function recordWebhook(
     );
   }
 
+  const verified =
+    await verifyPaypalWebhook(
+      request,
+      env,
+      payload
+    );
+
   const eventId =
     payload.id ||
     crypto.randomUUID();
+
+  const receivedAt =
+    new Date().toISOString();
 
   await env.DB
     .prepare(
       "INSERT OR IGNORE INTO paypal_webhook_events " +
       "(event_id, event_type, verified, received_at, raw_json) " +
-      "VALUES (?, ?, 0, ?, ?)"
+      "VALUES (?, ?, ?, ?, ?)"
     )
     .bind(
       eventId,
       payload.event_type ||
         "UNKNOWN",
-      new Date().toISOString(),
+      verified ? 1 : 0,
+      receivedAt,
       raw
     )
     .run();
 
+  if (!verified) {
+    return json(
+      {
+        ok: false,
+        error:
+          "paypal_webhook_unverified"
+      },
+      400
+    );
+  }
+
+  await applyPaypalWebhook(
+    env.DB,
+    payload
+  );
+
   return json({
     ok: true,
     received: true,
-    verified: false
+    verified: true
+  });
+}
+
+async function verifyPaypalWebhook(
+  request,
+  env,
+  payload
+) {
+  const webhookId =
+    env.PAYPAL_WEBHOOK_ID;
+
+  if (!webhookId) {
+    const error =
+      new Error(
+        "PAYPAL_WEBHOOK_ID is missing."
+      );
+
+    error.code =
+      "paypal_webhook_id_missing";
+
+    error.publicMessage =
+      "O Webhook ID do PayPal ainda não está configurado no Worker.";
+
+    error.status = 503;
+
+    throw error;
+  }
+
+  const headers = request.headers;
+
+  const transmissionId =
+    headers.get(
+      "paypal-transmission-id"
+    );
+
+  const transmissionTime =
+    headers.get(
+      "paypal-transmission-time"
+    );
+
+  const certUrl =
+    headers.get(
+      "paypal-cert-url"
+    );
+
+  const authAlgo =
+    headers.get(
+      "paypal-auth-algo"
+    );
+
+  const transmissionSig =
+    headers.get(
+      "paypal-transmission-sig"
+    );
+
+  if (
+    !transmissionId ||
+    !transmissionTime ||
+    !certUrl ||
+    !authAlgo ||
+    !transmissionSig
+  ) {
+    return false;
+  }
+
+  const accessToken =
+    await paypalAccessToken(
+      env.PAYPAL_CLIENT_ID,
+      env.PAYPAL_CLIENT_SECRET
+    );
+
+  const response =
+    await fetch(
+      PAYPAL_BASE +
+        "/v1/notifications/" +
+        "verify-webhook-signature",
+      {
+        method: "POST",
+        headers: {
+          "accept":
+            "application/json",
+          "content-type":
+            "application/json",
+          "authorization":
+            "Bearer " +
+            accessToken
+        },
+        body: JSON.stringify({
+          transmission_id:
+            transmissionId,
+          transmission_time:
+            transmissionTime,
+          cert_url:
+            certUrl,
+          auth_algo:
+            authAlgo,
+          transmission_sig:
+            transmissionSig,
+          webhook_id:
+            webhookId,
+          webhook_event:
+            payload
+        })
+      }
+    );
+
+  const result =
+    await response
+      .json()
+      .catch(
+        () => ({})
+      );
+
+  if (!response.ok) {
+    console.error(
+      "PayPal webhook verification failed",
+      response.status,
+      result
+    );
+
+    return false;
+  }
+
+  return (
+    result.verification_status ===
+    "SUCCESS"
+  );
+}
+
+async function applyPaypalWebhook(
+  db,
+  payload
+) {
+  const type =
+    String(
+      payload.event_type ||
+      ""
+    );
+
+  const resource =
+    payload.resource ||
+    {};
+
+  const subscriptionId =
+    resource.id ||
+    resource.billing_agreement_id ||
+    resource.subscription_id ||
+    null;
+
+  if (!subscriptionId) {
+    return;
+  }
+
+  const status =
+    webhookSubscriptionStatus(
+      type,
+      resource
+    );
+
+  if (!status) {
+    return;
+  }
+
+  await db
+    .prepare(
+      "UPDATE paypal_subscriptions " +
+      "SET status = ?, updated_at = ?, raw_json = ? " +
+      "WHERE paypal_subscription_id = ?"
+    )
+    .bind(
+      status,
+      new Date().toISOString(),
+      JSON.stringify(payload),
+      subscriptionId
+    )
+    .run();
+}
+
+function webhookSubscriptionStatus(
+  type,
+  resource
+) {
+  if (
+    type ===
+      "BILLING.SUBSCRIPTION.ACTIVATED" ||
+    type ===
+      "BILLING.SUBSCRIPTION.RE-ACTIVATED"
+  ) {
+    return "ACTIVE";
+  }
+
+  if (
+    type ===
+      "BILLING.SUBSCRIPTION.CANCELLED"
+  ) {
+    return "CANCELLED";
+  }
+
+  if (
+    type ===
+      "BILLING.SUBSCRIPTION.SUSPENDED"
+  ) {
+    return "SUSPENDED";
+  }
+
+  if (
+    type ===
+      "BILLING.SUBSCRIPTION.EXPIRED"
+  ) {
+    return "EXPIRED";
+  }
+
+  if (
+    type ===
+      "BILLING.SUBSCRIPTION.PAYMENT.FAILED"
+  ) {
+    return "PAYMENT_FAILED";
+  }
+
+  if (
+    type ===
+      "BILLING.SUBSCRIPTION.UPDATED"
+  ) {
+    const resourceStatus =
+      String(
+        resource.status ||
+        ""
+      ).toUpperCase();
+
+    if (
+      resourceStatus ===
+      "ACTIVE"
+    ) {
+      return "ACTIVE";
+    }
+
+    if (
+      resourceStatus ===
+      "CANCELLED"
+    ) {
+      return "CANCELLED";
+    }
+
+    if (
+      resourceStatus ===
+      "SUSPENDED"
+    ) {
+      return "SUSPENDED";
+    }
+
+    if (
+      resourceStatus ===
+      "EXPIRED"
+    ) {
+      return "EXPIRED";
+    }
+  }
+
+  return null;
+}
+
+async function accountStatus(
+  env,
+  user
+) {
+  await ensureBillingSchema(
+    env.DB
+  );
+
+  const subscription =
+    await env.DB
+      .prepare(
+        "SELECT paypal_subscription_id, " +
+        "plan_code, status, created_at, updated_at " +
+        "FROM paypal_subscriptions " +
+        "WHERE firebase_uid = ? " +
+        "ORDER BY updated_at DESC " +
+        "LIMIT 1"
+      )
+      .bind(
+        user.uid
+      )
+      .first();
+
+  const isPro =
+    subscription?.status ===
+    "ACTIVE";
+
+  const code =
+    isPro
+      ? "pro"
+      : "free";
+
+  const plan =
+    await env.DB
+      .prepare(
+        "SELECT code, name, price_usd, " +
+        "billing_interval, active " +
+        "FROM plans " +
+        "WHERE code = ? LIMIT 1"
+      )
+      .bind(code)
+      .first();
+
+  return json({
+    ok: true,
+    account: {
+      uid: user.uid,
+      plan: plan || {
+        code,
+        name:
+          isPro
+            ? "Pro"
+            : "Free",
+        price_usd:
+          isPro
+            ? "5.00"
+            : "0.00",
+        billing_interval:
+          "month",
+        active: 1
+      },
+      subscription:
+        subscription || null
+    }
   });
 }
 
