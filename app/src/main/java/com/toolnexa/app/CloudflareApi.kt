@@ -43,24 +43,29 @@ object CloudflareApi {
                 readTimeout = 120_000
                 requestMethod = "POST"
                 doOutput = true
+
                 setChunkedStreamingMode(
                     64 * 1024
                 )
+
                 setRequestProperty(
                     "Authorization",
                     "Bearer " +
                         firebaseIdToken
                 )
+
                 setRequestProperty(
                     "Content-Type",
                     context.contentResolver
                         .getType(uri)
                         ?: "image/jpeg"
                 )
+
                 setRequestProperty(
                     "Accept",
                     "image/png"
                 )
+
                 setRequestProperty(
                     "User-Agent",
                     "ToolNexa-Android/" +
@@ -140,6 +145,7 @@ object CloudflareApi {
                 file.length() == 0L
             ) {
                 file.delete()
+
                 throw IOException(
                     "O resultado ficou vazio."
                 )
@@ -315,40 +321,65 @@ object CloudflareApi {
                         index
                     ) ?: continue
 
+                val code =
+                    item.optString(
+                        "id",
+                        item.optString(
+                            "code"
+                        )
+                    )
+                        .trim()
+                        .uppercase()
+
+                val name =
+                    item.optString(
+                        "name",
+                        code
+                    )
+                        .trim()
+
+                val price =
+                    item.optString(
+                        "priceUsd",
+                        item.optString(
+                            "price_usd"
+                        )
+                    )
+                        .trim()
+
+                val interval =
+                    item.optString(
+                        "billingInterval",
+                        item.optString(
+                            "billing_interval"
+                        )
+                    )
+                        .trim()
+
+                if (code.isBlank()) {
+                    continue
+                }
+
                 plans.add(
                     PlanInfo(
-                        code =
-                            item.optString(
-                                "id",
-                                item.optString(
-                                    "code"
-                                )
-                            ),
-                        name =
-                            item.optString(
-                                "name"
-                            ),
-                        priceUsd =
-                            item.optString(
-                                "priceUsd",
-                                item.optString(
-                                    "price_usd"
-                                )
-                            ),
-                        interval =
-                            item.optString(
-                                "billingInterval",
-                                item.optString(
-                                    "billing_interval"
-                                )
-                            ),
+                        code = code,
+                        name = name,
+                        priceUsd = price,
+                        interval = interval,
                         paypalPlanId =
                             item.optString(
                                 "paypal_plan_id"
-                            ).ifBlank {
-                                null
-                            }
+                            )
+                                .ifBlank {
+                                    null
+                                }
                     )
+                )
+            }
+
+            if (plans.isEmpty()) {
+                throw IOException(
+                    "O servidor devolveu um catálogo de planos vazio."
                 )
             }
 
@@ -389,10 +420,14 @@ object CloudflareApi {
                     connection
                 )
 
-            val id =
+            val subscriptionId =
                 json.optString(
-                    "subscriptionId"
+                    "subscriptionId",
+                    json.optString(
+                        "subscription_id"
+                    )
                 )
+                    .trim()
 
             val approvalUrl =
                 json.optString(
@@ -401,9 +436,10 @@ object CloudflareApi {
                         "approval_url"
                     )
                 )
+                    .trim()
 
             if (
-                id.isBlank() ||
+                subscriptionId.isBlank() ||
                 approvalUrl.isBlank()
             ) {
                 throw IOException(
@@ -412,8 +448,10 @@ object CloudflareApi {
             }
 
             return PayPalSubscriptionInfo(
-                subscriptionId = id,
-                approvalUrl = approvalUrl
+                subscriptionId =
+                    subscriptionId,
+                approvalUrl =
+                    approvalUrl
             )
         } finally {
             connection.disconnect()
@@ -452,20 +490,63 @@ object CloudflareApi {
                     connection
                 )
 
+            val planCode =
+                json.optString(
+                    "plan",
+                    "FREE"
+                )
+                    .trim()
+                    .uppercase()
+
+            val planName =
+                json.optString(
+                    "planName",
+                    if (
+                        planCode == "PRO"
+                    ) {
+                        "Pro"
+                    } else {
+                        "Free"
+                    }
+                )
+                    .trim()
+
+            val priceUsd =
+                json.optString(
+                    "priceUsd",
+                    if (
+                        planCode == "PRO"
+                    ) {
+                        "5.00"
+                    } else {
+                        "0.00"
+                    }
+                )
+                    .trim()
+
+            val status =
+                json.optString(
+                    "status",
+                    "ACTIVE"
+                )
+                    .trim()
+
             return AccountInfo(
                 uid = "",
-                planCode =
-                    json.optString(
-                        "plan",
-                        "FREE"
-                    ),
-                planName =
-                    json.optString(
-                        "planName",
-                        json.optString(
-                            "plan",
-                            "Free"
-                  fun loadAccount(
+                planCode = planCode,
+                planName = planName,
+                priceUsd = priceUsd,
+                subscriptionStatus =
+                    status.ifBlank {
+                        null
+                    }
+            )
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    fun loadAccount(
         firebaseIdToken: String
     ): AccountInfo {
         val connection =
@@ -485,42 +566,45 @@ object CloudflareApi {
                 root.optString(
                     "plan",
                     "FREE"
-                ).uppercase()
+                )
+                    .trim()
+                    .uppercase()
 
             return AccountInfo(
                 uid = "",
-                planCode =
-                    planCode,
+                planCode = planCode,
                 planName =
                     root.optString(
                         "planName",
                         if (
-                            planCode ==
-                            "PRO"
+                            planCode == "PRO"
                         ) {
                             "Pro"
                         } else {
                             "Free"
                         }
-                    ),
+                    )
+                        .trim(),
                 priceUsd =
                     root.optString(
                         "priceUsd",
                         if (
-                            planCode ==
-                            "PRO"
+                            planCode == "PRO"
                         ) {
                             "5.00"
                         } else {
                             "0.00"
                         }
-                    ),
+                    )
+                        .trim(),
                 subscriptionStatus =
                     root.optString(
                         "status"
-                    ).ifBlank {
-                        null
-                    }
+                    )
+                        .trim()
+                        .ifBlank {
+                            null
+                        }
             )
         } finally {
             connection.disconnect()
@@ -566,9 +650,7 @@ object CloudflareApi {
             doInput =
                 true
 
-            if (
-                method != "GET"
-            ) {
+            if (method != "GET") {
                 doOutput =
                     true
             }
@@ -595,9 +677,7 @@ object CloudflareApi {
                 )
             }
 
-            if (
-                method != "GET"
-            ) {
+            if (method != "GET") {
                 setRequestProperty(
                     "Content-Type",
                     "application/json"
@@ -613,10 +693,7 @@ object CloudflareApi {
             connection.responseCode
 
         val stream =
-            if (
-                status in
-                200..299
-            ) {
+            if (status in 200..299) {
                 connection.inputStream
             } else {
                 connection.errorStream
@@ -630,21 +707,35 @@ object CloudflareApi {
                 }
                 ?: ""
 
-        val json =
-            JSONObject(
-                body.ifBlank {
-                    "{}"
-                }
+        if (body.isBlank()) {
+            throw IOException(
+                "O servidor devolveu uma resposta vazia (HTTP " +
+                    status +
+                    ")."
             )
+        }
 
-        if (
-            status !in
-            200..299
-        ) {
+        val json =
+            try {
+                JSONObject(body)
+            } catch (
+                error: Exception
+            ) {
+                throw IOException(
+                    "O servidor devolveu uma resposta inválida (HTTP " +
+                        status +
+                        ").",
+                    error
+                )
+            }
+
+        if (status !in 200..299) {
             throw IOException(
                 serverMessage(
                     json,
-                    "O servidor recusou o pedido."
+                    "O servidor recusou o pedido (HTTP " +
+                        status +
+                        ")."
                 )
             )
         }
@@ -660,11 +751,10 @@ object CloudflareApi {
             json.optString(
                 "message",
                 ""
-            ).trim()
+            )
+                .trim()
 
-        if (
-            message.isNotBlank()
-        ) {
+        if (message.isNotBlank()) {
             return message
         }
 
@@ -672,11 +762,10 @@ object CloudflareApi {
             json.optString(
                 "error",
                 ""
-            ).trim()
+            )
+                .trim()
 
-        if (
-            error.isNotBlank()
-        ) {
+        if (error.isNotBlank()) {
             return error
         }
 
@@ -685,13 +774,10 @@ object CloudflareApi {
                 "details"
             )
 
-        if (
-            details != null
-        ) {
+        if (details != null) {
             for (
                 index in
-                0 until
-                details.length()
+                0 until details.length()
             ) {
                 val item =
                     details.optJSONObject(
@@ -702,7 +788,8 @@ object CloudflareApi {
                     item.optString(
                         "description",
                         ""
-                    ).trim()
+                    )
+                        .trim()
 
                 if (
                     description.isNotBlank()
@@ -714,7 +801,8 @@ object CloudflareApi {
                     item.optString(
                         "issue",
                         ""
-                    ).trim()
+                    )
+                        .trim()
 
                 if (
                     issue.isNotBlank()
@@ -739,9 +827,7 @@ object CloudflareApi {
                     }
                     ?: ""
 
-            if (
-                body.isBlank()
-            ) {
+            if (body.isBlank()) {
                 return ""
             }
 
