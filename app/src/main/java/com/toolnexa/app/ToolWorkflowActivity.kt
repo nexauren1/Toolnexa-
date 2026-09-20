@@ -45,6 +45,7 @@ class ToolWorkflowActivity : Activity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
+        LanguageManager.apply(this)
         tool = intent.getStringExtra("tool") ?: "compressor"
         analytics.screen("tool_" + tool + "_stage_1")
         showStage1()
