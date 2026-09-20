@@ -727,6 +727,38 @@ object CloudflareApi {
         return fallback
     }
 
+    private fun readError(
+        connection: HttpURLConnection
+    ): String {
+        return try {
+            val body =
+                connection.errorStream
+                    ?.bufferedReader()
+                    ?.use {
+                        it.readText()
+                    }
+                    ?: ""
+
+            if (
+                body.isBlank()
+            ) {
+                return ""
+            }
+
+            val json =
+                JSONObject(
+                    body
+                )
+
+            serverMessage(
+                json,
+                ""
+            )
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
     private fun querySize(
         context: Context,
         uri: Uri
