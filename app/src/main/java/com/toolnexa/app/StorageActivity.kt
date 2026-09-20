@@ -12,7 +12,7 @@ import android.widget.TextView
 import android.widget.Toast
 import kotlin.math.roundToInt
 
-class StorageActivity : Activity {
+class StorageActivity : Activity() {
 
     private val analytics by lazy { AnalyticsTracker(this) }
     private val blue by lazy { getColor(R.color.toolnexa_blue) }

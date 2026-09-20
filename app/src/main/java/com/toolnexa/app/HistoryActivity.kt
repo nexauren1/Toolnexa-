@@ -16,7 +16,7 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
-class HistoryActivity : Activity {
+class HistoryActivity : Activity() {
     private val analytics by lazy { AnalyticsTracker(this) }
     private val blue by lazy { getColor(R.color.toolnexa_blue) }
     private val bg by lazy { getColor(R.color.toolnexa_bg) }
