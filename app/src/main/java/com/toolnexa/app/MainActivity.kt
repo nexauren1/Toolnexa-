@@ -347,8 +347,8 @@ class MainActivity : ComponentActivity() {
         )
 
         setContentView(root)
-        I18n.localizeWindow(this)
         buildDrawer()
+        I18n.localizeWindow(this)
     }
 
     private fun buildDrawer() {
@@ -2056,7 +2056,16 @@ class MainActivity : ComponentActivity() {
 
                 dialog.dismiss()
 
-                recreate()
+                /*
+                 * Android 13+ recreates the Activity automatically when
+                 * applicationLocales changes. On older Android versions,
+                 * manually recreate after saving the preference.
+                 */
+                if (
+                    android.os.Build.VERSION.SDK_INT < 33
+                ) {
+                    recreate()
+                }
             }
             .setNegativeButton(
                 I18n.t(this, "Cancelar"),

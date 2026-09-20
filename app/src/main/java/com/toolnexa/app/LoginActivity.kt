@@ -611,11 +611,14 @@ class LoginActivity : ComponentActivity() {
 
                 Toast.makeText(
                     this,
-                    if (registerMode) {
-                        "Conta criada com sucesso."
-                    } else {
-                        "Login efetuado com sucesso."
-                    },
+                    I18n.t(
+                        this,
+                        if (registerMode) {
+                            "Conta criada com sucesso."
+                        } else {
+                            "Login efetuado com sucesso."
+                        }
+                    ),
                     Toast.LENGTH_SHORT
                 ).show()
 

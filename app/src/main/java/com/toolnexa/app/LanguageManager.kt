@@ -2,7 +2,6 @@ package com.toolnexa.app
 
 import android.app.LocaleManager
 import android.content.Context
-import android.content.res.Configuration
 import android.os.Build
 import android.os.LocaleList
 import java.util.Locale
@@ -24,31 +23,26 @@ object LanguageManager {
             ARABIC
         )
 
+    /*
+     * Android 13+ already applies the selected application locale
+     * to Activity resources. Calling applicationLocales from onCreate()
+     * can trigger a second recreation and cause a black screen or loop.
+     *
+     * Therefore apply() is intentionally a no-op on Android 13+.
+     * The system performs the configuration update when set() changes
+     * applicationLocales.
+     */
     fun apply(
         context: Context
     ) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            return
+        }
+
         val code =
             current(context)
 
         if (code.isBlank()) {
-            return
-        }
-
-        if (Build.VERSION.SDK_INT >= 33) {
-            val manager =
-                context.getSystemService(
-                    LocaleManager::class.java
-                )
-
-            val currentTags =
-                manager.applicationLocales
-                    .toLanguageTags()
-
-            if (currentTags != code) {
-                manager.applicationLocales =
-                    LocaleList.forLanguageTags(code)
-            }
-
             return
         }
 
@@ -58,7 +52,7 @@ object LanguageManager {
         Locale.setDefault(locale)
 
         val configuration =
-            Configuration(
+            android.content.res.Configuration(
                 context.resources.configuration
             )
 
@@ -80,18 +74,6 @@ object LanguageManager {
             return
         }
 
-        if (Build.VERSION.SDK_INT >= 33) {
-            val manager =
-                context.getSystemService(
-                    LocaleManager::class.java
-                )
-
-            manager.applicationLocales =
-                LocaleList.forLanguageTags(code)
-
-            return
-        }
-
         context
             .getSharedPreferences(
                 "toolnexa_language",
@@ -103,18 +85,40 @@ object LanguageManager {
                 code
             )
             .apply()
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            val manager =
+                context.getSystemService(
+                    LocaleManager::class.java
+                )
+
+            if (
+                manager.applicationLocales
+                    .toLanguageTags() != code
+            ) {
+                /*
+                 * Android recreates affected Activities automatically.
+                 * Do not call Activity.recreate() afterwards.
+                 */
+                manager.applicationLocales =
+                    LocaleList.forLanguageTags(code)
+            }
+
+            return
+        }
     }
 
     fun current(
         context: Context
     ): String {
         if (Build.VERSION.SDK_INT >= 33) {
+            val manager =
+                context.getSystemService(
+                    LocaleManager::class.java
+                )
+
             val tags =
-                context
-                    .getSystemService(
-                        LocaleManager::class.java
-                    )
-                    .applicationLocales
+                manager.applicationLocales
                     .toLanguageTags()
 
             val first =
