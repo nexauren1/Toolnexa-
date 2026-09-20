@@ -832,17 +832,45 @@ async function entitlement(
       user.uid
     );
 
+  const currentPlanCode =
+    String(
+      current.plan ||
+      "FREE"
+    ).toUpperCase();
+
+  const plan =
+    await getPlan(
+      env.DB,
+      currentPlanCode
+    );
+
   return json({
     ok:
       true,
     plan:
-      String(
-        current.plan ||
-        "FREE"
-      ).toUpperCase(),
+      currentPlanCode,
+    planName:
+      plan?.name ||
+      (
+        currentPlanCode ===
+        "PRO"
+          ? "Pro"
+          : "Free"
+      ),
+    priceUsd:
+      plan?.price_usd ||
+      (
+        currentPlanCode ===
+        "PRO"
+          ? "5.00"
+          : "0.00"
+      ),
+    status:
+      current.status ||
+      "ACTIVE",
     isPro:
       hasPlanAccess(
-        current.plan,
+        currentPlanCode,
         "PRO"
       ) &&
       current.status ===
