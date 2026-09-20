@@ -2061,11 +2061,8 @@ class MainActivity : ComponentActivity() {
 
                 dialog.dismiss()
 
-                // Controlled recreation avoids Android 13 locale
-                // callbacks recreating the Activity twice.
-                window.decorView.post {
-                    recreate()
-                }
+                // Refresh translated views without recreating the Activity.
+                I18n.localizeWindow(this)
             }
             .setNegativeButton(
                 I18n.t(this, "Cancelar"),
