@@ -108,6 +108,12 @@ object CategoryCatalog {
                         "Imagem",
                         "Converta para JPG, PNG ou WebP.",
                         R.drawable.ic_tool_convert
+                    ),
+                    ToolDefinition(
+                        "Background Remover",
+                        "Imagem",
+                        "Remova o fundo com IA e preserve transparência.",
+                        R.drawable.ic_tool_background
                     )
                 )
 
