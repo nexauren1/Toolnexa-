@@ -8,6 +8,9 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.text.Editable
+import android.text.TextWatcher
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -167,6 +170,39 @@ class CategoryActivity : Activity() {
 
         root.addView(header)
 
+        val brandRail =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+            }
+
+        listOf(
+            R.color.toolnexa_green,
+            R.color.toolnexa_blue,
+            R.color.toolnexa_red,
+            R.color.toolnexa_yellow
+        ).forEach { colorRes ->
+            brandRail.addView(
+                View(this).apply {
+                    setBackgroundColor(
+                        getColor(colorRes)
+                    )
+                },
+                LinearLayout.LayoutParams(
+                    0,
+                    dp(4),
+                    1f
+                )
+            )
+        }
+
+        root.addView(
+            brandRail,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(4)
+            )
+        )
+
         val scroll =
             ScrollView(this)
 
@@ -235,93 +271,62 @@ class CategoryActivity : Activity() {
             }
         )
 
-        if (tools.isEmpty()) {
-            val empty =
-                LinearLayout(this).apply {
-                    orientation =
-                        LinearLayout.VERTICAL
-                    gravity =
-                        Gravity.CENTER
-                    setPadding(
-                        dp(24),
-                        dp(32),
-                        dp(24),
-                        dp(32)
-                    )
-                    background =
-                        GradientDrawable().apply {
-                            setColor(
-                                getColor(
-                                    R.color.toolnexa_surface
-                                )
-                            )
-                            setStroke(
-                                dp(1),
-                                getColor(
-                                    R.color.toolnexa_border
-                                )
-                            )
-                            cornerRadius =
-                                dp(18).toFloat()
-                        }
-                }
-
-            empty.addView(
-                TextView(this).apply {
-                    text = "Categoria preparada"
-                    textSize = 19f
-                    typeface =
-                        android.graphics.Typeface.DEFAULT_BOLD
-                    setTextColor(
-                        definition.accent
-                    )
-                    gravity = Gravity.CENTER
-                }
+        val search = EditText(this).apply {
+            hint = "Pesquisar ferramenta"
+            textSize = 15f
+            singleLine = true
+            setTextColor(
+                getColor(R.color.toolnexa_text)
             )
-
-            empty.addView(
-                TextView(this).apply {
-                    text =
-                        "Esta categoria já está pronta. As ferramentas serão adicionadas dentro dela."
-                    textSize = 14f
-                    setTextColor(
+            setHintTextColor(
+                getColor(R.color.toolnexa_muted)
+            )
+            setPadding(
+                dp(14),
+                dp(8),
+                dp(14),
+                dp(8)
+            )
+            background =
+                GradientDrawable().apply {
+                    setColor(
                         getColor(
-                            R.color.toolnexa_muted
+                            R.color.toolnexa_surface
                         )
                     )
-                    gravity = Gravity.CENTER
-                    setPadding(
-                        0,
-                        dp(8),
-                        0,
-                        0
+                    setStroke(
+                        dp(1),
+                        definition.accent
                     )
+                    cornerRadius =
+                        dp(14).toFloat()
                 }
+            setCompoundDrawablesWithIntrinsicBounds(
+                android.R.drawable.ic_menu_search,
+                0,
+                0,
+                0
             )
-
-            body.addView(
-                empty,
-                LinearLayout.LayoutParams(
-                    -1,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    setMargins(
-                        0,
-                        dp(10),
-                        0,
-                        0
-                    )
-                }
-            )
-
-            return
+            compoundDrawablePadding = dp(10)
         }
 
         body.addView(
+            search,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(52)
+            ).apply {
+                setMargins(
+                    0,
+                    dp(12),
+                    0,
+                    dp(4)
+                )
+            }
+        )
+
+        val countLabel =
             TextView(this).apply {
-                text =
-                    tools.size.toString() +
-                        " ferramenta(s)"
                 textSize = 12f
                 typeface =
                     android.graphics.Typeface.DEFAULT_BOLD
@@ -335,18 +340,188 @@ class CategoryActivity : Activity() {
                     dp(4)
                 )
             }
+
+        body.addView(countLabel)
+
+        val toolsContainer =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.VERTICAL
+            }
+
+        body.addView(
+            toolsContainer,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
         )
 
-        tools.forEach { tool ->
-            addToolCard(
-                body,
-                definition,
-                tool
-            )
+        fun renderTools(query: String) {
+            toolsContainer.removeAllViews()
+
+            val normalized =
+                query.trim().lowercase()
+
+            val filtered =
+                if (normalized.isBlank()) {
+                    tools
+                } else {
+                    tools.filter {
+                        it.name.lowercase().contains(normalized) ||
+                            it.description
+                                .lowercase()
+                                .contains(normalized)
+                    }
+                }
+
+            if (tools.isEmpty()) {
+                countLabel.text =
+                    "0 ferramentas"
+
+                val empty =
+                    LinearLayout(this).apply {
+                        orientation =
+                            LinearLayout.VERTICAL
+                        gravity = Gravity.CENTER
+                        setPadding(
+                            dp(24),
+                            dp(32),
+                            dp(24),
+                            dp(32)
+                        )
+                        background =
+                            GradientDrawable().apply {
+                                setColor(
+                                    getColor(
+                                        R.color.toolnexa_surface
+                                    )
+                                )
+                                setStroke(
+                                    dp(1),
+                                    getColor(
+                                        R.color.toolnexa_border
+                                    )
+                                )
+                                cornerRadius =
+                                    dp(18).toFloat()
+                            }
+                    }
+
+                empty.addView(
+                    TextView(this).apply {
+                        text =
+                            "Categoria preparada"
+                        textSize = 19f
+                        typeface =
+                            android.graphics.Typeface.DEFAULT_BOLD
+                        setTextColor(
+                            definition.accent
+                        )
+                        gravity = Gravity.CENTER
+                    }
+                )
+
+                empty.addView(
+                    TextView(this).apply {
+                        text =
+                            "As ferramentas desta categoria serão adicionadas em breve."
+                        textSize = 14f
+                        setTextColor(
+                            getColor(
+                                R.color.toolnexa_muted
+                            )
+                        )
+                        gravity = Gravity.CENTER
+                        setPadding(
+                            0,
+                            dp(8),
+                            0,
+                            0
+                        )
+                    }
+                )
+
+                toolsContainer.addView(empty)
+                return
+            }
+
+            countLabel.text =
+                filtered.size.toString() +
+                    if (filtered.size == 1) {
+                        " ferramenta"
+                    } else {
+                        " ferramentas"
+                    }
+
+            if (filtered.isEmpty()) {
+                toolsContainer.addView(
+                    TextView(this).apply {
+                        text =
+                            "Nenhuma ferramenta encontrada."
+                        textSize = 14f
+                        setTextColor(
+                            getColor(
+                                R.color.toolnexa_muted
+                            )
+                        )
+                        gravity = Gravity.CENTER
+                        setPadding(
+                            0,
+                            dp(28),
+                            0,
+                            dp(28)
+                        )
+                    }
+                )
+                return
+            }
+
+            filtered.forEach { tool ->
+                addToolCard(
+                    toolsContainer,
+                    definition,
+                    tool
+                )
+            }
         }
+
+        search.addTextChangedListener(
+            object : TextWatcher {
+                override fun beforeTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    count: Int,
+                    after: Int
+                ) = Unit
+
+                override fun onTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    before: Int,
+                    count: Int
+                ) {
+                    analytics.event(
+                        "category_tool_search",
+                        "category" to definition.name,
+                        "query_length" to
+                            (s?.length ?: 0).toString()
+                    )
+                    renderTools(
+                        s?.toString() ?: ""
+                    )
+                }
+
+                override fun afterTextChanged(
+                    s: Editable?
+                ) = Unit
+            }
+        )
+
+        renderTools("")
     }
 
-    private fun addToolCard(
+        private fun addToolCard(
         body: LinearLayout,
         definition: CategoryDefinition,
         tool: ToolDefinition
