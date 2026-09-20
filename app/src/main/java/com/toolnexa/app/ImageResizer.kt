@@ -28,10 +28,11 @@ class ImageResizer(
         uri: Uri,
         targetWidth: Int
     ): ResizeResult? {
+        val safeWidth = targetWidth.coerceIn(16, 4096)
         val source =
             decodeForWidth(
                 uri,
-                targetWidth
+                safeWidth
             ) ?: return null
 
         if (source.width <= 0 || source.height <= 0) {
@@ -42,7 +43,7 @@ class ImageResizer(
         val targetHeight =
             (
                 source.height.toDouble() *
-                    targetWidth.toDouble() /
+                    safeWidth.toDouble() /
                     source.width.toDouble()
             )
                 .roundToInt()
@@ -51,7 +52,7 @@ class ImageResizer(
         val resized =
             Bitmap.createScaledBitmap(
                 source,
-                targetWidth,
+                safeWidth,
                 targetHeight,
                 true
             )
@@ -84,7 +85,7 @@ class ImageResizer(
             file = output,
             originalBytes = getSize(uri),
             resizedBytes = output.length(),
-            width = targetWidth,
+            width = safeWidth,
             height = targetHeight
         )
 

@@ -45,6 +45,8 @@ class MainActivity : ComponentActivity() {
 
     private var selectedImage: Uri? = null
     private var selectedResizeImage: Uri? = null
+    private var compressorPreview: ImageView? = null
+    private var resizerPreview: ImageView? = null
     private var qualityValue = 82
 
     private val auth by lazy {
@@ -644,6 +646,8 @@ class MainActivity : ComponentActivity() {
 
         val preview = ImageView(this)
         preview.id = android.R.id.icon
+        compressorPreview = preview
+        resizerPreview = null
         preview.scaleType =
             ImageView.ScaleType.CENTER_INSIDE
         preview.setBackgroundColor(Color.WHITE)
@@ -990,6 +994,8 @@ class MainActivity : ComponentActivity() {
 
         val preview = ImageView(this)
         preview.id = android.R.id.custom
+        resizerPreview = preview
+        compressorPreview = null
         preview.scaleType =
             ImageView.ScaleType.CENTER_INSIDE
         preview.setBackgroundColor(Color.WHITE)
@@ -1069,13 +1075,13 @@ class MainActivity : ComponentActivity() {
             if (
                 targetWidth == null ||
                 targetWidth < 16 ||
-                targetWidth > 10000
+                targetWidth > 4096
             ) {
                 analytics.event(
                     "resize_invalid_width"
                 )
                 toast(
-                    "Use uma largura entre 16 e 10000 px."
+                    "Use uma largura entre 16 e 4096 px."
                 )
                 return@setOnClickListener
             }
@@ -1471,6 +1477,7 @@ class MainActivity : ComponentActivity() {
     private fun showSettings() {
         toolbarTitle.text = "Definições"
         content.removeAllViews()
+        analytics.screen("settings")
 
         content.addView(space(18))
 
@@ -1582,6 +1589,7 @@ class MainActivity : ComponentActivity() {
     private fun showAbout() {
         toolbarTitle.text = "Sobre"
         content.removeAllViews()
+        analytics.screen("about")
 
         content.addView(space(18))
 
@@ -1601,7 +1609,7 @@ class MainActivity : ComponentActivity() {
         )
         card.addView(
             bodyText(
-                "Uma coleção de ferramentas Android pensadas para tarefas rápidas. A versão 1.0.0 começa com Image Compressor e uma arquitetura preparada para contas, Firebase, backend Cloudflare, PayPal e planos futuros."
+                "Uma coleção de ferramentas Android para tarefas rápidas. A versão 1.1.0 inclui Image Compressor, Image Resizer, contas Firebase, Analytics, pesquisa de ferramentas, previews e atualizações pelo GitHub."
             )
         )
         card.addView(
@@ -1844,10 +1852,7 @@ class MainActivity : ComponentActivity() {
         ) {
             showImageResizer()
 
-            val preview =
-                root.findViewById<ImageView>(
-                    android.R.id.custom
-                )
+            val preview = resizerPreview
 
             Thread {
                 val bitmap =
@@ -1876,10 +1881,7 @@ class MainActivity : ComponentActivity() {
             showImageCompressor()
         }
 
-        val preview =
-            root.findViewById<ImageView>(
-                android.R.id.icon
-            )
+        val preview = compressorPreview
 
         Thread {
             val bitmap =
@@ -1963,41 +1965,6 @@ class MainActivity : ComponentActivity() {
                 .setView(layout)
                 .setCancelable(false)
                 .create()
-
-        gear.animate()
-            .rotationBy(360f)
-            .setDuration(850)
-            .setInterpolator(
-                android.view.animation.LinearInterpolator()
-            )
-            .setListener(
-                object : android.animation.Animator.AnimatorListener {
-                    override fun onAnimationStart(
-                        animation: android.animation.Animator
-                    ) = Unit
-
-                    override fun onAnimationEnd(
-                        animation: android.animation.Animator
-                    ) {
-                        if (dialog.isShowing) {
-                            gear.rotation = 0f
-                            gear.animate()
-                                .rotationBy(360f)
-                                .setDuration(850)
-                                .setListener(this)
-                                .start()
-                        }
-                    }
-
-                    override fun onAnimationCancel(
-                        animation: android.animation.Animator
-                    ) = Unit
-
-                    override fun onAnimationRepeat(
-                        animation: android.animation.Animator
-                    ) = Unit
-                }
-            )
 
         dialog.setOnShowListener {
             gear.animate()

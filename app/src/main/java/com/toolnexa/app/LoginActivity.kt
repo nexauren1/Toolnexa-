@@ -42,6 +42,7 @@ class LoginActivity : ComponentActivity() {
     private lateinit var passwordInput: EditText
     private lateinit var nameInput: EditText
     private lateinit var primaryButton: Button
+    private lateinit var forgotButton: Button
 
     private var registerMode = false
 
@@ -182,6 +183,27 @@ class LoginActivity : ComponentActivity() {
             }
         )
 
+        forgotButton = Button(this)
+        forgotButton.text = "Esqueci a senha"
+        styleSecondary(forgotButton)
+        forgotButton.setOnClickListener {
+            resetPassword()
+        }
+        body.addView(
+            forgotButton,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(48)
+            ).apply {
+                setMargins(
+                    0,
+                    dp(8),
+                    0,
+                    0
+                )
+            }
+        )
+
         val toggle = Button(this)
         toggle.text = "Criar uma conta"
         styleSecondary(toggle)
@@ -192,6 +214,12 @@ class LoginActivity : ComponentActivity() {
                     android.view.View.VISIBLE
                 } else {
                     android.view.View.GONE
+                }
+            forgotButton.visibility =
+                if (registerMode) {
+                    android.view.View.GONE
+                } else {
+                    android.view.View.VISIBLE
                 }
             primaryButton.text =
                 if (registerMode) {
@@ -300,6 +328,12 @@ class LoginActivity : ComponentActivity() {
             return
         }
 
+        if (registerMode && name.isBlank()) {
+            toast("Indique o teu nome.")
+            analytics.event("auth_name_missing")
+            return
+        }
+
         val dialog = showProcessing(
             if (registerMode) {
                 "A criar a conta..."
@@ -390,6 +424,38 @@ class LoginActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    private fun resetPassword() {
+        val email = emailInput.text.toString().trim()
+        if (email.isBlank()) {
+            toast("Indique primeiro o e-mail da tua conta.")
+            analytics.event("auth_reset_validation_error")
+            return
+        }
+
+        val dialog = showProcessing(
+            "A enviar o e-mail de recuperação..."
+        )
+        analytics.event("auth_reset_start")
+
+        auth.sendPasswordResetEmail(email)
+            .addOnCompleteListener { result ->
+                dialog.dismiss()
+                if (result.isSuccessful) {
+                    analytics.event("auth_reset_success")
+                    toast("Enviámos as instruções para o teu e-mail.")
+                } else {
+                    analytics.event(
+                        "auth_reset_failed",
+                        "error" to (
+                            result.exception?.javaClass?.simpleName
+                                ?: "unknown"
+                        )
+                    )
+                    toast("Não foi possível enviar o e-mail de recuperação.")
+                }
+            }
     }
 
     private fun launchGoogleSignIn() {

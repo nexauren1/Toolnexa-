@@ -5,22 +5,29 @@ import android.os.Bundle
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.auth.FirebaseUser
 
-class AnalyticsTracker(
-    context: Context
-) {
+class AnalyticsTracker(context: Context) {
 
     private val analytics =
-        FirebaseAnalytics.getInstance(context)
+        FirebaseAnalytics.getInstance(context.applicationContext)
+
+    private val screenClass =
+        context.javaClass.simpleName.ifBlank { "ToolNexa" }
 
     fun screen(name: String) {
+        val safeName = name
+            .lowercase()
+            .replace(Regex("[^a-z0-9_]"), "_")
+            .take(40)
+            .ifBlank { "screen" }
+
         val bundle = Bundle().apply {
             putString(
                 FirebaseAnalytics.Param.SCREEN_NAME,
-                name
+                safeName
             )
             putString(
                 FirebaseAnalytics.Param.SCREEN_CLASS,
-                contextClassName()
+                screenClass
             )
         }
 
@@ -49,10 +56,7 @@ class AnalyticsTracker(
             )
         }
 
-        analytics.logEvent(
-            safeName,
-            bundle
-        )
+        analytics.logEvent(safeName, bundle)
     }
 
     fun setUser(user: FirebaseUser) {
@@ -68,9 +72,5 @@ class AnalyticsTracker(
 
     fun clearUser() {
         analytics.setUserId(null)
-    }
-
-    private fun contextClassName(): String {
-        return "MainActivity"
     }
 }
