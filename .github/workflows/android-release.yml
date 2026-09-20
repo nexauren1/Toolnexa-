@@ -51,6 +51,7 @@ jobs:
           set -euo pipefail
           test -n "$TOOLNEXA_STORE_PASSWORD"
           test -n "$TOOLNEXA_KEY_ALIAS"
+          test -n "$TOOLNEXA_KEY_PASSWORD"
           # The existing ToolNexa upload keystore was validated with
           # the keystore password for both store and key.
           mkdir -p app/signing
@@ -62,9 +63,7 @@ jobs:
               storeFile = file("signing/toolnexa-upload.p12")
               storePassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
               keyAlias = System.getenv("TOOLNEXA_KEY_ALIAS")
-              // Keep the signing configuration compatible with the
-              // permanent upload keystore used by previous releases.
-              keyPassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
+              keyPassword = System.getenv("TOOLNEXA_KEY_PASSWORD")
           }
 
           android.buildTypes.getByName("release").signingConfig =
