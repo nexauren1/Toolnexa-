@@ -29,7 +29,7 @@ export default {
           ok: true,
           service: "ToolNexa API",
           worker: "toolnexa",
-          api_version: "1.12.2",
+          api_version: "1.12.3",
           paypal: env.PAYPAL_ENV || "sandbox",
           workers_ai: !!env.AI,
           images_binding: !!env.IMAGES,
@@ -231,6 +231,12 @@ function json(data, status = 200) {
         ...corsHeaders()
       }
     }
+  );
+}
+
+function nowSeconds() {
+  return Math.floor(
+    Date.now() / 1000
   );
 }
 
