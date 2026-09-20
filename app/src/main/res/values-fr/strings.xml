@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ToolNexa</string>
+    <string name="app_description">Des outils utiles dans une seule application.</string>
+    <string name="support_back">‹  ToolNexa</string>
+    <string name="support_title">Assistance, suggestions et réclamations</string>
+    <string name="support_description">Choisissez le type de contact, l’outil concerné et le problème précis. En appuyant sur Envoyer, votre application e-mail s’ouvre avec le rapport prêt à être vérifié.</string>
+    <string name="support_type_label">Type de contact</string><string name="support_tool_label">Outil ou zone</string><string name="support_problem_label">Problème</string><string name="support_message_label">Message</string>
+    <string name="support_message_hint">Expliquez le problème, l’idée ou la suggestion...</string>
+    <string name="support_diagnostics">Inclure les diagnostics techniques (modèle, Android, version de l’application et langue)</string>
+    <string name="support_privacy_note">Aucun mot de passe, token d’authentification, clé privée ou autre secret n’est inclus. L’e-mail s’ouvre pour vérification avant l’envoi.</string>
+    <string name="support_send">Envoyer au support</string><string name="support_message_required">Écrivez votre message.</string><string name="support_subject_prefix">[ToolNexa]</string><string name="support_no_email_app">Aucune application e-mail n’a été trouvée.</string>
+    <string-array name="support_types"><item>Assistance technique</item><item>Réclamation</item><item>Suggestion</item><item>Problème de paiement</item><item>Problème de compte</item></string-array>
+    <string-array name="support_tools"><item>Général</item><item>Background Remover</item><item>Image Compressor</item><item>Image Resizer</item><item>Image Converter</item><item>Forfaits / PayPal</item><item>Connexion / Compte</item><item>Historique</item><item>Autre outil</item></string-array>
+    <string-array name="support_problems"><item>Aucun problème précis</item><item>L’application se ferme / plante</item><item>Écran blanc</item><item>Fonctionnement incorrect</item><item>L’IA ne fonctionne pas</item><item>Résultat incorrect</item><item>Impossible d’enregistrer ou de partager</item><item>Problème de connexion / compte</item><item>Problème de paiement / forfait</item><item>Lent ou se bloque</item><item>Autre</item></string-array>
+</resources>
