@@ -500,14 +500,16 @@ class ToolWorkflowActivity : Activity() {
     }
 
     private fun body(): LinearLayout? {
-        val scroll =
-            root?.childrenSequence()
-                ?.filterIsInstance<ScrollView>()
-                ?.firstOrNull()
+        val container = root ?: return null
 
-        return scroll
-            ?.getChildAt(0)
-            as? LinearLayout
+        for (index in 0 until container.childCount) {
+            val child = container.getChildAt(index)
+            if (child is ScrollView) {
+                return child.getChildAt(0) as? LinearLayout
+            }
+        }
+
+        return null
     }
 
     private fun add(view: View, height: Int? = null) { body()?.addView(view, LinearLayout.LayoutParams(-1, height ?: ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(6), 0, dp(6)) }) }
