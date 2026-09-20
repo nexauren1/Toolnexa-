@@ -20,10 +20,14 @@ class ToolNexaApplication : Application() {
                             .javaClass
                             .simpleName
 
-                    if (
-                        name == "LoginActivity"
-                    ) {
-                        return
+                    val user =
+                        com.google.firebase.auth.FirebaseAuth
+                            .getInstance()
+                            .currentUser
+
+                    if (user != null) {
+                        AnalyticsTracker(activity)
+                            .setUser(user)
                     }
 
                     AnalyticsTracker(
