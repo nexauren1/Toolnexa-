@@ -164,13 +164,28 @@ class ToolWorkflowActivity : Activity() {
                         analytics.event("tool_process_failed", "tool" to tool)
                         toast("Não foi possível processar o arquivo.")
                     } else {
-                        resultFile = result.file
                         analytics.event("tool_process_success", "tool" to tool)
-                        val original = if (tool == "compressor") (result as CompressionResult).originalBytes else (result as ResizeResult).originalBytes
-                        val output = if (tool == "compressor") (result as CompressionResult).compressedBytes else (result as ResizeResult).resizedBytes
-                        val width = if (tool == "compressor") (result as CompressionResult).width else (result as ResizeResult).width
-                        val height = if (tool == "compressor") (result as CompressionResult).height else (result as ResizeResult).height
-                        showStage3(result.file, original, output, width, height)
+                        if (tool == "compressor") {
+                            val r = result as CompressionResult
+                            resultFile = r.file
+                            showStage3(
+                                r.file,
+                                r.originalBytes,
+                                r.compressedBytes,
+                                r.width,
+                                r.height
+                            )
+                        } else {
+                            val r = result as ResizeResult
+                            resultFile = r.file
+                            showStage3(
+                                r.file,
+                                r.originalBytes,
+                                r.resizedBytes,
+                                r.width,
+                                r.height
+                            )
+                        }
                     }
                 }
             } catch (e: Exception) {
