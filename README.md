@@ -41,7 +41,7 @@ ToolNexa is a native Android utility app focused on practical tools with a clean
 - Free: $0/month.
 - Pro: $5/month.
 - PayPal remains in Sandbox during development.
-- The Pro PayPal Plan ID is stored in D1; the Worker does not create PayPal products or plans automatically.
+- The Pro PayPal Product/Plan IDs are stored in D1. If they are missing, the Worker automatically creates the PayPal Sandbox product and monthly plan on the first Pro subscription request, then reuses the saved IDs.
 
 ## Firebase
 
