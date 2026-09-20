@@ -194,7 +194,16 @@ export default {
             "internal_error",
           message:
             error?.publicMessage ||
-            "Ocorreu um erro no servidor."
+            (
+              error?.message &&
+              String(
+                error.message
+              ).length < 240
+                ? String(
+                    error.message
+                  )
+                : "Ocorreu um erro no servidor."
+            )
         },
         error?.status || 500
       );
@@ -428,6 +437,10 @@ async function rebuildLegacyPlans(
     nowSeconds();
 
   await db.prepare(
+    "DROP TABLE IF EXISTS plans_v2"
+  ).run();
+
+  await db.prepare(
     "CREATE TABLE plans_v2 (" +
     "plan_id TEXT PRIMARY KEY, name TEXT NOT NULL, price_usd TEXT NOT NULL DEFAULT '0.00', " +
     "duration_days INTEGER, billing_interval TEXT NOT NULL DEFAULT 'NONE', " +
@@ -461,6 +474,10 @@ async function rebuildLegacySubscriptions(
 ) {
   const now =
     nowSeconds();
+
+  await db.prepare(
+    "DROP TABLE IF EXISTS paypal_subscriptions_v2"
+  ).run();
 
   await db.prepare(
     "CREATE TABLE paypal_subscriptions_v2 (" +
@@ -1428,9 +1445,7 @@ async function createPayPalProduct(
               plan.description,
             type:
               "SERVICE",
-            category:
-              "SOFTWARE"
-          })
+                })
       }
     );
 
