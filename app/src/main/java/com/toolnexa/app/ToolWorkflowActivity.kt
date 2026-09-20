@@ -66,6 +66,10 @@ class ToolWorkflowActivity : Activity() {
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 type = "image/*"
                 addCategory(Intent.CATEGORY_OPENABLE)
+                addFlags(
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                )
             }, REQUEST_PICK)
         }
         add(pick)
@@ -88,7 +92,13 @@ class ToolWorkflowActivity : Activity() {
 
     private fun showStage2() {
         buildBase("2 / 3  •  Personalizar")
-        addTitle(if (tool == "compressor") "Personalizar compressão" else "Personalizar tamanho")
+        addTitle(
+            when (tool) {
+                "compressor" -> "Personalizar compressão"
+                "resizer" -> "Personalizar tamanho"
+                else -> "Escolher formato"
+            }
+        )
         val uri = selectedUri ?: return showStage1()
         preview = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_INSIDE
@@ -309,7 +319,7 @@ class ToolWorkflowActivity : Activity() {
     private fun showStage3(file: File, original: Long, output: Long, width: Int, height: Int) {
         buildBase("3 / 3  •  Resultado")
         addTitle("Resultado pronto")
-        addText("Veja o resultado, compare os dados e guarde na sua pasta Nexauren X.")
+        addText("Veja o resultado e salve no diretório escolhido.")
         val image = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_INSIDE; setBackgroundColor(android.graphics.Color.WHITE); setPadding(dp(8), dp(8), dp(8), dp(8)) }
         preview = image
         add(image, 280)
@@ -353,7 +363,9 @@ class ToolWorkflowActivity : Activity() {
                         "tool_open_settings_for_storage",
                         "tool" to tool
                     )
+
                     finish()
+
                     startActivity(
                         Intent(
                             this,
@@ -376,7 +388,56 @@ class ToolWorkflowActivity : Activity() {
             "tool" to tool
         )
 
-        val toolFolde    private fun shareResult(file: File) {
+        val toolFolder =
+            when (tool) {
+                "compressor" -> "Compressor"
+                "resizer" -> "Resizer"
+                else -> "Converter"
+            }
+
+        val fileName =
+            "ToolNexa-" +
+                System.currentTimeMillis() +
+                "." +
+                file.extension
+
+        val saved =
+            NexaurenStorage.save(
+                this,
+                "Imagem",
+                toolFolder,
+                file,
+                fileName
+            )
+
+        if (saved != null) {
+            analytics.event(
+                "tool_save_success",
+                "tool" to tool
+            )
+
+            NexaurenHistory.add(
+                this,
+                toolFolder,
+                saved,
+                fileName,
+                file.length()
+            )
+
+            toast("Arquivo salvo.")
+        } else {
+            analytics.event(
+                "tool_save_failed",
+                "tool" to tool
+            )
+
+            toast(
+                "Não foi possível salvar no diretório escolhido."
+            )
+        }
+    }
+
+    private fun shareResult(file: File) {
         val uri = NexaurenStorage.fileProviderUri(this, file)
         startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
             type = "image/*"
@@ -454,5 +515,7 @@ class ToolWorkflowActivity : Activity() {
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).roundToInt()
 
-    companion object { const val REQUEST_PICK = 1001; const val REQUEST_FOLDER = 1002 }
+    companion object {
+        const val REQUEST_PICK = 1001
+    }
 }
