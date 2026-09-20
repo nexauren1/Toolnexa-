@@ -275,71 +275,32 @@ function json(data, status = 200) {
 }
 
 async function ensureBillingSchema(db) {
+  if (!db) {
+    const error =
+      new Error(
+        "D1 billing database is missing."
+      );
+
+    error.code =
+      "billing_database_missing";
+
+    error.publicMessage =
+      "O banco de billing do ToolNexa não está ligado ao Worker.";
+
+    error.status = 503;
+
+    throw error;
+  }
+
   if (!billingSchemaPromise) {
-    if (!db) {
-      const error =
-        new Error(
-          "D1 billing database is missing."
-        );
-
-      error.code =
-        "billing_database_missing";
-
-      error.publicMessage =
-        "O banco de billing do ToolNexa não está ligado ao Worker.";
-
-      error.status = 503;
-
-      throw error;
-    }
-
-    billingSchemaPromise = db.batch([
-      db.prepare(
-        "CREATE TABLE IF NOT EXISTS plans (" +
-        "code TEXT PRIMARY KEY, name TEXT NOT NULL, " +
-        "price_usd TEXT NOT NULL, billing_interval TEXT NOT NULL, " +
-        "paypal_plan_id TEXT, active INTEGER NOT NULL DEFAULT 1, " +
-        "sort_order INTEGER NOT NULL DEFAULT 0)"
-      ),
-      db.prepare(
-        "CREATE TABLE IF NOT EXISTS paypal_orders (" +
-        "paypal_order_id TEXT PRIMARY KEY, plan_code TEXT, " +
-        "status TEXT, amount_usd TEXT, " +
-        "currency TEXT NOT NULL DEFAULT 'USD', " +
-        "created_at TEXT NOT NULL, updated_at TEXT NOT NULL, " +
-        "raw_json TEXT)"
-      ),
-      db.prepare(
-        "CREATE TABLE IF NOT EXISTS paypal_subscriptions (" +
-        "paypal_subscription_id TEXT PRIMARY KEY, " +
-        "plan_code TEXT NOT NULL, firebase_uid TEXT, " +
-        "status TEXT, payer_email TEXT, created_at TEXT NOT NULL, " +
-        "updated_at TEXT NOT NULL, raw_json TEXT)"
-      ),
-      db.prepare(
-        "CREATE TABLE IF NOT EXISTS paypal_setup_lock (" +
-        "lock_key TEXT PRIMARY KEY, created_at TEXT NOT NULL)"
-      ),
-      db.prepare(
-        "CREATE TABLE IF NOT EXISTS paypal_webhook_events (" +
-        "event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL, " +
-        "verified INTEGER NOT NULL DEFAULT 0, " +
-        "received_at TEXT NOT NULL, raw_json TEXT NOT NULL)"
-      ),
-      db.prepare(
-        "INSERT OR IGNORE INTO plans " +
-        "(code,name,price_usd,billing_interval,paypal_plan_id,active,sort_order) " +
-        "VALUES ('free','Free','0.00','month',NULL,1,1)"
-      ),
-      db.prepare(
-        "INSERT OR IGNORE INTO plans " +
-        "(code,name,price_usd,billing_interval,paypal_plan_id,active,sort_order) " +
-        "VALUES ('pro','Pro','5.00','month',NULL,1,2)"
-      )
-    ]).catch(error => {
-      billingSchemaPromise = null;
-      throw error;
-    });
+    billingSchemaPromise =
+      createBillingTables(
+        db
+      ).catch(error => {
+        billingSchemaPromise =
+          null;
+        throw error;
+      });
   }
 
   await billingSchemaPromise;
@@ -357,7 +318,75 @@ async function ensureBillingSchema(db) {
 
   await billingMigrationPromise;
 
+  // Seed only after migrations so an older D1 schema
+  // cannot fail before missing columns are added.
+  await db.batch([
+    db.prepare(
+      "INSERT OR IGNORE INTO plans " +
+      "(code,name,price_usd,billing_interval,paypal_plan_id,active,sort_order) " +
+      "VALUES ('free','Free','0.00','month',NULL,1,1)"
+    ),
+    db.prepare(
+      "INSERT OR IGNORE INTO plans " +
+      "(code,name,price_usd,billing_interval,paypal_plan_id,active,sort_order) " +
+      "VALUES ('pro','Pro','5.00','month',NULL,1,2)"
+    )
+  ]);
+
+  // Normalize the built-in plans whenever the schema already existed.
+  await db.batch([
+    db.prepare(
+      "UPDATE plans SET " +
+      "name='Free', price_usd='0.00', " +
+      "billing_interval='month', active=1, sort_order=1 " +
+      "WHERE code='free'"
+    ),
+    db.prepare(
+      "UPDATE plans SET " +
+      "name='Pro', price_usd='5.00', " +
+      "billing_interval='month', active=1, sort_order=2 " +
+      "WHERE code='pro'"
+    )
+  ]);
+
   return billingSchemaPromise;
+}
+
+async function createBillingTables(db) {
+  await db.batch([
+    db.prepare(
+      "CREATE TABLE IF NOT EXISTS plans (" +
+      "code TEXT PRIMARY KEY, name TEXT NOT NULL, " +
+      "price_usd TEXT NOT NULL, billing_interval TEXT NOT NULL, " +
+      "paypal_plan_id TEXT, active INTEGER NOT NULL DEFAULT 1, " +
+      "sort_order INTEGER NOT NULL DEFAULT 0)"
+    ),
+    db.prepare(
+      "CREATE TABLE IF NOT EXISTS paypal_orders (" +
+      "paypal_order_id TEXT PRIMARY KEY, plan_code TEXT, " +
+      "status TEXT, amount_usd TEXT, " +
+      "currency TEXT NOT NULL DEFAULT 'USD', " +
+      "created_at TEXT NOT NULL, updated_at TEXT NOT NULL, " +
+      "raw_json TEXT)"
+    ),
+    db.prepare(
+      "CREATE TABLE IF NOT EXISTS paypal_subscriptions (" +
+      "paypal_subscription_id TEXT PRIMARY KEY, " +
+      "plan_code TEXT NOT NULL, firebase_uid TEXT, " +
+      "status TEXT, payer_email TEXT, created_at TEXT NOT NULL, " +
+      "updated_at TEXT NOT NULL, raw_json TEXT)"
+    ),
+    db.prepare(
+      "CREATE TABLE IF NOT EXISTS paypal_setup_lock (" +
+      "lock_key TEXT PRIMARY KEY, created_at TEXT NOT NULL)"
+    ),
+    db.prepare(
+      "CREATE TABLE IF NOT EXISTS paypal_webhook_events (" +
+      "event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL, " +
+      "verified INTEGER NOT NULL DEFAULT 0, " +
+      "received_at TEXT NOT NULL, raw_json TEXT NOT NULL)"
+    )
+  ]);
 }
 
 async function migrateBillingSchema(db) {
@@ -392,6 +421,18 @@ async function migrateBillingSchema(db) {
   if (!planColumns.has("sort_order")) {
     await db.prepare(
       "ALTER TABLE plans ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"
+    ).run();
+  }
+
+  if (!planColumns.has("created_at")) {
+    await db.prepare(
+      "ALTER TABLE plans ADD COLUMN created_at TEXT"
+    ).run();
+  }
+
+  if (!planColumns.has("updated_at")) {
+    await db.prepare(
+      "ALTER TABLE plans ADD COLUMN updated_at TEXT"
     ).run();
   }
 
