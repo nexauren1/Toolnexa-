@@ -48,6 +48,7 @@ class LoginActivity : ComponentActivity() {
     private lateinit var nameInput: EditText
     private lateinit var primaryButton: Button
     private lateinit var forgotButton: Button
+    private lateinit var phoneCountryButton: Button
     private lateinit var phoneInput: EditText
     private lateinit var phoneButton: Button
     private lateinit var phoneCodeInput: EditText
@@ -56,6 +57,7 @@ class LoginActivity : ComponentActivity() {
     private lateinit var phoneChangeButton: Button
 
     private var registerMode = false
+    private var selectedPhoneCountry: PhoneCountry? = null
     private var verificationId: String? = null
     private var resendToken: PhoneAuthProvider.ForceResendingToken? = null
     private var lastPhoneNumber: String? = null
@@ -91,6 +93,11 @@ class LoginActivity : ComponentActivity() {
         window.navigationBarColor = surface
         window.decorView.systemUiVisibility =
             android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+
+        if (auth.currentUser != null) {
+            openMain()
+            return
+        }
 
         buildUi()
         analytics.screen("login")
@@ -234,8 +241,24 @@ class LoginActivity : ComponentActivity() {
             )
         )
 
+        phoneCountryButton = Button(this)
+        phoneCountryButton.text = "Escolher país"
+        styleSecondary(phoneCountryButton)
+        phoneCountryButton.setOnClickListener {
+            showPhoneCountryPicker()
+        }
+        body.addView(
+            phoneCountryButton,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(50)
+            ).apply {
+                setMargins(0, 0, 0, dp(10))
+            }
+        )
+
         phoneInput = edit(
-            "Telefone (+258 84 123 4567)",
+            "Número com 9 dígitos, ex.: 841234567",
             InputType.TYPE_CLASS_PHONE
         )
         body.addView(phoneInput)
@@ -461,6 +484,17 @@ class LoginActivity : ComponentActivity() {
         setContentView(root)
     }
 
+    private fun openMain() {
+        analytics.event("auth_session_ready")
+        startActivity(
+            Intent(
+                this,
+                MainActivity::class.java
+            )
+        )
+        finish()
+    }
+
     private fun submitEmail() {
         val email = emailInput.text.toString().trim()
         val password = passwordInput.text.toString()
@@ -547,10 +581,7 @@ class LoginActivity : ComponentActivity() {
                     Toast.LENGTH_SHORT
                 ).show()
 
-                setResult(
-                    RESULT_OK
-                )
-                finish()
+                openMain()
             } else {
                 analytics.event(
                     if (registerMode) {
@@ -615,7 +646,7 @@ class LoginActivity : ComponentActivity() {
 
         if (phone == null) {
             toast(
-                "Use o formato internacional, por exemplo +258841234567."
+                "Escolhe o país e coloca exatamente 9 dígitos, por exemplo 841234567."
             )
             analytics.event(
                 "auth_phone_validation_error"
@@ -873,6 +904,8 @@ class LoginActivity : ComponentActivity() {
 
         phoneInput.text?.clear()
         phoneCodeInput.text?.clear()
+        selectedPhoneCountry = null
+        phoneCountryButton.text = "Escolher país"
 
         phoneInput.isEnabled = true
         phoneButton.isEnabled = true
@@ -921,6 +954,9 @@ class LoginActivity : ComponentActivity() {
     private fun normalizePhoneNumber(
         raw: String
     ): String? {
+        val country = selectedPhoneCountry
+            ?: return null
+
         val value = raw
             .trim()
             .replace(" ", "")
@@ -928,15 +964,33 @@ class LoginActivity : ComponentActivity() {
             .replace("(", "")
             .replace(")", "")
 
-        return if (
-            value.matches(
-                Regex("^\\+[1-9]\\d{7,14}$")
-            )
-        ) {
-            value
-        } else {
-            null
+        if (!value.matches(Regex("^\\d{9}$"))) {
+            return null
         }
+
+        return country.code + value
+    }
+
+    private fun showPhoneCountryPicker() {
+        val names = PhoneCountries.all.map {
+            "${it.flag}  ${it.name}  (${it.code})"
+        }.toTypedArray()
+
+        AlertDialog.Builder(this)
+            .setTitle("Escolher país")
+            .setItems(names) { _, which ->
+                val country = PhoneCountries.all[which]
+                selectedPhoneCountry = country
+                phoneCountryButton.text =
+                    "${country.flag}  ${country.name}  ${country.code}"
+                analytics.event(
+                    "auth_phone_country_selected",
+                    "country" to country.name,
+                    "country_code" to country.code
+                )
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     private fun phoneAuthErrorMessage(
