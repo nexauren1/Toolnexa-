@@ -1,5 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">ToolNexa</string>
-    <string name="app_description">Useful tools in one app.</string>
+    <string name="app_description">Ferramentas úteis numa só aplicação.</string>
+    <string name="support_back">‹  ToolNexa</string>
+    <string name="support_title">Suporte, sugestões e reclamações</string>
+    <string name="support_description">Escolha o tipo de contacto, a ferramenta relacionada e o problema específico. Ao tocar em Enviar, a sua aplicação de email abre com o relatório preenchido para rever antes de enviar.</string>
+    <string name="support_type_label">Tipo de contacto</string>
+    <string name="support_tool_label">Ferramenta ou área</string>
+    <string name="support_problem_label">Problema</string>
+    <string name="support_message_label">Mensagem</string>
+    <string name="support_message_hint">Explique o problema, a ideia ou a sugestão...</string>
+    <string name="support_diagnostics">Incluir diagnóstico técnico (modelo do aparelho, Android, versão da aplicação e idioma)</string>
+    <string name="support_privacy_note">Não incluímos palavras-passe, tokens de autenticação, chaves privadas ou outros segredos. O email abre para revisão antes de ser enviado.</string>
+    <string name="support_send">Enviar para o suporte</string>
+    <string name="support_message_required">Escreva a sua mensagem.</string>
+    <string name="support_subject_prefix">[ToolNexa]</string>
+    <string name="support_no_email_app">Não foi encontrada uma aplicação de email.</string>
+    <string-array name="support_types">
+        <item>Suporte técnico</item><item>Reclamação</item><item>Sugestão</item><item>Problema de pagamento</item><item>Problema de conta</item>
+    </string-array>
+    <string-array name="support_tools">
+        <item>Geral</item><item>Background Remover</item><item>Image Compressor</item><item>Image Resizer</item><item>Image Converter</item><item>Planos / PayPal</item><item>Login / Conta</item><item>Histórico</item><item>Outra ferramenta</item>
+    </string-array>
+    <string-array name="support_problems">
+        <item>Nenhum problema específico</item><item>A aplicação fecha / falha</item><item>Tela branca</item><item>Função não funciona</item><item>IA não funciona</item><item>Resultado incorreto</item><item>Não consigo salvar ou partilhar</item><item>Problema de login / conta</item><item>Problema de pagamento / plano</item><item>Lento ou bloqueia</item><item>Outro</item>
+    </string-array>
 </resources>
