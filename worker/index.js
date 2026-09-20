@@ -63,25 +63,58 @@ export default {
           );
         }
 
-        await ensurePlansSchema(
-          env.DB
-        );
+        try {
+          await ensurePlansSchema(
+            env.DB
+          );
 
-        const result =
-          await env.DB
-            .prepare(
-              "SELECT code, name, price_usd, " +
-              "billing_interval, paypal_plan_id, active " +
-              "FROM plans WHERE active = 1 " +
-              "ORDER BY sort_order, code"
-            )
-            .all();
+          const result =
+            await env.DB
+              .prepare(
+                "SELECT code, name, price_usd, " +
+                "billing_interval, paypal_plan_id, active " +
+                "FROM plans WHERE active = 1 " +
+                "ORDER BY sort_order, code"
+              )
+              .all();
 
-        return json({
-          ok: true,
-          plans:
-            result.results || []
-        });
+          return json({
+            ok: true,
+            plans:
+              result.results || []
+          });
+        } catch (error) {
+          // The public plan catalog must remain readable even
+          // when an older billing schema needs repair.
+          console.error(
+            "ToolNexa plans catalog fallback",
+            error
+          );
+
+          return json({
+            ok: true,
+            plans: [
+              {
+                code: "free",
+                name: "Free",
+                price_usd: "0.00",
+                billing_interval: "month",
+                paypal_plan_id: null,
+                active: 1
+              },
+              {
+                code: "pro",
+                name: "Pro",
+                price_usd: "5.00",
+                billing_interval: "month",
+                paypal_plan_id: null,
+                active: 1
+              }
+            ],
+            billing_catalog:
+              "fallback"
+          });
+        }
       }
 
       if (
