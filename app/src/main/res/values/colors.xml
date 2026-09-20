@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="toolnexa_blue">#2F6BFF</color>
+    <color name="toolnexa_bg">#F5F8FC</color>
+    <color name="toolnexa_surface">#FFFFFF</color>
+    <color name="toolnexa_text">#152033</color>
+    <color name="toolnexa_muted">#6C7890</color>
+    <color name="toolnexa_border">#DDE5F0</color>
+</resources>

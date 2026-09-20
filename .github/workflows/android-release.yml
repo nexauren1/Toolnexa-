@@ -1,0 +1,95 @@
+name: ToolNexa Android Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    env:
+      HAS_SIGNING: ${{ secrets.TOOLNEXA_KEYSTORE_BASE64 != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Build signed release when secrets exist
+        if: env.HAS_SIGNING == 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.TOOLNEXA_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.TOOLNEXA_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.TOOLNEXA_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.TOOLNEXA_KEY_PASSWORD }}
+        run: |
+          mkdir -p app/signing
+          echo "$KEYSTORE_B64" | base64 --decode > app/signing/toolnexa-upload.jks
+
+          cat >> app/build.gradle.kts <<'EOF'
+
+          android.signingConfigs.create("ciRelease") {
+              storeFile = file("signing/toolnexa-upload.jks")
+              storePassword = System.getenv("STORE_PASSWORD")
+              keyAlias = System.getenv("KEY_ALIAS")
+              keyPassword = System.getenv("KEY_PASSWORD")
+          }
+
+          android.buildTypes.getByName("release").signingConfig =
+              android.signingConfigs.getByName("ciRelease")
+          EOF
+
+          gradle :app:assembleRelease --stacktrace
+          cp app/build/outputs/apk/release/app-release.apk toolnexa.apk
+
+      - name: Build debug APK for first/test releases
+        if: env.HAS_SIGNING != 'true'
+        run: |
+          gradle :app:assembleDebug --stacktrace
+          cp app/build/outputs/apk/debug/app-debug.apk toolnexa.apk
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(grep -E 'versionName = ' app/build.gradle.kts | head -1 | cut -d '"' -f2)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ToolNexa-v${{ steps.version.outputs.version }}
+          path: toolnexa.apk
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: v${{ steps.version.outputs.version }}
+        run: |
+          NOTES="ToolNexa Android v$VERSION
+
+          First public app build. Includes Image Compressor, navigation menu, account placeholder, settings and GitHub Release update flow."
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" toolnexa.apk --clobber
+            gh release edit "$TAG" --title "ToolNexa Android v$VERSION" --notes "$NOTES"
+          else
+            gh release create "$TAG" toolnexa.apk --title "ToolNexa Android v$VERSION" --notes "$NOTES"
+          fi
