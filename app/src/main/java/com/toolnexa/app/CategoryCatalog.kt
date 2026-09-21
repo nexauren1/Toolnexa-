@@ -11,7 +11,8 @@ data class CategoryDefinition(
 )
 
 object CategoryCatalog {
-    val all =
+
+    val all: List<CategoryDefinition> =
         listOf(
             CategoryDefinition(
                 "Imagem",
@@ -85,50 +86,11 @@ object CategoryCatalog {
             )
         )
 
-    fun toolsFor(
-        category: String
-    ): List<ToolDefinition> {
-        return when (category) {
-            "Imagem" ->
-                listOf(
-                    ToolDefinition(
-                        "Image Compressor",
-                        "Imagem",
-                        "Reduza o tamanho com qualidade ajustável.",
-                        android.R.drawable.ic_menu_save
-                    ),
-                    ToolDefinition(
-                        "Image Resizer",
-                        "Imagem",
-                        "Altere a largura mantendo a proporção.",
-                        android.R.drawable.ic_menu_crop
-                    ),
-                    ToolDefinition(
-                        "Image Converter",
-                        "Imagem",
-                        "Converta para JPG, PNG ou WebP.",
-                        android.R.drawable.ic_menu_manage
-                    ),
-                    ToolDefinition(
-                        "Background Remover",
-                        "Imagem",
-                        "Remova o fundo com IA e preserve transparência.",
-                        android.R.drawable.ic_menu_delete
-                    )
-                )
+    fun toolsFor(category: String): List<ToolDefinition> {
+        return ToolRegistry.toolsFor(category)
+    }
 
-            "Áudio" ->
-                listOf(
-                    ToolDefinition(
-                        "Audio to MIDI",
-                        "Áudio",
-                        "Converta uma melodia de áudio em notas MIDI editáveis.",
-                        android.R.drawable.ic_media_play
-                    )
-                )
-
-            else ->
-                emptyList()
-        }
+    fun countFor(category: String): Int {
+        return ToolRegistry.countFor(category)
     }
 }

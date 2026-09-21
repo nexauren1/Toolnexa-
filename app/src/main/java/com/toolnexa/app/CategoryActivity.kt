@@ -234,7 +234,7 @@ class CategoryActivity : Activity() {
         setContentView(root)
 
         val tools =
-            CategoryCatalog.toolsFor(
+            ToolRegistry.toolsFor(
                 definition.name
             )
 
@@ -731,47 +731,66 @@ class CategoryActivity : Activity() {
                     tool.name
             )
 
-            if (
-                tool.name ==
-                    "Background Remover"
-            ) {
-                startActivity(
-                    Intent(
-                        this,
-                        BackgroundRemoverActivity::class.java
-                    )
-                )
-            } else if (
-                tool.name ==
-                    "Audio to MIDI"
-            ) {
-                startActivity(
-                    Intent(
-                        this,
-                        AudioToMidiActivity::class.java
-                    )
-                )
-            } else {
-                startActivity(
-                    Intent(
-                        this,
-                        ToolWorkflowActivity::class.java
-                    ).apply {
-                        putExtra(
-                            "tool",
-                            when (tool.name) {
-                                "Image Compressor" ->
-                                    "compressor"
-
-                                "Image Resizer" ->
-                                    "resizer"
-
-                                else ->
-                                    "converter"
-                            }
+            when (tool.id) {
+                "background-remover" -> {
+                    startActivity(
+                        Intent(
+                            this,
+                            BackgroundRemoverActivity::class.java
                         )
-                    }
-                )
+                    )
+                }
+
+                "audio-to-midi" -> {
+                    startActivity(
+                        Intent(
+                            this,
+                            AudioToMidiActivity::class.java
+                        )
+                    )
+                }
+
+                "image-compressor" -> {
+                    startActivity(
+                        Intent(
+                            this,
+                            ToolWorkflowActivity::class.java
+                        ).apply {
+                            putExtra(
+                                "tool",
+                                "compressor"
+                            )
+                        }
+                    )
+                }
+
+                "image-resizer" -> {
+                    startActivity(
+                        Intent(
+                            this,
+                            ToolWorkflowActivity::class.java
+                        ).apply {
+                            putExtra(
+                                "tool",
+                                "resizer"
+                            )
+                        }
+                    )
+                }
+
+                "image-converter" -> {
+                    startActivity(
+                        Intent(
+                            this,
+                            ToolWorkflowActivity::class.java
+                        ).apply {
+                            putExtra(
+                                "tool",
+                                "converter"
+                            )
+                        }
+                    )
+                }
             }
         }
 

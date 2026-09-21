@@ -4,5 +4,6 @@ data class ToolDefinition(
     val name: String,
     val category: String,
     val description: String,
-    val icon: Int
+    val icon: Int,
+    val id: String = ""
 )

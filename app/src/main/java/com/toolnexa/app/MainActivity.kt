@@ -921,17 +921,17 @@ class MainActivity : ComponentActivity() {
         )
 
         val count =
-            CategoryCatalog.toolsFor(
+            ToolRegistry.countFor(
                 category.name
-            ).size
+            )
 
         item.addView(
             TextView(this).apply {
                 text =
-                    if (count == 0) {
-                        "Preparada"
+                    if (count == 1) {
+                        "1 ferramenta"
                     } else {
-                        "$count ferramenta(s)"
+                        "$count ferramentas"
                     }
                 textSize = 11f
                 typeface =
@@ -1020,41 +1020,17 @@ class MainActivity : ComponentActivity() {
         fun render(query: String) {
             grid.removeAllViews()
 
-            val tools = listOf(
-                ToolDefinition(
-                    "Image Compressor",
-                    "Imagem",
-                    "Reduza o tamanho da imagem com qualidade ajustável.",
-                    R.drawable.ic_tool_compress
-                ),
-                ToolDefinition(
-                    "Image Resizer",
-                    "Imagem",
-                    "Redimensione a imagem e veja a nova prévia.",
-                    R.drawable.ic_tool_resize
-                ),
-                ToolDefinition(
-                    "Image Converter",
-                    "Imagem",
-                    "Converta imagens para JPG, PNG ou WebP.",
-                    R.drawable.ic_tool_convert
-                ),
-                ToolDefinition(
-                    "Background Remover",
-                    "Imagem",
-                    "Remova o fundo com IA e preserve transparência.",
-                    R.drawable.ic_tool_background
-                ),
-                ToolDefinition(
-                    "Audio to MIDI",
-                    "Áudio",
-                    "Converta uma melodia de áudio em notas MIDI editáveis.",
-                    android.R.drawable.ic_media_play
-                )
-            ).filter {
-                it.name.contains(query.trim(), true) ||
-                    it.category.contains(query.trim(), true)
-            }
+            val tools =
+                ToolRegistry.allTools.filter {
+                    it.name.contains(
+                        query.trim(),
+                        true
+                    ) ||
+                        it.category.contains(
+                            query.trim(),
+                            true
+                        )
+                }
 
             if (tools.isEmpty()) {
                 grid.addView(
@@ -1302,23 +1278,25 @@ class MainActivity : ComponentActivity() {
             analytics.event(
                 "tool_open",
                 "tool_name" to
-                    tool.name
+                    tool.name,
+                "tool_id" to
+                    tool.id
             )
 
-            when (tool.name) {
-                "Image Compressor" ->
+            when (tool.id) {
+                "image-compressor" ->
                     showImageCompressor()
 
-                "Image Resizer" ->
+                "image-resizer" ->
                     showImageResizer()
 
-                "Image Converter" ->
+                "image-converter" ->
                     showImageConverter()
 
-                "Background Remover" ->
+                "background-remover" ->
                     showBackgroundRemover()
 
-                "Audio to MIDI" ->
+                "audio-to-midi" ->
                     showAudioToMidi()
             }
         }
