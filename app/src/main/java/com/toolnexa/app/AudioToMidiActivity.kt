@@ -788,26 +788,18 @@ class AudioToMidiActivity : Activity() {
         engineCard.addView(
             choiceRow(
                 listOf(
-                    "neural" to I18n.t(this, "IA Neural"),
+                    "neural" to "IA Neural • PRO",
                     "local" to I18n.t(this, "Local rápido")
                 ),
-                conversionEngine
-            ) { key ->
-                if (
-                    key == "neural"
-                ) {
-                    ProGate.runOrUpgrade(
-                        this,
-                        "IA Neural"
-                    ) {
-                        conversionEngine =
-                            key
-                    }
-                } else {
+                conversionEngine,
+                onSelect = {
+                    key ->
                     conversionEngine =
                         key
-                }
-            }
+                },
+                proKeys =
+                    setOf("neural")
+            )
         )
         add(engineCard)
 
@@ -823,25 +815,17 @@ class AudioToMidiActivity : Activity() {
                     "voice" to "Voz",
                     "melody" to "Melodia",
                     "bass" to "Baixo",
-                    "wide" to "Amplo"
+                    "wide" to "Amplo • PRO"
                 ),
-                detectionProfile
-            ) { key ->
-                if (
-                    key == "wide"
-                ) {
-                    ProGate.runOrUpgrade(
-                        this,
-                        "Perfil Amplo"
-                    ) {
-                        detectionProfile =
-                            key
-                    }
-                } else {
+                detectionProfile,
+                onSelect = {
+                    key ->
                     detectionProfile =
                         key
-                }
-            }
+                },
+                proKeys =
+                    setOf("wide")
+            )
         )
         add(profileCard)
 
@@ -928,30 +912,21 @@ class AudioToMidiActivity : Activity() {
                 listOf(
                     "0" to "Desligada",
                     "8" to "1/8",
-                    "16" to "1/16",
-                    "32" to "1/32"
+                    "16" to "1/16 • PRO",
+                    "32" to "1/32 • PRO"
                 ),
-                quantizeGrid.toString()
-            ) { key ->
-                val grid =
-                    key.toIntOrNull() ?: 0
-
-                if (
-                    grid == 16 ||
-                    grid == 32
-                ) {
-                    ProGate.runOrUpgrade(
-                        this,
-                        "Quantização " + key
-                    ) {
-                        quantizeGrid =
-                            grid
-                    }
-                } else {
+                quantizeGrid.toString(),
+                onSelect = {
+                    key ->
                     quantizeGrid =
-                        grid
-                }
-            }
+                        key.toIntOrNull() ?: 0
+                },
+                proKeys =
+                    setOf(
+                        "16",
+                        "32"
+                    )
+            )
         )
 
         advanced.addView(
@@ -990,17 +965,43 @@ class AudioToMidiActivity : Activity() {
             }
         )
 
-        val cleanup = android.widget.CheckBox(this).apply {
-            text = "Limpeza inteligente"
-            textSize = 15f
-            setTextColor(textColor)
-            isChecked = cleanupEnabled
-            buttonTintList =
-                android.content.res.ColorStateList.valueOf(audioAccent)
-            setOnCheckedChangeListener { _, checked ->
-                cleanupEnabled = checked
+        val cleanup =
+            android.widget.CheckBox(this).apply {
+                text =
+                    "Limpeza inteligente • PRO"
+                textSize =
+                    15f
+                setTextColor(
+                    textColor
+                )
+                isChecked =
+                    cleanupEnabled
+                buttonTintList =
+                    android.content.res.ColorStateList.valueOf(
+                        audioAccent
+                    )
+                setOnClickListener {
+                    if (
+                        isChecked
+                    ) {
+                        isChecked =
+                            false
+
+                        ProGate.runOrUpgrade(
+                            this@AudioToMidiActivity,
+                            "Limpeza inteligente"
+                        ) {
+                            isChecked =
+                                true
+                            cleanupEnabled =
+                                true
+                        }
+                    } else {
+                        cleanupEnabled =
+                            false
+                    }
+                }
             }
-        }
         advanced.addView(cleanup)
         advanced.addView(
             bodyText(
@@ -2060,87 +2061,12 @@ class AudioToMidiActivity : Activity() {
             }
         )
 
-        val pro =
-            card()
-
-        pro.addView(
-            title(
-                "Recursos Pro",
-                18f
+        add(
+            infoCard(
+                "RECURSOS PRO",
+                "IA Neural, Perfil Amplo, Quantização 1/16 e 1/32 e Limpeza inteligente estão protegidos pelo plano Pro. Toque neles no ecrã de configuração para ver o upgrade."
             )
         )
-
-        pro.addView(
-            bodyText(
-                "Toque numa função Pro para ver as opções do upgrade."
-            )
-        )
-
-        fun proFeature(
-            name: String,
-            description: String
-        ): Button {
-            return button(
-                name + "  •  PRO",
-                false
-            ).apply {
-                textSize =
-                    13f
-                setOnClickListener {
-                    ProGate.runOrUpgrade(
-                        this@AudioToMidiActivity,
-                        name
-                    ) {
-                        Toast.makeText(
-                            this@AudioToMidiActivity,
-                            "Recurso Pro disponível para esta conta.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                }
-            }
-        }
-
-        pro.addView(
-            bodyText(
-                "IA Neural"
-            )
-        )
-        pro.addView(
-            proFeature(
-                "Conversão inteligente",
-                "Transcrição com IA"
-            )
-        )
-
-        pro.addView(
-            bodyText(
-                "Fluxo avançado"
-            ).apply {
-                setPadding(
-                    0,
-                    dp(8),
-                    0,
-                    0
-                )
-            }
-        )
-
-        listOf(
-            "Conversão em lote",
-            "Detecção multi-instrumento",
-            "MIDI multicanal",
-            "Exportação MIDI avançada"
-        ).forEach { feature ->
-            pro.addView(
-                proFeature(
-                    feature,
-                    ""
-                )
-            )
-        }
-
-        add(pro)
 
         if (
             result.notes.isEmpty()
