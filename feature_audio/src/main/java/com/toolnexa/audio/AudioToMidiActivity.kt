@@ -66,39 +66,39 @@ class AudioToMidiActivity : Activity() {
     private var sensitivityLabel: TextView? = null
 
     private val blue by lazy {
-        getColor(R.color.toolnexa_blue)
+        getColor(com.toolnexa.app.R.color.toolnexa_blue)
     }
 
     private val bg by lazy {
-        getColor(R.color.toolnexa_bg)
+        getColor(com.toolnexa.app.R.color.toolnexa_bg)
     }
 
     private val surface by lazy {
-        getColor(R.color.toolnexa_surface)
+        getColor(com.toolnexa.app.R.color.toolnexa_surface)
     }
 
     private val textColor by lazy {
-        getColor(R.color.toolnexa_text)
+        getColor(com.toolnexa.app.R.color.toolnexa_text)
     }
 
     private val muted by lazy {
-        getColor(R.color.toolnexa_muted)
+        getColor(com.toolnexa.app.R.color.toolnexa_muted)
     }
 
     private val border by lazy {
-        getColor(R.color.toolnexa_border)
+        getColor(com.toolnexa.app.R.color.toolnexa_border)
     }
 
     private val audioAccent by lazy {
-        getColor(R.color.toolnexa_purple)
+        getColor(com.toolnexa.app.R.color.toolnexa_purple)
     }
 
     private val audioAccent2 by lazy {
-        getColor(R.color.toolnexa_cyan)
+        getColor(com.toolnexa.app.R.color.toolnexa_cyan)
     }
 
     private val success by lazy {
-        getColor(R.color.toolnexa_green)
+        getColor(com.toolnexa.app.R.color.toolnexa_green)
     }
 
     override fun onCreate(state: Bundle?) {
@@ -318,7 +318,7 @@ class AudioToMidiActivity : Activity() {
             ProgressBar(
                 this,
                 null,
-                android.R.attr.progressBarStyleHorizontal
+                android.com.toolnexa.app.R.attr.progressBarStyleHorizontal
             ).apply {
                 max =
                     100
@@ -1106,7 +1106,7 @@ class AudioToMidiActivity : Activity() {
             ProgressBar(
                 this,
                 null,
-                android.R.attr.progressBarStyleHorizontal
+                android.com.toolnexa.app.R.attr.progressBarStyleHorizontal
             ).apply {
                 max = 100
                 progress = 0
