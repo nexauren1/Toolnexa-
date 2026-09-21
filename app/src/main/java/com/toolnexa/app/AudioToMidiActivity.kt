@@ -790,7 +790,7 @@ class AudioToMidiActivity : Activity() {
             bodyText(
                 I18n.t(
                     this,
-                    "A IA Neural faz transcrição polifónica. O Local rápido funciona sem descarregar o modelo e serve como fallback."
+                    "A IA Neural faz transcrição polifónica. O modelo fica guardado no aparelho depois do primeiro download."
                 )
             ).apply {
                 setPadding(0, dp(5), 0, dp(10))
@@ -1099,7 +1099,7 @@ class AudioToMidiActivity : Activity() {
                 if (engine == "neural") {
                     I18n.t(
                         this,
-                        "O modelo Basic Pitch está incluído no aplicativo. A inferência neural acontece no próprio aparelho."
+                        "O modelo Basic Pitch é baixado uma vez e guardado no aparelho. A inferência neural acontece localmente."
                     )
                 } else {
                     I18n.t(
@@ -1121,6 +1121,15 @@ class AudioToMidiActivity : Activity() {
         uri: Uri,
         options: ConversionOptions
     ) {
+        if (
+            !BasicPitchModelManager.isInstalled(
+                this
+            )
+        ) {
+            showModelSetup()
+            return
+        }
+
         buildConversionScreen(
             "neural"
         )
