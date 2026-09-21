@@ -117,6 +117,16 @@ object CategoryCatalog {
                     )
                 )
 
+            "Áudio" ->
+                listOf(
+                    ToolDefinition(
+                        "Audio to MIDI",
+                        "Áudio",
+                        "Converta uma melodia de áudio em notas MIDI editáveis.",
+                        android.R.drawable.ic_media_play
+                    )
+                )
+
             else ->
                 emptyList()
         }
