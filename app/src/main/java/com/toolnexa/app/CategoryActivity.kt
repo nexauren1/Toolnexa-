@@ -35,6 +35,35 @@ class CategoryActivity : Activity() {
                 categoryName.lowercase()
         )
 
+        val packageInfo =
+            ToolPackageCatalog.forCategory(
+                categoryName
+            )
+        val skipPackage =
+            intent.getBooleanExtra(
+                "skip_package",
+                false
+            )
+
+        if (
+            packageInfo != null &&
+            !skipPackage
+        ) {
+            startActivity(
+                Intent(
+                    this,
+                    ToolPackageActivity::class.java
+                ).apply {
+                    putExtra(
+                        "category",
+                        categoryName
+                    )
+                }
+            )
+            finish()
+            return
+        }
+
         build(categoryName)
     }
 
@@ -742,13 +771,9 @@ class CategoryActivity : Activity() {
                 "business-contract-maker",
                 "business-name-generator",
                 "business-pricing-calculator" -> {
-                    startActivity(
-                        Intent(
-                            this,
-                            BusinessToolActivity::class.java
-                        ).apply {
-                            putExtra("tool_id", tool.id)
-                        }
+                    openBusinessTool(
+                        tool.id,
+                        definition.name
                     )
                 }
 
@@ -835,6 +860,54 @@ class CategoryActivity : Activity() {
             .translationY(0f)
             .setDuration(240)
             .start()
+    }
+
+    private fun openBusinessTool(
+        toolId: String,
+        category: String
+    ) {
+        val packageInfo =
+            ToolPackageCatalog.forCategory(
+                category
+            )
+
+        if (
+            packageInfo != null &&
+            !ToolPackageManager(this)
+                .isInstalled(
+                    packageInfo.module
+                )
+        ) {
+            startActivity(
+                Intent(
+                    this,
+                    ToolPackageActivity::class.java
+                ).apply {
+                    putExtra(
+                        "category",
+                        category
+                    )
+                    putExtra(
+                        "tool_id",
+                        toolId
+                    )
+                }
+            )
+            return
+        }
+
+        startActivity(
+            Intent().apply {
+                setClassName(
+                    this@CategoryActivity,
+                    "com.toolnexa.business.BusinessToolActivity"
+                )
+                putExtra(
+                    "tool_id",
+                    toolId
+                )
+            }
+        )
     }
 
     private fun dp(value: Int): Int {
