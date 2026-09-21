@@ -2631,10 +2631,13 @@ class AudioToMidiActivity : Activity() {
                         it.tick
                     }.thenBy {
                         if (
-                            it.data.firstOrNull()
-                                ?.and(
-                                    0xF0
-                                ) == 0x80
+                            (
+                                it.data.firstOrNull()
+                                    ?.toInt()
+                                    ?.and(
+                                        0xF0
+                                    )
+                            ) == 0x80
                         ) {
                             0
                         } else {
