@@ -122,6 +122,11 @@ class ToolWorkflowActivity : Activity() {
         val back = button("Voltar e escolher outra imagem", false)
         back.setOnClickListener { showStage1() }
         add(back)
+        root?.post {
+            if (!isFinishing) {
+                I18n.localizeWindow(this)
+            }
+        }
     }
 
     private fun addCompressorOptions() {
@@ -339,6 +344,11 @@ class ToolWorkflowActivity : Activity() {
         val again = button("Processar outro arquivo", false)
         again.setOnClickListener { selectedUri = null; resultFile = null; showStage1() }
         add(again)
+        root?.post {
+            if (!isFinishing) {
+                I18n.localizeWindow(this)
+            }
+        }
     }
 
     private fun saveResult(file: File) {
@@ -497,7 +507,6 @@ class ToolWorkflowActivity : Activity() {
         scroll.addView(body)
         root!!.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
-        I18n.localizeWindow(this)
     }
 
     private fun body(): LinearLayout? {
