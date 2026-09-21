@@ -88,7 +88,6 @@ class SupportActivity : Activity() {
         )
 
         setContentView(root)
-        I18n.localizeWindow(this)
 
         body.addView(
             TextView(this).apply {
@@ -405,6 +404,12 @@ class SupportActivity : Activity() {
                 topMargin = dp(6)
             }
         )
+
+        root.post {
+            if (!isFinishing) {
+                I18n.localizeWindow(this)
+            }
+        }
     }
 
     private fun buildReport(
@@ -441,6 +446,11 @@ class SupportActivity : Activity() {
             appendLine("Account")
             appendLine("-------")
             appendLine(
+                "UID: " +
+                    (user?.uid
+                        ?: "Not available")
+            )
+            appendLine(
                 "Name: " +
                     (user?.displayName
                         ?: "Not available")
@@ -448,6 +458,50 @@ class SupportActivity : Activity() {
             appendLine(
                 "Account email: " +
                     (user?.email
+                        ?: "Not available")
+            )
+            appendLine(
+                "Phone: " +
+                    (user?.phoneNumber
+                        ?: "Not available")
+            )
+            appendLine(
+                "Email verified: " +
+                    (user?.isEmailVerified
+                        ?: false)
+            )
+            appendLine(
+                "Providers: " +
+                    (user?.providerData
+                        ?.filter {
+                            it.providerId.isNotBlank()
+                        }
+                        ?.joinToString(", ") {
+                            it.providerId
+                        }
+                        ?.ifBlank { "Not available" }
+                        ?: "Not available")
+            )
+            appendLine(
+                "Created: " +
+                    (user?.metadata?.creationTimestamp
+                        ?.let {
+                            SimpleDateFormat(
+                                "yyyy-MM-dd HH:mm:ss",
+                                Locale.US
+                            ).format(Date(it))
+                        }
+                        ?: "Not available")
+            )
+            appendLine(
+                "Last sign-in: " +
+                    (user?.metadata?.lastSignInTimestamp
+                        ?.let {
+                            SimpleDateFormat(
+                                "yyyy-MM-dd HH:mm:ss",
+                                Locale.US
+                            ).format(Date(it))
+                        }
                         ?: "Not available")
             )
             appendLine()
@@ -500,38 +554,42 @@ class SupportActivity : Activity() {
         subject: String,
         body: String
     ) {
-        val mailto =
-            Intent(
-                Intent.ACTION_SENDTO
-            ).apply {
-                data =
-                    Uri.parse(
-                        "mailto:nexaurenstore@gmail.com"
-                    )
-                putExtra(
-                    Intent.EXTRA_EMAIL,
-                    arrayOf(
-                        "nexaurenstore@gmail.com"
-                    )
-                )
-                putExtra(
-                    Intent.EXTRA_SUBJECT,
+        val chooserTitle =
+            I18n.t(
+                this,
+                "Abrir aplicação de email"
+            )
+
+        /*
+         * Gmail can ignore EXTRA_TEXT on ACTION_SENDTO.
+         * Put subject/body directly into the mailto URI so the
+         * compose window opens already populated.
+         */
+        val mailtoUri =
+            Uri.Builder()
+                .scheme("mailto")
+                .path("nexaurenstore@gmail.com")
+                .appendQueryParameter(
+                    "subject",
                     subject
                 )
-                putExtra(
-                    Intent.EXTRA_TEXT,
+                .appendQueryParameter(
+                    "body",
                     body
                 )
-            }
+                .build()
+
+        val mailto =
+            Intent(
+                Intent.ACTION_SENDTO,
+                mailtoUri
+            )
 
         try {
             startActivity(
                 Intent.createChooser(
                     mailto,
-                    I18n.t(
-                        this,
-                        "Abrir aplicação de email"
-                    )
+                    chooserTitle
                 )
             )
             analytics.event(
