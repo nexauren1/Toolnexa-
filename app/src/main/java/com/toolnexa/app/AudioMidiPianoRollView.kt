@@ -321,9 +321,9 @@ class AudioMidiPianoRollView(
                 downY =
                     event.y
 
-                val hit =
+                        val hit =
                     findNote(
-                        contentX,
+                        event.x,
                         event.y
                     )
 
@@ -721,8 +721,7 @@ class AudioMidiPianoRollView(
                     mutableNotes[index],
                     height.toFloat()
                 ).contains(
-                    x +
-                        keyboardWidth(),
+                    x,
                     y
                 )
             ) {
