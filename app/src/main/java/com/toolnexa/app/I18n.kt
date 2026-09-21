@@ -85,6 +85,7 @@ object I18n {
             "Preparar conversão" to mapOf("en" to "Prepare conversion", "es" to "Preparar conversión", "fr" to "Préparer la conversion", "ar" to "تحضير التحويل"),
             "Configuração" to mapOf("en" to "Settings", "es" to "Configuración", "fr" to "Configuration", "ar" to "الإعدادات"),
             "Sensibilidade: 50%" to mapOf("en" to "Sensitivity: 50%", "es" to "Sensibilidad: 50%", "fr" to "Sensibilité : 50 %", "ar" to "الحساسية: 50%"),
+            "Sensibilidade" to mapOf("en" to "Sensitivity", "es" to "Sensibilidad", "fr" to "Sensibilité", "ar" to "الحساسية"),
             "Ajuste a sensibilidade. Valores mais altos ignoram trechos muito baixos." to mapOf("en" to "Adjust sensitivity. Higher values ignore very quiet sections.", "es" to "Ajusta la sensibilidad. Los valores más altos ignoran las partes muy bajas.", "fr" to "Réglez la sensibilité. Les valeurs plus élevées ignorent les passages très faibles.", "ar" to "اضبط الحساسية. القيم الأعلى تتجاهل المقاطع الهادئة جدًا."),
             "Converter para MIDI" to mapOf("en" to "Convert to MIDI", "es" to "Convertir a MIDI", "fr" to "Convertir en MIDI", "ar" to "تحويل إلى MIDI"),
             "Resultado" to mapOf("en" to "Result", "es" to "Resultado", "fr" to "Résultat", "ar" to "النتيجة"),
