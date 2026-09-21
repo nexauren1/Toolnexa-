@@ -964,28 +964,82 @@ object ToolNexaTranslation {
             )
         )
 
+    private val wordRegexCache =
+        mutableMapOf<String, Regex>()
+
+    private val wordMapCache =
+        mutableMapOf<String, Map<String, String>>()
+
+    private fun compiledWordRegex(
+        language: String
+    ): Regex? {
+        wordRegexCache[language]?.let {
+            return it
+        }
+
+        val dictionary =
+            wordTranslations[language]
+                ?: return null
+
+        val normalized =
+            dictionary.entries
+                .sortedByDescending {
+                    it.key.length
+                }
+
+        val pattern =
+            normalized
+                .joinToString(
+                    "|",
+                    prefix =
+                        "(?i)(?<![\\p{L}])(?:",
+                    postfix =
+                        ")(?![\\p{L}])"
+                ) {
+                    Regex.escape(it.key)
+                }
+
+        return Regex(pattern).also {
+            wordRegexCache[language] = it
+        }
+    }
+
+    private fun compiledWordMap(
+        language: String
+    ): Map<String, String> {
+        return wordMapCache.getOrPut(language) {
+            (wordTranslations[language]
+                ?: emptyMap())
+                .entries
+                .associate {
+                    it.key.lowercase(
+                        Locale.ROOT
+                    ) to it.value
+                }
+        }
+    }
+
     fun words(
         value: String,
         language: String
     ): String {
-        val dictionary =
-            wordTranslations[language]
-                ?: return value
-
-        var result = value
-
-        for ((source, target) in dictionary) {
-            result =
-                result.replace(
-                    Regex(
-                        "(?i)(?<![\\p{L}])" +
-                            Regex.escape(source) +
-                            "(?![\\p{L}])"
-                    ),
-                    target
-                )
+        if (value.isBlank()) {
+            return value
         }
 
-        return result
+        val regex =
+            compiledWordRegex(language)
+                ?: return value
+
+        val dictionary =
+            compiledWordMap(language)
+
+        return regex.replace(value) { match ->
+            dictionary[
+                match.value.lowercase(
+                    Locale.ROOT
+                )
+            ] ?: match.value
+        }
     }
 }
