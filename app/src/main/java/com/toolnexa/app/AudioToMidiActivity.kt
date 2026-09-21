@@ -101,6 +101,12 @@ class AudioToMidiActivity : Activity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
+
+        previewPlayer =
+            MidiPreviewPlayer(
+                cacheDir
+            )
+
         LanguageManager.apply(this)
         analytics.screen("audio_to_midi")
 
@@ -514,10 +520,8 @@ class AudioToMidiActivity : Activity() {
     private var midiWriteInProgress =
         false
 
-    private val previewPlayer =
-        MidiPreviewPlayer(
-            cacheDir
-        )
+    private var previewPlayer:
+        MidiPreviewPlayer? = null
 
     private fun showStage1() {
         buildBase("Audio → MIDI")
@@ -2029,7 +2033,7 @@ class AudioToMidiActivity : Activity() {
                     12.5f
 
                 setOnClickListener {
-                    previewPlayer.play(
+                    previewPlayer?.play(
                         editorNotes.map {
                             AudioMidiPianoRollView.Note(
                                 it.startSeconds,
