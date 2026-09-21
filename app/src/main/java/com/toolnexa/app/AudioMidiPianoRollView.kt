@@ -61,8 +61,60 @@ class AudioMidiPianoRollView(
 
     init {
         isFocusable = true
+        isClickable = true
+
+        setWillNotDraw(false)
+
+        setLayerType(
+            View.LAYER_TYPE_SOFTWARE,
+            null
+        )
+
         setBackgroundColor(
             0xFFF7F9FD.toInt()
+        )
+
+        postInvalidateOnAnimation()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+
+        post {
+            requestLayout()
+            invalidate()
+        }
+    }
+
+    override fun onMeasure(
+        widthMeasureSpec: Int,
+        heightMeasureSpec: Int
+    ) {
+        val desiredWidth =
+            dp(900)
+
+        val desiredHeight =
+            dp(430)
+
+        val measuredWidth =
+            resolveSize(
+                desiredWidth,
+                widthMeasureSpec
+            )
+
+        val measuredHeight =
+            resolveSize(
+                desiredHeight,
+                heightMeasureSpec
+            )
+
+        setMeasuredDimension(
+            measuredWidth.coerceAtLeast(
+                desiredWidth
+            ),
+            measuredHeight.coerceAtLeast(
+                desiredHeight
+            )
         )
     }
 
