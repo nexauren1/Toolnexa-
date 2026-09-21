@@ -16,6 +16,7 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.HorizontalScrollView
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
@@ -108,11 +109,33 @@ class AudioToMidiActivity : Activity() {
     override fun onDestroy() {
         neuralEngine?.close()
         neuralEngine = null
+        previewPlayer.stop()
         executor.shutdownNow()
         super.onDestroy()
     }
 
-    private var neuralEngine: BasicPitchWebEngine? = null
+    private var neuralEngine: BasicPitchNativeEngine? = null
+
+    private var editorView:
+        AudioMidiPianoRollView? = null
+
+    private var editorNotes =
+        mutableListOf<NoteEvent>()
+
+    private var editorDurationSeconds =
+        0.0
+
+    private var editorBpm =
+        120
+
+    private var editorDirty =
+        false
+
+    private var midiWriteInProgress =
+        false
+
+    private val previewPlayer =
+        MidiPreviewPlayer()
 
     private fun showStage1() {
         buildBase("Audio → MIDI")
@@ -696,7 +719,7 @@ class AudioToMidiActivity : Activity() {
                 if (engine == "neural") {
                     I18n.t(
                         this,
-                        "O modelo é obtido pela internet quando necessário. O áudio permanece no aparelho."
+                        "O modelo Basic Pitch está incluído no aplicativo. A inferência neural acontece no próprio aparelho."
                     )
                 } else {
                     I18n.t(
@@ -718,180 +741,261 @@ class AudioToMidiActivity : Activity() {
         uri: Uri,
         options: ConversionOptions
     ) {
-        val range =
-            detectionRange(
-                options.profile
-            )
+        buildConversionScreen(
+            "neural"
+        )
 
-        val normalized =
-            (
-                options.sensitivity -
-                    20
-                ).coerceIn(
-                    0,
-                    60
-                ) / 60f
+        executor.execute {
+            try {
+                val decoded =
+                    AudioDecoder.decode(
+                        this,
+                        uri,
+                        MAX_SECONDS
+                    ) { progress ->
+                        runOnUiThread {
+                            if (!isFinishing) {
+                                progressBar?.progress =
+                                    (
+                                        progress * 0.14f
+                                    ).roundToInt()
 
-        val onsetThreshold =
-            (
-                0.68f -
-                    normalized *
-                    0.28f
-                ).coerceIn(
-                    0.35f,
-                    0.68f
-                )
-
-        val frameThreshold =
-            (
-                0.46f -
-                    normalized *
-                    0.20f
-                ).coerceIn(
-                    0.24f,
-                    0.46f
-                )
-
-        val minNoteFrames =
-            if (options.cleanup) {
-                5
-            } else {
-                3
-            }
-
-        neuralEngine?.close()
-
-        neuralEngine =
-            BasicPitchWebEngine(
-                activity = this,
-                audioUri = uri,
-                minMidi = range.first,
-                maxMidi = range.second,
-                onsetThreshold = onsetThreshold,
-                frameThreshold = frameThreshold,
-                minNoteLengthFrames = minNoteFrames,
-                maxSeconds = MAX_SECONDS,
-                onProgress = { progress, message ->
-                    if (!isFinishing) {
-                        progressBar?.progress =
-                            progress
-                        progressText?.text =
-                            message +
-                                " " +
-                                progress +
-                                "%"
-                    }
-                },
-                onSuccess = { notes, durationSeconds ->
-                    val engine = neuralEngine
-                    neuralEngine = null
-                    engine?.close()
-
-                    executor.execute {
-                        try {
-                            val baseNotes =
-                                notes.map { note ->
-                                    NoteEvent(
-                                        startSeconds =
-                                            note.startSeconds,
-                                        durationSeconds =
-                                            note.durationSeconds,
-                                        pitch =
-                                            note.pitch,
-                                        velocity =
-                                            (
-                                                35 +
-                                                    note.amplitude *
-                                                    83.0
-                                                ).roundToInt()
-                                                    .coerceIn(
-                                                        35,
-                                                        118
-                                                    ),
-                                        pitchBends =
-                                            note.pitchBends
-                                    )
-                                }
-
-                            val enhanced =
-                                enhanceNotes(
-                                    baseNotes,
-                                    options,
-                                    durationSeconds.coerceAtLeast(
-                                        MIN_SECONDS
-                                    )
-                                )
-
-                            if (enhanced.isEmpty()) {
-                                throw IllegalStateException(
+                                progressText?.text =
                                     I18n.t(
-                                        this@AudioToMidiActivity,
-                                        "A IA não encontrou notas musicais claras."
-                                    )
-                                )
-                            }
-
-                            val file =
-                                File(
-                                    cacheDir,
-                                    "toolnexa-audio-midi-" +
-                                        System.currentTimeMillis() +
-                                        ".mid"
-                                )
-
-                            MidiFileWriter.write(
-                                file,
-                                enhanced,
-                                options.bpm
-                            )
-
-                            resultFile = file
-
-                            runOnUiThread {
-                                if (!isFinishing) {
-                                    showResult(
-                                        file,
-                                        TranscriptionResult(
-                                            enhanced
-                                        ),
-                                        durationSeconds,
-                                        options,
-                                        "neural"
-                                    )
-                                }
-                            }
-                        } catch (error: Exception) {
-                            runOnUiThread {
-                                if (!isFinishing) {
-                                    Toast.makeText(
                                         this,
-                                        error.message
-                                            ?: "Não foi possível gerar o MIDI neural.",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-
-                                    startLocalConversion(
-                                        uri,
-                                        options,
-                                        true
-                                    )
-                                }
+                                        "A analisar áudio..."
+                                    ) +
+                                        " " +
+                                        progress +
+                                        "%"
                             }
                         }
                     }
-                },
-                onError = { message ->
-                    neuralEngine = null
 
+                val range =
+                    detectionRange(
+                        options.profile
+                    )
+
+                val normalized =
+                    (
+                        options.sensitivity -
+                            20
+                        ).coerceIn(
+                            0,
+                            60
+                        ) / 60f
+
+                val onsetThreshold =
+                    (
+                        0.68f -
+                            normalized *
+                            0.28f
+                        ).coerceIn(
+                            0.35f,
+                            0.68f
+                        )
+
+                val frameThreshold =
+                    (
+                        0.46f -
+                            normalized *
+                            0.20f
+                        ).coerceIn(
+                            0.24f,
+                            0.46f
+                        )
+
+                val minNoteFrames =
+                    if (
+                        options.cleanup
+                    ) {
+                        5
+                    } else {
+                        3
+                    }
+
+                neuralEngine?.close()
+
+                val engine =
+                    BasicPitchNativeEngine(
+                        context = this,
+                        minMidi = range.first,
+                        maxMidi = range.second,
+                        onsetThreshold = onsetThreshold,
+                        frameThreshold = frameThreshold,
+                        minNoteLengthFrames = minNoteFrames,
+                        maxSeconds = MAX_SECONDS,
+                        onProgress = {
+                            progress,
+                            message ->
+                            runOnUiThread {
+                                if (!isFinishing) {
+                                    progressBar?.progress =
+                                        progress
+
+                                    progressText?.text =
+                                        message +
+                                            " " +
+                                            progress +
+                                            "%"
+                                }
+                            }
+                        },
+                        onSuccess = {
+                            notes,
+                            durationSeconds ->
+                            neuralEngine = null
+
+                            executor.execute {
+                                try {
+                                    val baseNotes =
+                                        notes.map {
+                                            note ->
+                                            NoteEvent(
+                                                startSeconds =
+                                                    note.startSeconds,
+                                                durationSeconds =
+                                                    note.durationSeconds,
+                                                pitch =
+                                                    note.pitch,
+                                                velocity =
+                                                    (
+                                                        35 +
+                                                            note.amplitude *
+                                                            83.0
+                                                        ).roundToInt()
+                                                            .coerceIn(
+                                                                35,
+                                                                118
+                                                            ),
+                                                pitchBends =
+                                                    note.pitchBends
+                                            )
+                                        }
+
+                                    val enhanced =
+                                        enhanceNotes(
+                                            baseNotes,
+                                            options,
+                                            durationSeconds.coerceAtLeast(
+                                                MIN_SECONDS
+                                            )
+                                        )
+
+                                    if (
+                                        enhanced.isEmpty()
+                                    ) {
+                                        throw IllegalStateException(
+                                            I18n.t(
+                                                this@AudioToMidiActivity,
+                                                "A IA não encontrou notas musicais claras."
+                                            )
+                                        )
+                                    }
+
+                                    val file =
+                                        File(
+                                            cacheDir,
+                                            "toolnexa-audio-midi-" +
+                                                System.currentTimeMillis() +
+                                                ".mid"
+                                        )
+
+                                    MidiFileWriter.write(
+                                        file,
+                                        enhanced,
+                                        options.bpm
+                                    )
+
+                                    resultFile =
+                                        file
+
+                                    runOnUiThread {
+                                        if (!isFinishing) {
+                                            showResult(
+                                                file,
+                                                TranscriptionResult(
+                                                    enhanced
+                                                ),
+                                                durationSeconds,
+                                                options,
+                                                "neural"
+                                            )
+                                        }
+                                    }
+                                } catch (
+                                    error: Exception
+                                ) {
+                                    runOnUiThread {
+                                        if (
+                                            !isFinishing
+                                        ) {
+                                            Toast.makeText(
+                                                this,
+                                                error.message
+                                                    ?: "Não foi possível gerar o MIDI neural.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+
+                                            startLocalConversion(
+                                                uri,
+                                                options,
+                                                true
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        onError = {
+                            message ->
+                            neuralEngine =
+                                null
+
+                            if (
+                                !isFinishing
+                            ) {
+                                Toast.makeText(
+                                    this,
+                                    message +
+                                        " " +
+                                        I18n.t(
+                                            this,
+                                            "A usar o motor local como fallback."
+                                        ),
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                                startLocalConversion(
+                                    uri,
+                                    options,
+                                    true
+                                )
+                            }
+                        }
+                    )
+
+                neuralEngine =
+                    engine
+
+                engine.start(
+                    samples =
+                        decoded.samples,
+                    sampleRate =
+                        decoded.sampleRate,
+                    durationSeconds =
+                        decoded.durationSeconds
+                )
+            } catch (
+                error: Exception
+            ) {
+                runOnUiThread {
                     if (!isFinishing) {
                         Toast.makeText(
                             this,
-                            message +
-                                " " +
-                                I18n.t(
-                                    this,
-                                    "A usar o motor local como fallback."
-                                ),
+                            error.message
+                                ?: "Não foi possível preparar a IA neural.",
                             Toast.LENGTH_LONG
                         ).show()
 
@@ -902,9 +1006,8 @@ class AudioToMidiActivity : Activity() {
                         )
                     }
                 }
-            )
-
-        neuralEngine?.start()
+            }
+        }
     }
 
     private fun startLocalConversion(
@@ -1055,147 +1158,566 @@ class AudioToMidiActivity : Activity() {
     ) {
         buildBase("Resultado")
 
-        val hero = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(20), dp(20), dp(20))
-            background =
-                android.graphics.drawable.GradientDrawable().apply {
-                    setColor(success)
-                    cornerRadius = dp(24).toFloat()
-                }
-        }
+        editorNotes =
+            result.notes.map {
+                it.copy()
+            }.toMutableList()
 
-        hero.addView(TextView(this).apply {
-            text = "CONVERSÃO CONCLUÍDA"
-            textSize = 11.5f
-            setTextColor(android.graphics.Color.WHITE)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            letterSpacing = 0.08f
-        })
-        hero.addView(TextView(this).apply {
-            text = "MIDI pronto"
-            textSize = 29f
-            setTextColor(android.graphics.Color.WHITE)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(0, dp(7), 0, dp(3))
-        })
-        hero.addView(TextView(this).apply {
-            text = "O resultado está pronto para editar, guardar e partilhar."
-            textSize = 14.5f
-            setTextColor(android.graphics.Color.WHITE)
-        })
-        add(hero)
+        editorDurationSeconds =
+            durationSeconds.coerceAtLeast(
+                MIN_SECONDS
+            )
 
-        val stats = card()
-        stats.addView(title("Resumo da análise", 17f))
-        stats.addView(
-            bodyText(
-                I18n.t(this, "Notas") + ": " +
-                    result.notes.size +
-                    "   •   " +
-                    I18n.t(this, "Duração") + ": " +
-                    formatDuration(durationSeconds)
-            ).apply { setPadding(0, dp(7), 0, 0) }
+        editorBpm =
+            options.bpm
+
+        editorDirty =
+            false
+
+        midiWriteInProgress =
+            false
+
+        val hero =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.VERTICAL
+
+                setPadding(
+                    dp(20),
+                    dp(20),
+                    dp(20),
+                    dp(20)
+                )
+
+                background =
+                    android.graphics.drawable.GradientDrawable().apply {
+                        setColor(
+                            success
+                        )
+                        cornerRadius =
+                            dp(24).toFloat()
+                    }
+            }
+
+        hero.addView(
+            TextView(this).apply {
+                text =
+                    "CONVERSÃO CONCLUÍDA"
+
+                textSize =
+                    11.5f
+
+                setTextColor(
+                    android.graphics.Color.WHITE
+                )
+
+                typeface =
+                    android.graphics.Typeface.DEFAULT_BOLD
+
+                letterSpacing =
+                    0.08f
+            }
         )
 
-        val pitches = result.notes.map { it.pitch }
-        if (pitches.isNotEmpty()) {
+        hero.addView(
+            TextView(this).apply {
+                text =
+                    "MIDI pronto para editar"
+
+                textSize =
+                    29f
+
+                setTextColor(
+                    android.graphics.Color.WHITE
+                )
+
+                typeface =
+                    android.graphics.Typeface.DEFAULT_BOLD
+
+                setPadding(
+                    0,
+                    dp(7),
+                    0,
+                    dp(3)
+                )
+            }
+        )
+
+        hero.addView(
+            TextView(this).apply {
+                text =
+                    "Agora pode ouvir e ajustar as notas antes de exportar."
+                textSize =
+                    14.5f
+                setTextColor(
+                    android.graphics.Color.WHITE
+                )
+            }
+        )
+
+        add(hero)
+
+        val stats =
+            card()
+
+        stats.addView(
+            title(
+                "Resumo da análise",
+                17f
+            )
+        )
+
+        val summary =
+            bodyText(
+                I18n.t(
+                    this,
+                    "Notas"
+                ) +
+                    ": " +
+                    editorNotes.size +
+                    "   •   " +
+                    I18n.t(
+                        this,
+                        "Duração"
+                    ) +
+                    ": " +
+                    formatDuration(
+                        editorDurationSeconds
+                    )
+            ).apply {
+                tag =
+                    "editor_summary"
+                setPadding(
+                    0,
+                    dp(7),
+                    0,
+                    0
+                )
+            }
+
+        stats.addView(
+            summary
+        )
+
+        val pitches =
+            editorNotes.map {
+                it.pitch
+            }
+
+        if (
+            pitches.isNotEmpty()
+        ) {
             stats.addView(
                 bodyText(
-                    I18n.t(this, "Extensão") + ": " +
-                        noteName(pitches.minOrNull() ?: 0) +
+                    I18n.t(
+                        this,
+                        "Extensão"
+                    ) +
+                        ": " +
+                        noteName(
+                            pitches.minOrNull()
+                                ?: 0
+                        ) +
                         " – " +
-                        noteName(pitches.maxOrNull() ?: 0)
-                ).apply { setPadding(0, dp(5), 0, 0) }
+                        noteName(
+                            pitches.maxOrNull()
+                                ?: 0
+                        )
+                ).apply {
+                    setPadding(
+                        0,
+                        dp(5),
+                        0,
+                        0
+                    )
+                }
             )
         }
 
         stats.addView(
             bodyText(
-                I18n.t(this, "Tonalidade estimada") + ": " +
-                    estimateKey(result.notes) +
+                I18n.t(
+                    this,
+                    "Tonalidade estimada"
+                ) +
+                    ": " +
+                    estimateKey(
+                        editorNotes
+                    ) +
                     " • " +
-                    I18n.t(this, "BPM") + ": " +
-                    options.bpm
-            ).apply { setPadding(0, dp(5), 0, 0) }
+                    I18n.t(
+                        this,
+                        "BPM"
+                    ) +
+                    ": " +
+                    editorBpm
+            ).apply {
+                setPadding(
+                    0,
+                    dp(5),
+                    0,
+                    0
+                )
+            }
         )
 
         stats.addView(
             bodyText(
-                I18n.t(this, "Motor") + ": " +
-                    engineLabel(engineName) +
-                    " • " +
-                    I18n.t(this, "Pitch bends") +
+                I18n.t(
+                    this,
+                    "Motor"
+                ) +
                     ": " +
-                    result.notes.count {
+                    engineLabel(
+                        engineName
+                    ) +
+                    " • " +
+                    I18n.t(
+                        this,
+                        "Pitch bends"
+                    ) +
+                    ": " +
+                    editorNotes.count {
                         it.pitchBends.isNotEmpty()
                     }
             ).apply {
-                setPadding(0, dp(5), 0, 0)
+                setPadding(
+                    0,
+                    dp(5),
+                    0,
+                    0
+                )
             }
         )
 
-        stats.addView(
-            bodyText(
-                I18n.t(this, "Perfil") + ": " +
-                    profileLabel(options.profile) +
-                    " • " +
-                    I18n.t(this, "Quantização") + ": " +
-                    quantizeLabel(options.quantizeGrid) +
-                    " • " +
-                    I18n.t(this, "Transposição") + ": " +
-                    options.transposeSemitones.toSignedString() +
-                    " st"
-            ).apply { setPadding(0, dp(5), 0, 0) }
-        )
         add(stats)
 
-        val previewCard = card()
-        previewCard.addView(title("Prévia MIDI", 17f))
-        previewCard.addView(
-            MidiPreviewView(
-                this,
-                result.notes,
-                durationSeconds,
-                audioAccent,
-                audioAccent2
-            ).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    -1,
-                    dp(190)
-                ).apply {
-                    topMargin = dp(12)
-                }
-            }
+        val editorCard =
+            card()
+
+        editorCard.addView(
+            title(
+                "Piano Roll",
+                19f
+            )
         )
-        previewCard.addView(
+
+        editorCard.addView(
             bodyText(
-                "A prévia mostra a posição e a altura das notas detetadas."
-            ).apply { setPadding(0, dp(8), 0, 0) }
+                "Toque numa nota para selecionar. Arraste para mudar o tempo e a altura; arraste pela extremidade para mudar a duração."
+            ).apply {
+                setPadding(
+                    0,
+                    dp(6),
+                    0,
+                    dp(10)
+                )
+            }
         )
-        add(previewCard)
+
+        val horizontal =
+            HorizontalScrollView(
+                this
+            ).apply {
+                isHorizontalScrollBarEnabled =
+                    true
+                overScrollMode =
+                    View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            }
+
+        val roll =
+            AudioMidiPianoRollView(
+                this,
+                editorDurationSeconds,
+                editorNotes
+            ) {
+                changed ->
+                editorNotes =
+                    changed.map {
+                        NoteEvent(
+                            startSeconds =
+                                it.startSeconds,
+                            durationSeconds =
+                                it.durationSeconds,
+                            pitch =
+                                it.pitch,
+                            velocity =
+                                it.velocity,
+                            pitchBends =
+                                it.pitchBends,
+                            channel =
+                                it.channel
+                        )
+                    }.toMutableList()
+
+                editorDirty =
+                    true
+
+                summary.text =
+                    I18n.t(
+                        this@AudioToMidiActivity,
+                        "Notas"
+                    ) +
+                        ": " +
+                        editorNotes.size +
+                        "   •   " +
+                        I18n.t(
+                            this@AudioToMidiActivity,
+                            "Duração"
+                        ) +
+                        ": " +
+                        formatDuration(
+                            editorDurationSeconds
+                        )
+            }
+
+        editorView =
+            roll
+
+        val rollWidth =
+            max(
+                dp(900),
+                (
+                    dp(46) +
+                        editorDurationSeconds *
+                        72f
+                    ).roundToInt()
+            )
+
+        horizontal.addView(
+            roll,
+            ViewGroup.LayoutParams(
+                rollWidth,
+                dp(430)
+            )
+        )
+
+        editorCard.addView(
+            horizontal,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(430)
+            )
+        )
+
+        val editorActions =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.HORIZONTAL
+                gravity =
+                    Gravity.CENTER_VERTICAL
+            }
+
+        fun editorAction(
+            label: String,
+            onClick: () -> Unit
+        ): Button {
+            return button(
+                label,
+                false
+            ).apply {
+                textSize =
+                    12.5f
+                minHeight =
+                    dp(44)
+                setOnClickListener {
+                    onClick()
+                }
+            }
+        }
+
+        editorActions.addView(
+            editorAction(
+                "Adicionar"
+            ) {
+                roll.addNote(
+                    startSeconds =
+                        (
+                            roll.selectedNote()
+                                ?.let {
+                                    it.startSeconds +
+                                        it.durationSeconds
+                                }
+                                ?: 0.0
+                            ).coerceAtMost(
+                                max(
+                                    0.0,
+                                    editorDurationSeconds -
+                                        0.5
+                                )
+                            ),
+                    pitch =
+                        roll.selectedNote()
+                            ?.pitch
+                            ?: 60,
+                    durationSeconds =
+                        min(
+                            0.5,
+                            editorDurationSeconds
+                        )
+                },
+                LinearLayout.LayoutParams(
+                    0,
+                    dp(44),
+                    1f
+                ).apply {
+                    rightMargin =
+                        dp(6)
+                }
+            )
+        )
+
+        editorActions.addView(
+            editorAction(
+                "Duplicar"
+            ) {
+                roll.duplicateSelected()
+            },
+            LinearLayout.LayoutParams(
+                0,
+                dp(44),
+                1f
+            ).apply {
+                rightMargin =
+                    dp(6)
+            }
+        )
+
+        editorActions.addView(
+            editorAction(
+                "Apagar"
+            ) {
+                roll.deleteSelected()
+            },
+            LinearLayout.LayoutParams(
+                0,
+                dp(44),
+                1f
+            )
+        )
+
+        editorCard.addView(
+            editorActions
+        )
+
+        val previewActions =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.HORIZONTAL
+                gravity =
+                    Gravity.CENTER_VERTICAL
+                setPadding(
+                    0,
+                    dp(10),
+                    0,
+                    0
+                )
+            }
+
+        previewActions.addView(
+            button(
+                "▶ Reproduzir prévia",
+                true
+            ).apply {
+                textSize =
+                    12.5f
+
+                setOnClickListener {
+                    previewPlayer.play(
+                        editorNotes.map {
+                            AudioMidiPianoRollView.Note(
+                                it.startSeconds,
+                                it.durationSeconds,
+                                it.pitch,
+                                it.velocity,
+                                it.pitchBends,
+                                it.channel
+                            )
+                        },
+                        editorDurationSeconds
+                    )
+                }
+            },
+            LinearLayout.LayoutParams(
+                0,
+                dp(48),
+                1f
+            ).apply {
+                rightMargin =
+                    dp(6)
+            }
+        )
+
+        previewActions.addView(
+            button(
+                "■ Parar",
+                false
+            ).apply {
+                textSize =
+                    12.5f
+                setOnClickListener {
+                    previewPlayer.stop()
+                }
+            },
+            LinearLayout.LayoutParams(
+                0,
+                dp(48),
+                1f
+            )
+        )
+
+        editorCard.addView(
+            previewActions
+        )
+
+        add(editorCard)
 
         add(
-            button("Exportar MIDI", true).apply {
+            button(
+                "Exportar MIDI",
+                true
+            ).apply {
                 setOnClickListener {
-                    exportMidi(file)
+                    exportEditedMidi()
                 }
             }
         )
 
         add(
-            button("Guardar no histórico", false).apply {
+            button(
+                "Guardar no histórico",
+                false
+            ).apply {
                 setOnClickListener {
-                    saveMidi(file)
+                    saveEditedMidi()
                 }
             }
         )
 
         add(
-            button("Converter outro áudio", false).apply {
+            button(
+                "Partilhar MIDI",
+                false
+            ).apply {
                 setOnClickListener {
-                    selectedUri = null
-                    resultFile = null
+                    shareEditedMidi()
+                }
+            }
+        )
+
+        add(
+            button(
+                "Converter outro áudio",
+                false
+            ).apply {
+                setOnClickListener {
+                    previewPlayer.stop()
+                    selectedUri =
+                        null
+                    resultFile =
+                        null
+                    editorView =
+                        null
                     showStage1()
                 }
             }
@@ -1203,18 +1725,8 @@ class AudioToMidiActivity : Activity() {
 
         add(
             infoCard(
-                "MOTOR ATUAL",
-                if (engineName == "neural") {
-                    I18n.t(
-                        this,
-                        "O resultado foi criado pelo motor neural Basic Pitch, com transcrição polifónica e informação de pitch bend. A análise neural exige acesso à internet para obter o modelo."
-                    )
-                } else {
-                    I18n.t(
-                        this,
-                        "O resultado foi criado pelo motor local de análise espectral. O modo neural pode ser usado quando o modelo estiver disponível."
-                    )
-                }
+                "EDIÇÃO ANTES DA EXPORTAÇÃO",
+                "A conversão gera um rascunho MIDI no aparelho. Pode ouvir a prévia e ajustar as notas no piano roll antes de criar o ficheiro final."
             )
         )
 
@@ -1256,6 +1768,120 @@ class AudioToMidiActivity : Activity() {
                 "Não foi possível abrir o exportador.",
                 Toast.LENGTH_SHORT
             ).show()
+        }
+    }
+
+    private fun exportEditedMidi() {
+        prepareEditedMidi { file ->
+            exportMidi(
+                file
+            )
+        }
+    }
+
+    private fun saveEditedMidi() {
+        prepareEditedMidi { file ->
+            saveMidi(
+                file
+            )
+        }
+    }
+
+    private fun shareEditedMidi() {
+        prepareEditedMidi { file ->
+            shareMidi(
+                file
+            )
+        }
+    }
+
+    private fun prepareEditedMidi(
+        onReady: (File) -> Unit
+    ) {
+        if (midiWriteInProgress) {
+            Toast.makeText(
+                this,
+                "A preparar o MIDI...",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        val existing =
+            resultFile
+
+        if (
+            !editorDirty &&
+            existing != null &&
+            existing.exists()
+        ) {
+            onReady(
+                existing
+            )
+            return
+        }
+
+        midiWriteInProgress =
+            true
+
+        val notes =
+            editorNotes.map {
+                it.copy()
+            }
+
+        val duration =
+            editorDurationSeconds
+
+        val outputName =
+            selectedName
+
+        executor.execute {
+            try {
+                val file =
+                    File(
+                        cacheDir,
+                        "toolnexa-audio-midi-edit-" +
+                            System.currentTimeMillis() +
+                            ".mid"
+                    )
+
+                MidiFileWriter.write(
+                    file,
+                    notes,
+                    editorBpm
+                )
+
+                resultFile =
+                    file
+
+                editorDirty =
+                    false
+
+                runOnUiThread {
+                    midiWriteInProgress =
+                        false
+
+                    if (!isFinishing) {
+                        onReady(
+                            file
+                        )
+                    }
+                }
+            } catch (
+                error: Exception
+            ) {
+                runOnUiThread {
+                    midiWriteInProgress =
+                        false
+
+                    Toast.makeText(
+                        this,
+                        error.message
+                            ?: "Não foi possível preparar o MIDI editado.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         }
     }
 
