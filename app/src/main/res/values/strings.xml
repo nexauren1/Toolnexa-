@@ -26,4 +26,6 @@
         <item>Nenhum problema específico</item><item>A aplicação fecha / falha</item><item>Tela branca</item><item>Função não funciona</item><item>IA não funciona</item><item>Resultado incorreto</item><item>Não consigo salvar ou partilhar</item><item>Problema de login / conta</item><item>Problema de pagamento / plano</item><item>Lento ou bloqueia</item><item>Outro</item>
     </string-array>
     <string name="feature_business_title">ToolNexa Business</string>
+    <string name="feature_image_title">ToolNexa Image</string>
+    <string name="feature_audio_title">ToolNexa Audio</string>
 </resources>
