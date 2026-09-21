@@ -453,7 +453,13 @@ class BasicPitchNativeEngine(
                         outputs[index]!!
                     )
 
-                if (freqs == 264) {
+                if (
+                    freqs == 264 ||
+                    roleForTensor(
+                        tensor.name(),
+                        freqs
+                    ) == Role.CONTOUR
+                ) {
                     contourRows.addMatrix(
                         values,
                         frames,
@@ -500,7 +506,10 @@ class BasicPitchNativeEngine(
                         name.contains(
                             "statefulpartitionedcall:0"
                         ) ||
-                            name == "identity" -> {
+                            name == "identity" ||
+                            name.contains(
+                                "contour"
+                            ) -> {
                             Role.CONTOUR
                         }
 
@@ -677,6 +686,59 @@ class BasicPitchNativeEngine(
             finalNotes,
             durationSeconds
         )
+    }
+
+    private fun roleForTensor(
+        name: String,
+        frequencyCount: Int
+    ): Role? {
+        if (
+            frequencyCount != 264 &&
+            frequencyCount != 88
+        ) {
+            return null
+        }
+
+        val normalized =
+            name.lowercase()
+
+        return when {
+            normalized.contains(
+                "statefulpartitionedcall:0"
+            ) ||
+                normalized == "identity" ||
+                normalized.contains(
+                    "contour"
+                ) -> {
+                Role.CONTOUR
+            }
+
+            normalized.contains(
+                "statefulpartitionedcall:1"
+            ) ||
+                normalized.contains(
+                    "identity_1"
+                ) ||
+                normalized.contains(
+                    "note"
+                ) -> {
+                Role.NOTE
+            }
+
+            normalized.contains(
+                "statefulpartitionedcall:2"
+            ) ||
+                normalized.contains(
+                    "identity_2"
+                ) ||
+                normalized.contains(
+                    "onset"
+                ) -> {
+                Role.ONSET
+            }
+
+            else -> null
+        }
     }
 
     private fun decodeNotes(
