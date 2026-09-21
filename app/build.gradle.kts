@@ -19,10 +19,6 @@ android {
         buildConfig = true
     }
 
-    androidResources {
-        noCompress += "tflite"
-    }
-
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -40,34 +36,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-}
-
-val basicPitchModel =
-    file("src/main/assets/basic_pitch_nmp.tflite")
-
-tasks.register("ensureBasicPitchModel") {
-    outputs.file(basicPitchModel)
-
-    doLast {
-        if (
-            !basicPitchModel.exists() ||
-            basicPitchModel.length() < 100000L
-        ) {
-            basicPitchModel.parentFile.mkdirs()
-
-            java.net.URI(
-                "https://raw.githubusercontent.com/spotify/basic-pitch/main/basic_pitch/saved_models/icassp_2022/nmp.tflite"
-            ).toURL().openStream().use { input ->
-                basicPitchModel.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-        }
-    }
-}
-
-tasks.named("preBuild").configure {
-    dependsOn("ensureBasicPitchModel")
 }
 
 dependencies {
