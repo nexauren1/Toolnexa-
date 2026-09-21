@@ -2175,7 +2175,8 @@ class AudioToMidiActivity : Activity() {
         val durationSeconds: Double,
         val pitch: Int,
         val velocity: Int,
-        val pitchBends: List<Int> = emptyList()
+        val pitchBends: List<Int> = emptyList(),
+        val channel: Int = 0
     )
 
     private data class TranscriptionResult(
@@ -3911,6 +3912,11 @@ class AudioToMidiActivity : Activity() {
     private object MidiFileWriter {
 
         private const val PPQ = 480
+        private const val BEND_RANGE_SEMITONES = 2.0
+
+        private val midiChannels =
+            (0..15)
+                .filter { it != 9 }
 
         fun write(
             file: File,
@@ -3923,6 +3929,11 @@ class AudioToMidiActivity : Activity() {
                     300
                 )
 
+            val prepared =
+                assignChannels(
+                    notes
+                )
+
             val tempoUs =
                 (
                     60_000_000.0 /
@@ -3931,13 +3942,15 @@ class AudioToMidiActivity : Activity() {
                         1,
                         0xFFFFFF
                     )
+
             val events =
                 mutableListOf<MidiEvent>()
 
             events.add(
                 MidiEvent(
-                    0,
-                    byteArrayOf(
+                    tick = 0,
+                    priority = 0,
+                    data = byteArrayOf(
                         0xFF.toByte(),
                         0x51.toByte(),
                         0x03,
@@ -3952,17 +3965,47 @@ class AudioToMidiActivity : Activity() {
                 )
             )
 
-            events.add(
-                MidiEvent(
-                    0,
-                    byteArrayOf(
-                        0xC0.toByte(),
-                        0
+            val bendChannels =
+                prepared
+                    .filter {
+                        it.pitchBends.isNotEmpty()
+                    }
+                    .map {
+                        it.channel
+                    }
+                    .distinct()
+
+            for (channel in bendChannels) {
+                addPitchBendRangeEvents(
+                    events,
+                    channel
+                )
+            }
+
+            val usedChannels =
+                prepared
+                    .map {
+                        it.channel
+                    }
+                    .distinct()
+
+            for (channel in usedChannels) {
+                events.add(
+                    MidiEvent(
+                        tick = 0,
+                        priority = 1,
+                        data = byteArrayOf(
+                            (
+                                0xC0 or
+                                    channel
+                                ).toByte(),
+                            0
+                        )
                     )
                 )
-            )
+            }
 
-            for (note in notes) {
+            for (note in prepared) {
                 val startTick =
                     max(
                         0L,
@@ -3971,7 +4014,8 @@ class AudioToMidiActivity : Activity() {
                                 safeBpm.toDouble() /
                                 60.0 *
                                 PPQ
-                            ).roundToInt()
+                            )
+                                .roundToInt()
                                 .toLong()
                     )
 
@@ -3991,11 +4035,26 @@ class AudioToMidiActivity : Activity() {
                                 .toLong()
                     )
 
+                if (
+                    note.pitchBends.isNotEmpty()
+                ) {
+                    addPitchBendEvents(
+                        events,
+                        note,
+                        startTick,
+                        endTick
+                    )
+                }
+
                 events.add(
                     MidiEvent(
-                        startTick,
-                        byteArrayOf(
-                            0x90.toByte(),
+                        tick = startTick,
+                        priority = 4,
+                        data = byteArrayOf(
+                            (
+                                0x90 or
+                                    note.channel
+                                ).toByte(),
                             note.pitch.toByte(),
                             note.velocity.toByte()
                         )
@@ -4004,14 +4063,34 @@ class AudioToMidiActivity : Activity() {
 
                 events.add(
                     MidiEvent(
-                        endTick,
-                        byteArrayOf(
-                            0x80.toByte(),
+                        tick = endTick,
+                        priority = 2,
+                        data = byteArrayOf(
+                            (
+                                0x80 or
+                                    note.channel
+                                ).toByte(),
                             note.pitch.toByte(),
                             0
                         )
                     )
                 )
+
+                if (
+                    note.pitchBends.isNotEmpty()
+                ) {
+                    events.add(
+                        MidiEvent(
+                            tick = endTick,
+                            priority = 3,
+                            data =
+                                pitchBendData(
+                                    note.channel,
+                                    0.0
+                                )
+                        )
+                    )
+                }
             }
 
             val sorted =
@@ -4019,19 +4098,7 @@ class AudioToMidiActivity : Activity() {
                     compareBy<MidiEvent> {
                         it.tick
                     }.thenBy {
-                        if (
-                            (
-                                it.data.firstOrNull()
-                                    ?.toInt()
-                                    ?.and(
-                                        0xF0
-                                    )
-                            ) == 0x80
-                        ) {
-                            0
-                        } else {
-                            1
-                        }
+                        it.priority
                     }
                 )
 
@@ -4063,21 +4130,10 @@ class AudioToMidiActivity : Activity() {
                     event.tick
             }
 
-            track.write(
-                0
-            )
-
-            track.write(
-                0xFF
-            )
-
-            track.write(
-                0x2F
-            )
-
-            track.write(
-                0
-            )
+            track.write(0)
+            track.write(0xFF)
+            track.write(0x2F)
+            track.write(0)
 
             val trackBytes =
                 track.toByteArray()
@@ -4095,27 +4151,19 @@ class AudioToMidiActivity : Activity() {
                 )
 
                 output.write(
-                    intToBytes(
-                        6
-                    )
+                    intToBytes(6)
                 )
 
                 output.write(
-                    shortToBytes(
-                        0
-                    )
+                    shortToBytes(0)
                 )
 
                 output.write(
-                    shortToBytes(
-                        1
-                    )
+                    shortToBytes(1)
                 )
 
                 output.write(
-                    shortToBytes(
-                        PPQ
-                    )
+                    shortToBytes(PPQ)
                 )
 
                 output.write(
@@ -4139,8 +4187,240 @@ class AudioToMidiActivity : Activity() {
             }
         }
 
+        private fun assignChannels(
+            notes: List<NoteEvent>
+        ): List<NoteEvent> {
+            if (notes.isEmpty()) {
+                return emptyList()
+            }
+
+            data class Active(
+                val channel: Int,
+                val endSeconds: Double
+            )
+
+            val active =
+                mutableListOf<Active>()
+
+            return notes
+                .sortedBy {
+                    it.startSeconds
+                }
+                .map { note ->
+                    active.removeAll {
+                        it.endSeconds <=
+                            note.startSeconds +
+                                0.0005
+                    }
+
+                    val used =
+                        active
+                            .map {
+                                it.channel
+                            }
+                            .toSet()
+
+                    val channel =
+                        midiChannels.firstOrNull {
+                            !used.contains(it)
+                        } ?: midiChannels[
+                            active.size %
+                                midiChannels.size
+                        ]
+
+                    active.add(
+                        Active(
+                            channel,
+                            note.startSeconds +
+                                note.durationSeconds
+                        )
+                    )
+
+                    note.copy(
+                        channel = channel
+                    )
+                }
+        }
+
+        private fun addPitchBendRangeEvents(
+            events: MutableList<MidiEvent>,
+            channel: Int
+        ) {
+            val status =
+                (
+                    0xB0 or
+                        channel
+                    ).toByte()
+
+            fun cc(
+                number: Int,
+                value: Int
+            ) {
+                events.add(
+                    MidiEvent(
+                        tick = 0,
+                        priority = 0,
+                        data = byteArrayOf(
+                            status,
+                            number.toByte(),
+                            value.toByte()
+                        )
+                    )
+                )
+            }
+
+            cc(101, 0)
+            cc(100, 0)
+            cc(6, BEND_RANGE_SEMITONES.roundToInt())
+            cc(38, 0)
+            cc(101, 127)
+            cc(100, 127)
+        }
+
+        private fun addPitchBendEvents(
+            events: MutableList<MidiEvent>,
+            note: NoteEvent,
+            startTick: Long,
+            endTick: Long
+        ) {
+            val bends =
+                simplifyBends(
+                    note.pitchBends
+                )
+
+            if (bends.isEmpty()) {
+                return
+            }
+
+            val span =
+                max(
+                    1L,
+                    endTick -
+                        startTick
+                )
+
+            bends.forEachIndexed { index, value ->
+                val position =
+                    if (bends.size == 1) {
+                        0.0
+                    } else {
+                        index.toDouble() /
+                            (
+                                bends.lastIndex
+                            ).toDouble()
+                    }
+
+                val tick =
+                    startTick +
+                        (
+                            span.toDouble() *
+                                position
+                            ).roundToInt()
+                                .toLong()
+
+                val semitones =
+                    value.toDouble() /
+                        3.0
+
+                events.add(
+                    MidiEvent(
+                        tick = tick,
+                        priority = 3,
+                        data =
+                            pitchBendData(
+                                note.channel,
+                                semitones
+                            )
+                    )
+                )
+            }
+        }
+
+        private fun simplifyBends(
+            input: List<Int>
+        ): List<Int> {
+            if (input.isEmpty()) {
+                return emptyList()
+            }
+
+            val maxPoints = 32
+
+            if (
+                input.size <=
+                    maxPoints
+            ) {
+                return input
+            }
+
+            return List(maxPoints) { index ->
+                val sourceIndex =
+                    (
+                        index.toDouble() /
+                            (
+                                maxPoints - 1
+                                ).toDouble()
+                        *
+                        (
+                            input.lastIndex
+                                ).toDouble()
+                    )
+                        .roundToInt()
+                        .coerceIn(
+                            0,
+                            input.lastIndex
+                        )
+
+                input[sourceIndex]
+            }
+        }
+
+        private fun pitchBendData(
+            channel: Int,
+            semitones: Double
+        ): ByteArray {
+            val normalized =
+                (
+                    semitones /
+                        BEND_RANGE_SEMITONES
+                    ).coerceIn(
+                        -1.0,
+                        1.0
+                    )
+
+            val value =
+                (
+                    8192.0 +
+                        normalized *
+                        8191.0
+                    )
+                    .roundToInt()
+                    .coerceIn(
+                        0,
+                        16383
+                    )
+
+            return byteArrayOf(
+                (
+                    0xE0 or
+                        channel
+                    ).toByte(),
+                (
+                    value and
+                        0x7F
+                    ).toByte(),
+                (
+                    (
+                        value shr
+                            7
+                        ) and
+                        0x7F
+                    ).toByte()
+            )
+        }
+
         private data class MidiEvent(
             val tick: Long,
+            val priority: Int,
             val data: ByteArray
         )
 
