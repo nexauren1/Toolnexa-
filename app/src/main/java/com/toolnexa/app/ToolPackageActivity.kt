@@ -243,6 +243,10 @@ class ToolPackageActivity : Activity() {
                         "category",
                         packageInfo.category
                     )
+                    putExtra(
+                        "skip_package",
+                        true
+                    )
                 }
             }
 
