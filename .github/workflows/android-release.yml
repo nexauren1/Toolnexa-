@@ -16,7 +16,7 @@ permissions:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       TOOLNEXA_KEYSTORE_BASE64: ${{ secrets.TOOLNEXA_KEYSTORE_BASE64 }}
       TOOLNEXA_STORE_PASSWORD: ${{ secrets.TOOLNEXA_STORE_PASSWORD }}
