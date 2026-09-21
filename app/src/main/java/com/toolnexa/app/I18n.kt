@@ -1078,7 +1078,9 @@ object I18n {
         val decor =
             try {
                 context
-                    .let { it as android.app.Activity }
+                    .let {
+                        it as android.app.Activity
+                    }
                     .window
                     .decorView
             } catch (_: Exception) {
@@ -1097,69 +1099,118 @@ object I18n {
         context: Context,
         root: View
     ) {
-        localizeView(
+        val textViews =
+            ArrayList<TextView>()
+
+        collectTextViews(
+            root,
+            textViews
+        )
+
+        localizeTextViewsInBatches(
             context,
-            root
+            textViews,
+            0
         )
     }
 
-    private fun localizeView(
-        context: Context,
-        view: View
+    private fun collectTextViews(
+        view: View,
+        output: MutableList<TextView>
     ) {
         if (view is TextView) {
-            val current =
-                view.text
-                    ?.toString()
-                    .orEmpty()
-
-            if (
-                current.isNotBlank() &&
-                !current.contains(
-                    "\$"
-                )
-            ) {
-                view.text =
-                    t(
-                        context,
-                        current
-                    )
-            }
-
-            val hint =
-                view.hint
-                    ?.toString()
-                    .orEmpty()
-
-            if (hint.isNotBlank()) {
-                view.hint =
-                    t(
-                        context,
-                        hint
-                    )
-            }
-
-            val description =
-                view.contentDescription
-                    ?.toString()
-                    .orEmpty()
-
-            if (description.isNotBlank()) {
-                view.contentDescription =
-                    t(
-                        context,
-                        description
-                    )
-            }
+            output.add(view)
         }
 
         if (view is ViewGroup) {
             for (i in 0 until view.childCount) {
-                localizeView(
-                    context,
-                    view.getChildAt(i)
+                collectTextViews(
+                    view.getChildAt(i),
+                    output
                 )
             }
+        }
+    }
+
+    private fun localizeTextViewsInBatches(
+        context: Context,
+        views: List<TextView>,
+        start: Int
+    ) {
+        if (start >= views.size) {
+            return
+        }
+
+        val end =
+            minOf(
+                start + 18,
+                views.size
+            )
+
+        for (index in start until end) {
+            localizeTextView(
+                context,
+                views[index]
+            )
+        }
+
+        if (end < views.size) {
+            views[end - 1].post {
+                localizeTextViewsInBatches(
+                    context,
+                    views,
+                    end
+                )
+            }
+        }
+    }
+
+    private fun localizeTextView(
+        context: Context,
+        view: TextView
+    ) {
+        val current =
+            view.text
+                ?.toString()
+                .orEmpty()
+
+        if (
+            current.isNotBlank() &&
+            !current.contains(
+                "\$"
+            )
+        ) {
+            view.text =
+                t(
+                    context,
+                    current
+                )
+        }
+
+        val hint =
+            view.hint
+                ?.toString()
+                .orEmpty()
+
+        if (hint.isNotBlank()) {
+            view.hint =
+                t(
+                    context,
+                    hint
+                )
+        }
+
+        val description =
+            view.contentDescription
+                ?.toString()
+                .orEmpty()
+
+        if (description.isNotBlank()) {
+            view.contentDescription =
+                t(
+                    context,
+                    description
+                )
         }
     }
 
