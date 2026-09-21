@@ -741,6 +741,16 @@ class CategoryActivity : Activity() {
                         BackgroundRemoverActivity::class.java
                     )
                 )
+            } else if (
+                tool.name ==
+                    "Audio to MIDI"
+            ) {
+                startActivity(
+                    Intent(
+                        this,
+                        AudioToMidiActivity::class.java
+                    )
+                )
             } else {
                 startActivity(
                     Intent(
