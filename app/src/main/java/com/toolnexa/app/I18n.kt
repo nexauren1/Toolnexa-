@@ -1367,7 +1367,9 @@ object I18n {
                 ?: value
         }
 
-$dynMarker
+        Regex(
+            """^Versão (.+) • conta protegida • Analytics ativo$"""
+        ).matchEntire(value)?.let { match ->
             val v = match.groupValues[1]
             return when (language) {
                 "en" -> "Version $v • protected account • Analytics active"
