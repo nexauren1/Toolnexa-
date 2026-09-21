@@ -140,7 +140,7 @@ class AudioToMidiActivity : Activity() {
         })
 
         hero.addView(TextView(this).apply {
-            text = "Transforme melodias gravadas em MIDI editável, com controlo de BPM, afinação, quantização e limpeza."
+            text = "Transforme melodias gravadas em MIDI editável, com controlo de BPM, transposição, quantização e limpeza."
             textSize = 14.5f
             setTextColor(android.graphics.Color.WHITE)
             setLineSpacing(0f, 1.15f)
@@ -1729,71 +1729,6 @@ class AudioToMidiActivity : Activity() {
         )
     }
 
-    private fun prepareSamples(
-        source: FloatArray
-    ): FloatArray {
-        if (source.isEmpty()) return source
-
-        var mean = 0.0
-
-        for (sample in source) {
-            mean += sample.toDouble()
-        }
-
-        mean /=
-            source.size.toDouble()
-
-        val cleaned =
-            FloatArray(
-                source.size
-            )
-
-        var peak = 0.0
-
-        for (i in source.indices) {
-            val value =
-                (
-                    source[i].toDouble() -
-                        mean
-                    ).coerceIn(
-                        -1.0,
-                        1.0
-                    )
-
-            cleaned[i] =
-                value.toFloat()
-
-            peak =
-                max(
-                    peak,
-                    abs(value)
-                )
-        }
-
-        if (peak <= 0.0001) {
-            return cleaned
-        }
-
-        val gain =
-            min(
-                1.85,
-                0.92 / peak
-            )
-
-        for (i in cleaned.indices) {
-            cleaned[i] =
-                (
-                    cleaned[i] *
-                        gain.toFloat()
-                    ).coerceIn(
-                        -1f,
-                        1f
-                    )
-        }
-
-        return cleaned
-    }
-
     private fun queryDisplayName(
         resolver: ContentResolver,
         uri: Uri
@@ -2453,6 +2388,71 @@ class AudioToMidiActivity : Activity() {
                 } catch (_: Exception) {
                 }
             }
+        }
+
+        private fun prepareSamples(
+            source: FloatArray
+        ): FloatArray {
+            if (source.isEmpty()) return source
+
+            var mean = 0.0
+
+            for (sample in source) {
+                mean += sample.toDouble()
+            }
+
+            mean /=
+                source.size.toDouble()
+
+            val cleaned =
+                FloatArray(
+                    source.size
+                )
+
+            var peak = 0.0
+
+            for (i in source.indices) {
+                val value =
+                    (
+                        source[i].toDouble() -
+                            mean
+                        ).coerceIn(
+                            -1.0,
+                            1.0
+                        )
+
+                cleaned[i] =
+                    value.toFloat()
+
+                peak =
+                    max(
+                        peak,
+                        abs(value)
+                    )
+            }
+
+            if (peak <= 0.0001) {
+                return cleaned
+            }
+
+            val gain =
+                min(
+                    1.85,
+                    0.92 / peak
+                )
+
+            for (i in cleaned.indices) {
+                cleaned[i] =
+                    (
+                        cleaned[i] *
+                            gain.toFloat()
+                        ).coerceIn(
+                            -1f,
+                            1f
+                        )
+            }
+
+            return cleaned
         }
 
         private fun appendPcm(
