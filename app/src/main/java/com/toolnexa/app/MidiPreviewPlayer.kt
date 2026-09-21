@@ -1,19 +1,24 @@
 package com.toolnexa.app
 
-import android.media.AudioAttributes
-import android.media.AudioFormat
-import android.media.AudioTrack
+import android.media.MediaPlayer
+import java.io.BufferedOutputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
-import kotlin.math.roundToInt
 
 class MidiPreviewPlayer {
 
-    private var track:
-        AudioTrack? = null
+    private var player:
+        MediaPlayer? = null
+
+    private var previewFile:
+        File? = null
 
     private var worker:
         Thread? = null
@@ -55,301 +60,88 @@ class MidiPreviewPlayer {
             return
         }
 
-        val sampleRate =
-            22050
-
-        val minBuffer =
-            AudioTrack.getMinBufferSize(
-                sampleRate,
-                AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
-            )
-
-        if (
-            minBuffer <= 0
-        ) {
-            onStopped?.invoke()
-            return
-        }
-
-        val localTrack =
-            try {
-                AudioTrack.Builder()
-                    .setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(
-                                AudioAttributes.USAGE_MEDIA
-                            )
-                            .setContentType(
-                                AudioAttributes.CONTENT_TYPE_MUSIC
-                            )
-                            .build()
-                    )
-                    .setAudioFormat(
-                        AudioFormat.Builder()
-                            .setSampleRate(
-                                sampleRate
-                            )
-                            .setEncoding(
-                                AudioFormat.ENCODING_PCM_16BIT
-                            )
-                            .setChannelMask(
-                                AudioFormat.CHANNEL_OUT_MONO
-                            )
-                            .build()
-                    )
-                    .setBufferSizeInBytes(
-                        max(
-                            minBuffer,
-                            sampleRate / 2
-                        )
-                    )
-                    .setTransferMode(
-                        AudioTrack.MODE_STREAM
-                    )
-                    .build()
-            } catch (_: Exception) {
-                onStopped?.invoke()
-                return
-            }
+        val duration =
+            durationSeconds
+                .coerceIn(
+                    0.1,
+                    300.0
+                )
 
         synchronized(lock) {
-            track =
-                localTrack
             running =
                 true
         }
 
         worker =
             Thread {
+                var file:
+                    File? = null
+
                 try {
-                    localTrack.play()
-
-                    val chunkFrames =
-                        1024
-
-                    val buffer =
-                        ShortArray(
-                            chunkFrames
+                    file =
+                        createPreviewWav(
+                            notes,
+                            duration
                         )
 
-                    val totalFrames =
-                        (
-                            durationSeconds *
-                                sampleRate
-                            ).toLong()
+                    synchronized(lock) {
+                        if (!running) {
+                            return@Thread
+                        }
 
-                    var framePosition =
-                        0L
+                        previewFile =
+                            file
+                    }
 
-                    while (
-                        isRunning(
-                            localTrack
-                        ) &&
-                        framePosition <
-                            totalFrames
-                    ) {
-                        val chunkStart =
-                            framePosition.toDouble() /
-                                sampleRate
-
-                        val framesToWrite =
-                            minOf(
-                                chunkFrames,
-                                (
-                                    totalFrames -
-                                        framePosition
-                                    ).toInt()
+                    val localPlayer =
+                        MediaPlayer().apply {
+                            setDataSource(
+                                file.absolutePath
                             )
 
-                        val chunkEnd =
-                            (
-                                framePosition +
-                                    framesToWrite
-                                ).toDouble() /
-                                sampleRate
-
-                        val activeNotes =
-                            notes.filter {
-                                it.startSeconds <
-                                    chunkEnd &&
-                                    (
-                                        it.startSeconds +
-                                            it.durationSeconds
-                                        ) >
-                                        chunkStart
-                            }
-
-                        val activeGain =
-                            0.19 /
-                                max(
-                                    1.0,
-                                    sqrt(
-                                        activeNotes.size
-                                            .toDouble()
-                                    )
+                            setOnCompletionListener {
+                                finishPlayback(
+                                    this,
+                                    file,
+                                    onStopped
                                 )
-
-                        for (
-                            index
-                            in 0 until
-                                framesToWrite
-                        ) {
-                            val time =
-                                (
-                                    framePosition +
-                                        index
-                                    ).toDouble() /
-                                    sampleRate
-
-                            var sample =
-                                0.0
-
-                            for (
-                                note
-                                in activeNotes
-                            ) {
-                                val noteEnd =
-                                    note.startSeconds +
-                                        note.durationSeconds
-
-                                if (
-                                    time <
-                                        note.startSeconds ||
-                                    time >=
-                                        noteEnd
-                                ) {
-                                    continue
-                                }
-
-                                val relative =
-                                    time -
-                                        note.startSeconds
-
-                                val bend =
-                                    bendAt(
-                                        note,
-                                        relative
-                                    )
-
-                                val frequency =
-                                    midiToHz(
-                                        note.pitch
-                                    ) *
-                                        2.0.pow(
-                                            bend /
-                                                12.0
-                                        )
-
-                                val phase =
-                                    2.0 *
-                                        PI *
-                                        frequency *
-                                        relative
-
-                                val envelope =
-                                    envelope(
-                                        relative,
-                                        note.durationSeconds
-                                    )
-
-                                val velocity =
-                                    (
-                                        note.velocity /
-                                            127.0
-                                        ).coerceIn(
-                                            0.0,
-                                            1.0
-                                        )
-
-                                val fundamental =
-                                    sin(
-                                        phase
-                                    )
-
-                                val harmonic2 =
-                                    sin(
-                                        phase * 2.0
-                                    ) * 0.12
-
-                                val harmonic3 =
-                                    sin(
-                                        phase * 3.0
-                                    ) * 0.05
-
-                                sample +=
-                                    (
-                                        fundamental +
-                                            harmonic2 +
-                                            harmonic3
-                                        ) *
-                                        velocity *
-                                        envelope *
-                                        activeGain
                             }
 
-                            buffer[index] =
-                                (
-                                    sample.coerceIn(
-                                        -0.8,
-                                        0.8
-                                    ) *
-                                        Short.MAX_VALUE
-                                    ).toInt()
-                                        .toShort()
+                            setOnErrorListener { mp, _, _ ->
+                                finishPlayback(
+                                    mp,
+                                    file,
+                                    onStopped
+                                )
+                                true
+                            }
+
+                            prepare()
                         }
-
-                        val written =
-                            localTrack.write(
-                                buffer,
-                                0,
-                                framesToWrite,
-                                AudioTrack.WRITE_BLOCKING
-                            )
-
-                        if (
-                            written <= 0
-                        ) {
-                            break
-                        }
-
-                        framePosition +=
-                            written
-                    }
-
-                    try {
-                        localTrack.stop()
-                    } catch (_: Exception) {
-                    }
-                } catch (_: InterruptedException) {
-                } catch (_: Exception) {
-                } finally {
-                    synchronized(lock) {
-                        if (
-                            track ===
-                                localTrack
-                        ) {
-                            track =
-                                null
-                            running =
-                                false
-                        }
-                    }
-
-                    try {
-                        localTrack.release()
-                    } catch (_: Exception) {
-                    }
 
                     synchronized(lock) {
-                        if (
-                            worker ===
-                                Thread.currentThread()
-                        ) {
-                            worker =
-                                null
+                        if (!running) {
+                            try {
+                                localPlayer.release()
+                            } catch (_: Exception) {
+                            }
+                            return@Thread
                         }
+
+                        player =
+                            localPlayer
                     }
+
+                    localPlayer.start()
+                } catch (
+                    error: Exception
+                ) {
+                    synchronized(lock) {
+                        running =
+                            false
+                    }
+
+                    file?.delete()
 
                     onStopped?.invoke()
                 }
@@ -359,35 +151,351 @@ class MidiPreviewPlayer {
     }
 
     fun stop() {
-        val localTrack:
-            AudioTrack?
+        val localPlayer:
+            MediaPlayer?
+        val localFile:
+            File?
 
         synchronized(lock) {
             running =
                 false
-            localTrack =
-                track
+
+            localPlayer =
+                player
+
+            localFile =
+                previewFile
+
+            player =
+                null
+
+            previewFile =
+                null
+
+            worker?.interrupt()
+            worker =
+                null
         }
 
         try {
-            localTrack?.pause()
-            localTrack?.flush()
+            localPlayer?.stop()
         } catch (_: Exception) {
         }
 
-        synchronized(lock) {
-            worker?.interrupt()
+        try {
+            localPlayer?.release()
+        } catch (_: Exception) {
         }
+
+        localFile?.delete()
     }
 
-    private fun isRunning(
-        localTrack: AudioTrack
-    ): Boolean {
+    private fun finishPlayback(
+        mediaPlayer:
+            MediaPlayer,
+        file: File?,
+        onStopped:
+            (() -> Unit)?
+    ) {
         synchronized(lock) {
-            return running &&
-                track ===
-                    localTrack
+            if (
+                player ===
+                    mediaPlayer
+            ) {
+                player =
+                    null
+
+                running =
+                    false
+
+                previewFile =
+                    null
+            }
         }
+
+        try {
+            mediaPlayer.release()
+        } catch (_: Exception) {
+        }
+
+        file?.delete()
+
+        onStopped?.invoke()
+    }
+
+    private fun createPreviewWav(
+        notes:
+            List<AudioMidiPianoRollView.Note>,
+        durationSeconds: Double
+    ): File {
+        val sampleRate =
+            44100
+
+        val totalFrames =
+            (
+                durationSeconds *
+                    sampleRate
+                ).toLong()
+                .coerceAtLeast(
+                    1L
+                )
+
+        val file =
+            File.createTempFile(
+                "toolnexa-midi-preview-",
+                ".wav"
+            )
+
+        BufferedOutputStream(
+            FileOutputStream(
+                file
+            ),
+            64 * 1024
+        ).use { output ->
+            writeWavHeader(
+                output,
+                sampleRate,
+                totalFrames
+            )
+
+            val chunkFrames =
+                4096
+
+            val pcm =
+                ByteBuffer
+                    .allocate(
+                        chunkFrames * 2
+                    )
+                    .order(
+                        ByteOrder.LITTLE_ENDIAN
+                    )
+
+            var frame =
+                0L
+
+            while (
+                frame <
+                    totalFrames &&
+                isRunning()
+            ) {
+                pcm.clear()
+
+                val count =
+                    minOf(
+                        chunkFrames,
+                        (
+                            totalFrames -
+                                frame
+                            ).toInt()
+                    )
+
+                val chunkStart =
+                    frame.toDouble() /
+                        sampleRate
+
+                val chunkEnd =
+                    (
+                        frame +
+                            count
+                        ).toDouble() /
+                        sampleRate
+
+                val activeNotes =
+                    notes.filter {
+                        it.startSeconds <
+                            chunkEnd &&
+                            (
+                                it.startSeconds +
+                                    it.durationSeconds
+                                ) >
+                                chunkStart
+                    }
+
+                val activeGain =
+                    0.22 /
+                        max(
+                            1.0,
+                            sqrt(
+                                activeNotes.size
+                                    .toDouble()
+                            )
+                        )
+
+                for (
+                    index
+                    in 0 until count
+                ) {
+                    val time =
+                        (
+                            frame +
+                                index
+                            ).toDouble() /
+                            sampleRate
+
+                    var sample =
+                        0.0
+
+                    for (
+                        note
+                        in activeNotes
+                    ) {
+                        val noteEnd =
+                            note.startSeconds +
+                                note.durationSeconds
+
+                        if (
+                            time <
+                                note.startSeconds ||
+                            time >=
+                                noteEnd
+                        ) {
+                            continue
+                        }
+
+                        val relative =
+                            time -
+                                note.startSeconds
+
+                        val frequency =
+                            midiToHz(
+                                note.pitch
+                            ) *
+                                2.0.pow(
+                                    bendAt(
+                                        note,
+                                        relative
+                                    ) /
+                                        12.0
+                                )
+
+                        val phase =
+                            2.0 *
+                                PI *
+                                frequency *
+                                relative
+
+                        val envelope =
+                            envelope(
+                                relative,
+                                note.durationSeconds
+                            )
+
+                        val velocity =
+                            (
+                                note.velocity /
+                                    127.0
+                                ).coerceIn(
+                                    0.0,
+                                    1.0
+                                )
+
+                        sample +=
+                            (
+                                sin(
+                                    phase
+                                ) +
+                                    sin(
+                                        phase * 2.0
+                                    ) * 0.12 +
+                                    sin(
+                                        phase * 3.0
+                                    ) * 0.05
+                                ) *
+                                velocity *
+                                envelope *
+                                activeGain
+                    }
+
+                    val pcmSample =
+                        (
+                            sample.coerceIn(
+                                -0.85,
+                                0.85
+                            ) *
+                                Short.MAX_VALUE
+                            ).toInt()
+                                .toShort()
+
+                    pcm.putShort(
+                        pcmSample
+                    )
+                }
+
+                output.write(
+                    pcm.array(),
+                    0,
+                    count * 2
+                )
+
+                frame +=
+                    count
+            }
+        }
+
+        return file
+    }
+
+    private fun writeWavHeader(
+        output:
+            BufferedOutputStream,
+        sampleRate: Int,
+        frames: Long
+    ) {
+        val dataSize =
+            frames * 2L
+
+        val riffSize =
+            36L + dataSize
+
+        fun writeAscii(
+            value: String
+        ) {
+            output.write(
+                value.toByteArray(
+                    Charsets.US_ASCII
+                )
+            )
+        }
+
+        fun writeInt32(
+            value: Long
+        ) {
+            output.write(
+                byteArrayOf(
+                    (value and 0xFF).toByte(),
+                    ((value shr 8) and 0xFF).toByte(),
+                    ((value shr 16) and 0xFF).toByte(),
+                    ((value shr 24) and 0xFF).toByte()
+                )
+            )
+        }
+
+        fun writeInt16(
+            value: Int
+        ) {
+            output.write(
+                byteArrayOf(
+                    (value and 0xFF).toByte(),
+                    ((value shr 8) and 0xFF).toByte()
+                )
+            )
+        }
+
+        writeAscii("RIFF")
+        writeInt32(riffSize)
+        writeAscii("WAVE")
+        writeAscii("fmt ")
+        writeInt32(16)
+        writeInt16(1)
+        writeInt16(1)
+        writeInt32(sampleRate.toLong())
+        writeInt32(
+            sampleRate.toLong() * 2L
+        )
+        writeInt16(2)
+        writeInt16(16)
+        writeAscii("data")
+        writeInt32(dataSize)
     }
 
     private fun bendAt(
@@ -422,7 +530,7 @@ class MidiPreviewPlayer {
                         bends.size -
                             1
                         )
-                ).roundToInt()
+                ).toInt()
                     .coerceIn(
                         0,
                         bends.lastIndex
@@ -479,5 +587,11 @@ class MidiPreviewPlayer {
                     ) /
                     12.0
             )
+    }
+
+    private fun isRunning(): Boolean {
+        synchronized(lock) {
+            return running
+        }
     }
 }
