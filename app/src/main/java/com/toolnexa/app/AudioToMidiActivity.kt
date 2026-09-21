@@ -254,6 +254,51 @@ class AudioToMidiActivity : Activity() {
             data
         )
 
+        if (requestCode == REQUEST_SAVE) {
+            if (
+                resultCode == RESULT_OK &&
+                data?.data != null &&
+                resultFile != null
+            ) {
+                try {
+                    contentResolver.openOutputStream(
+                        data.data!!
+                    ).use { output ->
+                        if (output == null) {
+                            throw IllegalStateException(
+                                "Não foi possível abrir o destino."
+                            )
+                        }
+
+                        resultFile!!
+                            .inputStream()
+                            .use { input ->
+                                input.copyTo(output)
+                            }
+                    }
+
+                    Toast.makeText(
+                        this,
+                        "MIDI exportado com sucesso.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    analytics.event(
+                        "audio_to_midi_exported"
+                    )
+                } catch (error: Exception) {
+                    Toast.makeText(
+                        this,
+                        error.message
+                            ?: "Não foi possível exportar o MIDI.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+
+            return
+        }
+
         if (
             requestCode != REQUEST_PICK ||
             resultCode != RESULT_OK ||
@@ -512,51 +557,49 @@ class AudioToMidiActivity : Activity() {
 
     private fun startConversion() {
         val uri = selectedUri ?: return
+        val options = currentOptions()
 
         convertButton?.isEnabled = false
 
-        buildBase(
-            "A converter"
-        )
+        buildBase("A converter")
 
-        addTitle(
-            "A converter áudio"
-        )
-
-        addText(
-            "A analisar o áudio e a criar as notas MIDI. " +
-                "Não feche esta tela durante o processo."
-        )
-
-        progressBar =
-            ProgressBar(
-                this,
-                null,
-                android.R.attr.progressBarStyleHorizontal
-            ).apply {
-                max = 100
-                progress = 0
+        val statusCard = card()
+        statusCard.addView(
+            TextView(this).apply {
+                text = "TOOLNEXA ENGINE"
+                textSize = 11.5f
+                setTextColor(audioAccent)
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                letterSpacing = 0.08f
             }
-
-        add(
-            progressBar!!,
-            dp(16)
         )
-
-        progressText =
-            bodyText(
-                "A preparar o áudio..."
-            )
-
-        add(
-            progressText!!
+        statusCard.addView(
+            title("A criar o seu MIDI", 24f).apply {
+                setPadding(0, dp(7), 0, dp(2))
+            }
         )
+        statusCard.addView(
+            bodyText("Descodificação → análise → limpeza → exportação")
+        )
+        add(statusCard)
+
+        progressBar = ProgressBar(
+            this,
+            null,
+            android.R.attr.progressBarStyleHorizontal
+        ).apply {
+            max = 100
+            progress = 0
+        }
+        add(progressBar!!, 12)
+
+        progressText = bodyText("A preparar o áudio...")
+        add(progressText!!)
 
         add(
             infoCard(
-                "PROCESSAMENTO",
-                "Tudo está a ser executado em segundo plano " +
-                    "para manter a interface responsiva."
+                "PROCESSAMENTO EM SEGUNDO PLANO",
+                "A conversão corre fora da interface para manter o app responsivo."
             )
         )
 
@@ -566,73 +609,67 @@ class AudioToMidiActivity : Activity() {
             }
         }
 
-        val selectedSensitivity =
-            sensitivity
-
         executor.execute {
             try {
-                val decoded =
-                    AudioDecoder.decode(
-                        this,
-                        uri,
-                        MAX_SECONDS
-                    ) { progress ->
-                        runOnUiThread {
-                            if (!isFinishing) {
-                                progressBar?.progress =
-                                    progress
-
-                                progressText?.text =
-                                    "A analisar áudio... " +
-                                        progress +
-                                        "%"
-                            }
+                val decoded = AudioDecoder.decode(
+                    this,
+                    uri,
+                    MAX_SECONDS
+                ) { progress ->
+                    runOnUiThread {
+                        if (!isFinishing) {
+                            progressBar?.progress = progress
+                            progressText?.text =
+                                I18n.t(this, "A analisar áudio...") + " " + progress + "%"
                         }
                     }
+                }
 
+                val range = detectionRange(options.profile)
                 val threshold =
-                    PitchTranscriber
-                        .thresholdForSensitivity(
-                            selectedSensitivity
-                        )
+                    PitchTranscriber.thresholdForSensitivity(
+                        options.sensitivity
+                    )
 
-                val result =
-                    PitchTranscriber.transcribe(
-                        decoded.samples,
-                        decoded.sampleRate,
-                        threshold
-                    ) { progress ->
-                        runOnUiThread {
-                            if (!isFinishing) {
-                                progressBar?.progress =
-                                    progress
-
-                                progressText?.text =
-                                    "A detetar notas... " +
-                                        progress +
-                                        "%"
-                            }
+                val detected = PitchTranscriber.transcribe(
+                    decoded.samples,
+                    decoded.sampleRate,
+                    threshold,
+                    range.first,
+                    range.second
+                ) { progress ->
+                    runOnUiThread {
+                        if (!isFinishing) {
+                            progressBar?.progress = progress
+                            progressText?.text =
+                                I18n.t(this, "A detetar notas...") + " " + progress + "%"
                         }
                     }
+                }
 
-                if (result.notes.isEmpty()) {
+                val enhanced = enhanceNotes(
+                    detected.notes,
+                    options,
+                    decoded.durationSeconds
+                )
+
+                if (enhanced.isEmpty()) {
                     throw IllegalStateException(
-                        "Não foram encontradas notas musicais claras. " +
-                            "Tente uma gravação mais limpa ou aumente a sensibilidade."
+                        "Não foram encontradas notas musicais claras. Tente outro perfil, ajuste a sensibilidade ou use uma gravação mais limpa."
                     )
                 }
 
-                val file =
-                    File(
-                        cacheDir,
-                        "toolnexa-audio-midi-" +
-                            System.currentTimeMillis() +
-                            ".mid"
-                    )
+                val file = File(
+                    cacheDir,
+                    "toolnexa-audio-midi-" +
+                        System.currentTimeMillis() +
+                        ".mid"
+                )
 
                 MidiFileWriter.write(
                     file,
-                    result.notes
+                    enhanced,
+                    options.bpm
                 )
 
                 resultFile = file
@@ -641,8 +678,9 @@ class AudioToMidiActivity : Activity() {
                     if (!isFinishing) {
                         showResult(
                             file,
-                            result,
-                            decoded.durationSeconds
+                            TranscriptionResult(enhanced),
+                            decoded.durationSeconds,
+                            options
                         )
                     }
                 }
@@ -651,11 +689,9 @@ class AudioToMidiActivity : Activity() {
                     if (!isFinishing) {
                         Toast.makeText(
                             this,
-                            error.message
-                                ?: "Não foi possível converter o áudio.",
+                            error.message ?: "Não foi possível converter o áudio.",
                             Toast.LENGTH_LONG
                         ).show()
-
                         showStage2()
                     }
                 }
@@ -666,94 +702,146 @@ class AudioToMidiActivity : Activity() {
     private fun showResult(
         file: File,
         result: TranscriptionResult,
-        durationSeconds: Double
+        durationSeconds: Double,
+        options: ConversionOptions
     ) {
-        buildBase(
-            "Resultado"
-        )
+        buildBase("Resultado")
 
-        addTitle(
-            "MIDI pronto"
-        )
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(20), dp(20), dp(20))
+            background =
+                android.graphics.drawable.GradientDrawable().apply {
+                    setColor(success)
+                    cornerRadius = dp(24).toFloat()
+                }
+        }
 
-        addText(
-            "A conversão terminou. O ficheiro está pronto para " +
-                "abrir, partilhar ou guardar."
-        )
+        hero.addView(TextView(this).apply {
+            text = "CONVERSÃO CONCLUÍDA"
+            textSize = 11.5f
+            setTextColor(android.graphics.Color.WHITE)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            letterSpacing = 0.08f
+        })
+        hero.addView(TextView(this).apply {
+            text = "MIDI pronto"
+            textSize = 29f
+            setTextColor(android.graphics.Color.WHITE)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setPadding(0, dp(7), 0, dp(3))
+        })
+        hero.addView(TextView(this).apply {
+            text = "O resultado está pronto para editar, guardar e partilhar."
+            textSize = 14.5f
+            setTextColor(android.graphics.Color.WHITE)
+        })
+        add(hero)
 
-        val resultCard = card()
-
-        resultCard.addView(
-            title(
-                file.name,
-                17f
-            )
-        )
-
-        resultCard.addView(
+        val stats = card()
+        stats.addView(title("Resumo da análise", 17f))
+        stats.addView(
             bodyText(
-                "Notas detetadas: " +
+                I18n.t(this, "Notas") + ": " +
                     result.notes.size +
-                    " • Duração: " +
-                    formatDuration(
-                        durationSeconds
-                    )
-            )
+                    "   •   " +
+                    I18n.t(this, "Duração") + ": " +
+                    formatDuration(durationSeconds)
+            ).apply { setPadding(0, dp(7), 0, 0) }
         )
 
-        resultCard.addView(
+        val pitches = result.notes.map { it.pitch }
+        if (pitches.isNotEmpty()) {
+            stats.addView(
+                bodyText(
+                    I18n.t(this, "Extensão") + ": " +
+                        noteName(pitches.minOrNull() ?: 0) +
+                        " – " +
+                        noteName(pitches.maxOrNull() ?: 0)
+                ).apply { setPadding(0, dp(5), 0, 0) }
+            )
+        }
+
+        stats.addView(
             bodyText(
-                "Tempo MIDI: 120 BPM • Canal 1"
-            )
+                I18n.t(this, "Tonalidade estimada") + ": " +
+                    estimateKey(result.notes) +
+                    " • " +
+                    I18n.t(this, "BPM") + ": " +
+                    options.bpm
+            ).apply { setPadding(0, dp(5), 0, 0) }
         )
 
-        add(resultCard)
+        stats.addView(
+            bodyText(
+                I18n.t(this, "Perfil") + ": " +
+                    profileLabel(options.profile) +
+                    " • " +
+                    I18n.t(this, "Quantização") + ": " +
+                    quantizeLabel(options.quantizeGrid) +
+                    " • " +
+                    I18n.t(this, "Transposição") + ": " +
+                    options.transposeSemitones.toSignedString() +
+                    " st"
+            ).apply { setPadding(0, dp(5), 0, 0) }
+        )
+        add(stats)
 
-        val open =
-            button(
-                "Abrir / partilhar MIDI",
-                true
-            )
+        val previewCard = card()
+        previewCard.addView(title("Prévia MIDI", 17f))
+        previewCard.addView(
+            MidiPreviewView(
+                this,
+                result.notes,
+                durationSeconds,
+                audioAccent,
+                audioAccent2
+            ).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    -1,
+                    dp(190)
+                ).apply {
+                    topMargin = dp(12)
+                }
+            }
+        )
+        previewCard.addView(
+            bodyText(
+                "A prévia mostra a posição e a altura das notas detetadas."
+            ).apply { setPadding(0, dp(8), 0, 0) }
+        )
+        add(previewCard)
 
-        open.setOnClickListener {
-            shareMidi(file)
-        }
+        add(
+            button("Exportar MIDI", true).apply {
+                setOnClickListener {
+                    exportMidi(file)
+                }
+            }
+        )
 
-        add(open)
+        add(
+            button("Guardar no histórico", false).apply {
+                setOnClickListener {
+                    saveMidi(file)
+                }
+            }
+        )
 
-        val save =
-            button(
-                "Guardar no armazenamento",
-                false
-            )
-
-        save.setOnClickListener {
-            saveMidi(file)
-        }
-
-        add(save)
-
-        val again =
-            button(
-                "Converter outro áudio",
-                false
-            )
-
-        again.setOnClickListener {
-            selectedUri = null
-            resultFile = null
-            showStage1()
-        }
-
-        add(again)
+        add(
+            button("Converter outro áudio", false).apply {
+                setOnClickListener {
+                    selectedUri = null
+                    resultFile = null
+                    showStage1()
+                }
+            }
+        )
 
         add(
             infoCard(
-                "SOBRE O MOTOR",
-                "A primeira versão usa análise de espectro e " +
-                    "deteção de frequência para criar notas MIDI. " +
-                    "Para maior precisão polifónica, uma futura versão " +
-                    "poderá usar um modelo dedicado de transcrição musical."
+                "MOTOR ATUAL",
+                "A versão atual usa análise espectral local. Os perfis e o pós-processamento melhoram a preparação do MIDI, enquanto uma futura versão poderá adicionar uma rede de transcrição polifónica dedicada."
             )
         )
 
@@ -761,6 +849,40 @@ class AudioToMidiActivity : Activity() {
             if (!isFinishing) {
                 I18n.localizeWindow(this)
             }
+        }
+    }
+
+    private fun exportMidi(
+        file: File
+    ) {
+        resultFile = file
+
+        try {
+            startActivityForResult(
+                Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                    type = "audio/midi"
+                    putExtra(
+                        Intent.EXTRA_TITLE,
+                        safeFileName(
+                            selectedName.substringBeforeLast(".")
+                        ) + ".mid"
+                    )
+                    addCategory(
+                        Intent.CATEGORY_OPENABLE
+                    )
+                },
+                REQUEST_SAVE
+            )
+
+            analytics.event(
+                "audio_to_midi_export_picker"
+            )
+        } catch (_: Exception) {
+            Toast.makeText(
+                this,
+                "Não foi possível abrir o exportador.",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -916,6 +1038,7 @@ class AudioToMidiActivity : Activity() {
         }
 
         val buttons = linkedMapOf<String, Button>()
+        val selectedKeyHolder = arrayOf(selectedKey)
 
         fun refresh() {
             buttons.forEach { (key, button) ->
@@ -949,8 +1072,6 @@ class AudioToMidiActivity : Activity() {
             }
         }
 
-        val selectedKeyHolder = arrayOf(selectedKey)
-
         options.forEachIndexed { index, pair ->
             val button = Button(this).apply {
                 text = pair.second
@@ -982,6 +1103,336 @@ class AudioToMidiActivity : Activity() {
         refresh()
         return row
     }
+
+    private fun currentOptions(): ConversionOptions {
+        return ConversionOptions(
+            detectionProfile,
+            sensitivity,
+            bpm,
+            transposeSemitones,
+            quantizeGrid,
+            cleanupEnabled
+        )
+    }
+
+    private fun detectionRange(profile: String): Pair<Int, Int> {
+        return when (profile) {
+            "voice" -> 48 to 88
+            "bass" -> 28 to 60
+            "wide" -> 24 to 108
+            else -> 36 to 96
+        }
+    }
+
+    private fun profileLabel(profile: String): String {
+        val key = when (profile) {
+            "voice" -> "Voz"
+            "bass" -> "Baixo"
+            "wide" -> "Amplo"
+            else -> "Melodia"
+        }
+        return I18n.t(this, key)
+    }
+
+    private fun quantizeLabel(grid: Int): String {
+        return I18n.t(
+            this,
+            when (grid) {
+                8 -> "1/8"
+                16 -> "1/16"
+                32 -> "1/32"
+                else -> "Desligada"
+            }
+        )
+    }
+
+    private fun enhanceNotes(
+        input: List<NoteEvent>,
+        options: ConversionOptions,
+        durationSeconds: Double
+    ): List<NoteEvent> {
+        if (input.isEmpty()) return emptyList()
+
+        var notes = input.sortedBy { it.startSeconds }
+
+        if (options.cleanup) {
+            notes = notes
+                .filter { it.durationSeconds >= 0.055 }
+                .fold(mutableListOf()) { acc, note ->
+                    val previous = acc.lastOrNull()
+
+                    if (
+                        previous != null &&
+                        previous.pitch == note.pitch &&
+                        note.startSeconds -
+                            (
+                                previous.startSeconds +
+                                    previous.durationSeconds
+                            ) < 0.11
+                    ) {
+                        acc[acc.lastIndex] = previous.copy(
+                            durationSeconds = max(
+                                previous.durationSeconds,
+                                (
+                                    note.startSeconds +
+                                        note.durationSeconds
+                                ) - previous.startSeconds
+                            ),
+                            velocity = max(
+                                previous.velocity,
+                                note.velocity
+                            )
+                        )
+                    } else {
+                        acc.add(note)
+                    }
+
+                    acc
+                }
+        }
+
+        val transposed = notes.map { note ->
+            note.copy(
+                pitch = (
+                    note.pitch +
+                        options.transposeSemitones
+                    ).coerceIn(0, 127)
+            )
+        }
+
+        val quantized =
+            if (options.quantizeGrid > 0) {
+                val beatSeconds =
+                    60.0 /
+                        options.bpm.toDouble()
+
+                val gridSeconds =
+                    beatSeconds *
+                        (
+                            4.0 /
+                                options.quantizeGrid.toDouble()
+                            )
+
+                transposed.map { note ->
+                    val rawStart =
+                        note.startSeconds
+
+                    val rawEnd =
+                        note.startSeconds +
+                            note.durationSeconds
+
+                    val start =
+                        (
+                            (
+                                rawStart /
+                                    gridSeconds
+                                ).roundToInt() *
+                                gridSeconds
+                            ).coerceIn(
+                                0.0,
+                                durationSeconds
+                            )
+
+                    val desiredEnd =
+                        (
+                            (
+                                rawEnd /
+                                    gridSeconds
+                                ).roundToInt() *
+                                gridSeconds
+                            )
+
+                    val minDuration =
+                        max(
+                            0.04,
+                            gridSeconds * 0.5
+                        )
+
+                    val end =
+                        max(
+                            start +
+                                minDuration,
+                            desiredEnd
+                        ).coerceAtMost(
+                            durationSeconds
+                        )
+
+                    note.copy(
+                        startSeconds = start,
+                        durationSeconds = max(
+                            0.04,
+                            end - start
+                        )
+                    )
+                }
+            } else {
+                transposed
+            }
+
+        val sorted =
+            quantized
+                .filter {
+                    it.startSeconds <
+                        durationSeconds
+                }
+                .sortedBy {
+                    it.startSeconds
+                }
+
+        if (!options.cleanup) {
+            return sorted
+        }
+
+        val result =
+            mutableListOf<NoteEvent>()
+
+        for (note in sorted) {
+            val previous =
+                result.lastOrNull()
+
+            if (
+                previous != null &&
+                note.startSeconds <
+                    previous.startSeconds +
+                        previous.durationSeconds &&
+                note.pitch != previous.pitch
+            ) {
+                val safeStart =
+                    max(
+                        note.startSeconds,
+                        previous.startSeconds +
+                            0.01
+                    )
+
+                val safeEnd =
+                    note.startSeconds +
+                        note.durationSeconds
+
+                if (safeEnd > safeStart) {
+                    result.add(
+                        note.copy(
+                            startSeconds = safeStart,
+                            durationSeconds =
+                                safeEnd - safeStart
+                        )
+                    )
+                }
+            } else {
+                result.add(note)
+            }
+        }
+
+        return result
+    }
+
+    private fun estimateKey(
+        notes: List<NoteEvent>
+    ): String {
+        if (notes.isEmpty()) return "—"
+
+        val histogram = DoubleArray(12)
+
+        notes.forEach { note ->
+            histogram[note.pitch % 12] +=
+                max(0.1, note.durationSeconds) *
+                    (
+                        note.velocity /
+                            127.0
+                        )
+        }
+
+        val major = doubleArrayOf(
+            6.35, 2.23, 3.48, 2.33,
+            4.38, 4.09, 2.52, 5.19,
+            2.39, 3.66, 2.29, 2.88
+        )
+
+        val minor = doubleArrayOf(
+            6.33, 2.68, 3.52, 5.38,
+            2.60, 3.53, 2.54, 4.75,
+            3.98, 2.69, 3.34, 3.17
+        )
+
+        val names = arrayOf(
+            "C", "C#", "D", "D#", "E", "F",
+            "F#", "G", "G#", "A", "A#", "B"
+        )
+
+        var bestScore =
+            Double.NEGATIVE_INFINITY
+
+        var bestName =
+            "—"
+
+        for (root in 0 until 12) {
+            var majorScore = 0.0
+            var minorScore = 0.0
+
+            for (i in 0 until 12) {
+                val value =
+                    histogram[
+                        (root + i) % 12
+                    ]
+
+                majorScore +=
+                    value * major[i]
+
+                minorScore +=
+                    value * minor[i]
+            }
+
+            if (majorScore > bestScore) {
+                bestScore = majorScore
+                bestName =
+                    names[root] +
+                        " " +
+                        I18n.t(this, "maior")
+            }
+
+            if (minorScore > bestScore) {
+                bestScore = minorScore
+                bestName =
+                    names[root] +
+                        " " +
+                        I18n.t(this, "menor")
+            }
+        }
+
+        return bestName
+    }
+
+    private fun noteName(midi: Int): String {
+        val names = arrayOf(
+            "C", "C#", "D", "D#", "E", "F",
+            "F#", "G", "G#", "A", "A#", "B"
+        )
+
+        val pitch =
+            midi.coerceIn(0, 127)
+
+        val octave =
+            (pitch / 12) - 1
+
+        return names[pitch % 12] +
+            octave
+    }
+
+    private fun Int.toSignedString(): String {
+        return if (this > 0) {
+            "+$this"
+        } else {
+            this.toString()
+        }
+    }
+
+    private data class ConversionOptions(
+        val profile: String,
+        val sensitivity: Int,
+        val bpm: Int,
+        val transposeSemitones: Int,
+        val quantizeGrid: Int,
+        val cleanup: Boolean
+    )
 
     private fun buildBase(
         subtitle: String
@@ -1278,6 +1729,71 @@ class AudioToMidiActivity : Activity() {
         )
     }
 
+    private fun prepareSamples(
+        source: FloatArray
+    ): FloatArray {
+        if (source.isEmpty()) return source
+
+        var mean = 0.0
+
+        for (sample in source) {
+            mean += sample.toDouble()
+        }
+
+        mean /=
+            source.size.toDouble()
+
+        val cleaned =
+            FloatArray(
+                source.size
+            )
+
+        var peak = 0.0
+
+        for (i in source.indices) {
+            val value =
+                (
+                    source[i].toDouble() -
+                        mean
+                    ).coerceIn(
+                        -1.0,
+                        1.0
+                    )
+
+            cleaned[i] =
+                value.toFloat()
+
+            peak =
+                max(
+                    peak,
+                    abs(value)
+                )
+        }
+
+        if (peak <= 0.0001) {
+            return cleaned
+        }
+
+        val gain =
+            min(
+                1.85,
+                0.92 / peak
+            )
+
+        for (i in cleaned.indices) {
+            cleaned[i] =
+                (
+                    cleaned[i] *
+                        gain.toFloat()
+                    ).coerceIn(
+                        -1f,
+                        1f
+                    )
+        }
+
+        return cleaned
+    }
+
     private fun queryDisplayName(
         resolver: ContentResolver,
         uri: Uri
@@ -1341,6 +1857,194 @@ class AudioToMidiActivity : Activity() {
     private data class TranscriptionResult(
         val notes: List<NoteEvent>
     )
+
+    private class MidiPreviewView(
+        context: Context,
+        private val notes: List<NoteEvent>,
+        private val durationSeconds: Double,
+        private val primaryColor: Int,
+        private val secondaryColor: Int
+    ) : View(context) {
+
+        private val paint =
+            android.graphics.Paint(
+                android.graphics.Paint.ANTI_ALIAS_FLAG
+            )
+
+        override fun onDraw(
+            canvas: android.graphics.Canvas
+        ) {
+            super.onDraw(canvas)
+
+            val width =
+                width.toFloat()
+
+            val height =
+                height.toFloat()
+
+            paint.style =
+                android.graphics.Paint.Style.FILL
+
+            paint.color =
+                0xFFF7F9FD.toInt()
+
+            canvas.drawRect(
+                0f,
+                0f,
+                width,
+                height,
+                paint
+            )
+
+            paint.color =
+                0xFFDCE5F2.toInt()
+
+            paint.strokeWidth =
+                dp(1).toFloat()
+
+            for (i in 1 until 8) {
+                val y =
+                    height * i / 8f
+
+                canvas.drawLine(
+                    0f,
+                    y,
+                    width,
+                    y,
+                    paint
+                )
+            }
+
+            for (i in 1 until 10) {
+                val x =
+                    width * i / 10f
+
+                canvas.drawLine(
+                    x,
+                    0f,
+                    x,
+                    height,
+                    paint
+                )
+            }
+
+            if (
+                notes.isEmpty() ||
+                durationSeconds <= 0.0
+            ) {
+                return
+            }
+
+            val minPitch =
+                (
+                    notes.minOf {
+                        it.pitch
+                    } - 3
+                    ).coerceAtLeast(0)
+
+            val maxPitch =
+                (
+                    notes.maxOf {
+                        it.pitch
+                    } + 3
+                    ).coerceAtMost(127)
+
+            val pitchRange =
+                max(
+                    1,
+                    maxPitch - minPitch
+                )
+
+            notes.forEachIndexed { index, note ->
+                val x =
+                    (
+                        note.startSeconds /
+                            durationSeconds
+                        ).toFloat() *
+                        width
+
+                val noteWidth =
+                    max(
+                        dp(5).toFloat(),
+                        (
+                            note.durationSeconds /
+                                durationSeconds
+                            ).toFloat() *
+                            width
+                    )
+
+                val normalized =
+                    (
+                        note.pitch -
+                            minPitch
+                        ).toFloat() /
+                        pitchRange.toFloat()
+
+                val y =
+                    height -
+                        (
+                            normalized *
+                                (
+                                    height -
+                                        dp(10)
+                                    )
+                            ) -
+                        dp(7)
+
+                val alpha =
+                    (
+                        110 +
+                            (
+                                note.velocity.coerceIn(
+                                    35,
+                                    118
+                                ) - 35
+                            ) * 2
+                        ).coerceIn(
+                            110,
+                            255
+                        )
+
+                val base =
+                    if (index % 2 == 0) {
+                        primaryColor
+                    } else {
+                        secondaryColor
+                    }
+
+                paint.color =
+                    (
+                        base and
+                            0x00FFFFFF
+                        ) or
+                        (
+                            alpha shl 24
+                            )
+
+                canvas.drawRoundRect(
+                    x,
+                    y - dp(6),
+                    min(
+                        width,
+                        x + noteWidth
+                    ),
+                    y + dp(6),
+                    dp(6).toFloat(),
+                    dp(6).toFloat(),
+                    paint
+                )
+            }
+        }
+
+        private fun dp(
+            value: Int
+        ): Int {
+            return (
+                value *
+                    resources.displayMetrics.density
+                ).roundToInt()
+        }
+    }
 
     private object AudioDecoder {
 
@@ -1711,8 +2415,11 @@ class AudioToMidiActivity : Activity() {
                         )
                     }
 
+                val prepared =
+                    prepareSamples(samples)
+
                 val durationSeconds =
-                    samples.size.toDouble() /
+                    prepared.size.toDouble() /
                         targetRate.toDouble()
 
                 if (
@@ -1729,7 +2436,7 @@ class AudioToMidiActivity : Activity() {
                 onProgress(100)
 
                 return DecodedAudio(
-                    samples,
+                    prepared,
                     targetRate,
                     durationSeconds
                 )
@@ -1998,6 +2705,8 @@ class AudioToMidiActivity : Activity() {
             samples: FloatArray,
             sampleRate: Int,
             rmsThreshold: Float,
+            minMidi: Int,
+            maxMidi: Int,
             onProgress: (Int) -> Unit
         ): TranscriptionResult {
             val analyzer =
@@ -2058,7 +2767,9 @@ class AudioToMidiActivity : Activity() {
                         analyzer.detectMidiPitch(
                             samples,
                             offset,
-                            sampleRate
+                            sampleRate,
+                            minMidi,
+                            maxMidi
                         )
                     }
 
@@ -2512,7 +3223,9 @@ class AudioToMidiActivity : Activity() {
             fun detectMidiPitch(
                 samples: FloatArray,
                 offset: Int,
-                sampleRate: Int
+                sampleRate: Int,
+                minMidi: Int,
+                maxMidi: Int
             ): Int {
                 for (
                     i in
@@ -2563,7 +3276,7 @@ class AudioToMidiActivity : Activity() {
 
                 for (
                     midi in
-                    MIN_MIDI..MAX_MIDI
+                    minMidi..maxMidi
                 ) {
                     val frequency =
                         440.0 *
@@ -2809,12 +3522,26 @@ class AudioToMidiActivity : Activity() {
     private object MidiFileWriter {
 
         private const val PPQ = 480
-        private const val TEMPO_US = 500_000
 
         fun write(
             file: File,
-            notes: List<NoteEvent>
+            notes: List<NoteEvent>,
+            bpm: Int
         ) {
+            val safeBpm =
+                bpm.coerceIn(
+                    30,
+                    300
+                )
+
+            val tempoUs =
+                (
+                    60_000_000.0 /
+                        safeBpm.toDouble()
+                    ).roundToInt().coerceIn(
+                        1,
+                        0xFFFFFF
+                    )
             val events =
                 mutableListOf<MidiEvent>()
 
@@ -2826,12 +3553,12 @@ class AudioToMidiActivity : Activity() {
                         0x51.toByte(),
                         0x03,
                         (
-                            TEMPO_US shr 16
+                            tempoUs shr 16
                         ).toByte(),
                         (
-                            TEMPO_US shr 8
+                            tempoUs shr 8
                         ).toByte(),
-                        TEMPO_US.toByte()
+                        tempoUs.toByte()
                     )
                 )
             )
@@ -2852,7 +3579,8 @@ class AudioToMidiActivity : Activity() {
                         0L,
                         (
                             note.startSeconds *
-                                2.0 *
+                                safeBpm.toDouble() /
+                                60.0 *
                                 PPQ
                             ).roundToInt()
                                 .toLong()
@@ -2866,7 +3594,8 @@ class AudioToMidiActivity : Activity() {
                                 note.startSeconds +
                                     note.durationSeconds
                                 ) *
-                                2.0 *
+                                safeBpm.toDouble() /
+                                60.0 *
                                 PPQ
                             )
                                 .roundToInt()
@@ -3137,6 +3866,7 @@ class AudioToMidiActivity : Activity() {
 
     companion object {
         private const val REQUEST_PICK = 1201
+        private const val REQUEST_SAVE = 1202
         private const val TIMEOUT_US = 10_000L
         private const val MIN_SECONDS = 0.8
         private const val MAX_SECONDS = 120
