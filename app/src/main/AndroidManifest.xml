@@ -44,18 +44,6 @@
             android:exported="false" />
 
         <activity
-            android:name=".ToolWorkflowActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".BackgroundRemoverActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".AudioToMidiActivity"
-            android:exported="false" />
-
-        <activity
             android:name=".PlansActivity"
             android:exported="true"
             android:launchMode="singleTop">
