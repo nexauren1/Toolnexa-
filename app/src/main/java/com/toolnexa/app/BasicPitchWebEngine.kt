@@ -135,29 +135,24 @@ class BasicPitchWebEngine(
             val configuredHtml =
                 HTML
                     .replace(
-                        "\u0000",
-                        onsetThreshold.toString(),
-                        1
+                        "ONSET_THRESHOLD_TOKEN",
+                        onsetThreshold.toString()
                     )
                     .replace(
-                        "\u0000",
-                        frameThreshold.toString(),
-                        1
+                        "FRAME_THRESHOLD_TOKEN",
+                        frameThreshold.toString()
                     )
                     .replace(
-                        "\u0000",
-                        minNoteLengthFrames.toString(),
-                        1
+                        "MIN_NOTE_LENGTH_TOKEN",
+                        minNoteLengthFrames.toString()
                     )
                     .replace(
-                        "\u0000",
-                        maxMidi.toString(),
-                        1
+                        "MAX_MIDI_TOKEN",
+                        maxMidi.toString()
                     )
                     .replace(
-                        "\u0000",
-                        minMidi.toString(),
-                        1
+                        "MIN_MIDI_TOKEN",
+                        minMidi.toString()
                     )
 
             view.loadDataWithBaseURL(
