@@ -478,14 +478,15 @@ class BasicPitchNativeEngine(
             }
 
             val progress =
-                8 +
-                    (
+                (
+                    8f +
                         (
-                            windowIndex + 1
-                        ).toFloat() /
-                            windows.toFloat()
-                        ) * 62f
-                    ).roundToInt()
+                            (
+                                windowIndex + 1
+                            ).toFloat() /
+                                windows.toFloat()
+                            ) * 62f
+                ).roundToInt()
 
             onProgress(
                 progress.coerceIn(
@@ -1216,7 +1217,7 @@ class BasicPitchNativeEngine(
                             contourColumns +
                             bin
                     ] *
-                        gaussian
+                        gaussian.toFloat()
 
                 if (
                     score >
@@ -1256,10 +1257,11 @@ class BasicPitchNativeEngine(
         ) {
             val sourceIndex =
                 (
-                    i *
-                        (bends.size - 1)
-                    ).toDouble() /
-                        (MAX_BEND_POINTS - 1)
+                    (
+                        i *
+                            (bends.size - 1)
+                        ).toDouble() /
+                            (MAX_BEND_POINTS - 1)
                     ).roundToInt()
 
             result.add(
@@ -1332,8 +1334,7 @@ class BasicPitchNativeEngine(
                     input.size.toDouble() *
                         targetRate.toDouble() /
                         sourceRate.toDouble()
-                    ).roundToInt()
-                )
+                ).roundToInt()
             )
 
         val output =
