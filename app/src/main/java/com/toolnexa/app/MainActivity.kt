@@ -1294,13 +1294,8 @@ class MainActivity : ComponentActivity() {
                 "business-contract-maker",
                 "business-name-generator",
                 "business-pricing-calculator" -> {
-                    startActivity(
-                        Intent(
-                            this,
-                            BusinessToolActivity::class.java
-                        ).apply {
-                            putExtra("tool_id", tool.id)
-                        }
+                    openBusinessToolFromHome(
+                        tool.id
                     )
                 }
 
