@@ -9,6 +9,73 @@ import java.util.Locale
 
 object I18n {
 
+    private val extraTranslations =
+        mapOf(
+            "Imagem" to mapOf("en" to "Image", "es" to "Imagen", "fr" to "Image", "ar" to "صورة"),
+            "Vídeo" to mapOf("en" to "Video", "es" to "Vídeo", "fr" to "Vidéo", "ar" to "فيديو"),
+            "Produtividade" to mapOf("en" to "Productivity", "es" to "Productividad", "fr" to "Productivité", "ar" to "الإنتاجية"),
+            "Código" to mapOf("en" to "Code", "es" to "Código", "fr" to "Code", "ar" to "البرمجة"),
+            "Dev" to mapOf("en" to "Dev", "es" to "Desarrollo", "fr" to "Développement", "ar" to "التطوير"),
+            "Business" to mapOf("en" to "Business", "es" to "Negocios", "fr" to "Business", "ar" to "الأعمال"),
+            "Marketplace" to mapOf("en" to "Marketplace", "es" to "Mercado", "fr" to "Marketplace", "ar" to "السوق"),
+            "Texto" to mapOf("en" to "Text", "es" to "Texto", "fr" to "Texte", "ar" to "النص"),
+            "PDF" to mapOf("en" to "PDF", "es" to "PDF", "fr" to "PDF", "ar" to "PDF"),
+            "Áudio" to mapOf("en" to "Audio", "es" to "Audio", "fr" to "Audio", "ar" to "الصوت"),
+
+            "Compressão, tamanho e formatos" to mapOf("en" to "Compression, sizing and formats", "es" to "Compresión, tamaño y formatos", "fr" to "Compression, taille et formats", "ar" to "الضغط والأحجام والتنسيقات"),
+            "Ferramentas para ficheiros de vídeo" to mapOf("en" to "Tools for video files", "es" to "Herramientas para archivos de vídeo", "fr" to "Outils pour les fichiers vidéo", "ar" to "أدوات لملفات الفيديو"),
+            "Tarefas, organização e trabalho" to mapOf("en" to "Tasks, organization and work", "es" to "Tareas, organización y trabajo", "fr" to "Tâches, organisation et travail", "ar" to "المهام والتنظيم والعمل"),
+            "Ferramentas para escrever e tratar código" to mapOf("en" to "Tools for writing and working with code", "es" to "Herramientas para escribir y trabajar con código", "fr" to "Outils pour écrire et traiter du code", "ar" to "أدوات لكتابة ومعالجة البرمجة"),
+            "Utilitários para desenvolvimento" to mapOf("en" to "Development utilities", "es" to "Utilidades para desarrollo", "fr" to "Utilitaires de développement", "ar" to "أدوات مساعدة للتطوير"),
+            "Ferramentas para negócios e operações" to mapOf("en" to "Tools for business and operations", "es" to "Herramientas para negocios y operaciones", "fr" to "Outils pour les affaires et les opérations", "ar" to "أدوات للأعمال والعمليات"),
+            "Conteúdo e preparação para vendas online" to mapOf("en" to "Content and preparation for online sales", "es" to "Contenido y preparación para ventas online", "fr" to "Contenu et préparation aux ventes en ligne", "ar" to "المحتوى والتحضير للبيع عبر الإنترنت"),
+            "Edição, limpeza e transformação de texto" to mapOf("en" to "Text editing, cleanup and transformation", "es" to "Edición, limpieza y transformación de texto", "fr" to "Édition, nettoyage et transformation de texte", "ar" to "تحرير النص وتنظيفه وتحويله"),
+            "Ferramentas para documentos PDF" to mapOf("en" to "Tools for PDF documents", "es" to "Herramientas para documentos PDF", "fr" to "Outils pour les documents PDF", "ar" to "أدوات لمستندات PDF"),
+            "Ferramentas para ficheiros e áudio" to mapOf("en" to "Tools for files and audio", "es" to "Herramientas para archivos y audio", "fr" to "Outils pour les fichiers et l’audio", "ar" to "أدوات للملفات والصوت"),
+
+            "Reduza o tamanho com qualidade ajustável." to mapOf("en" to "Reduce size with adjustable quality.", "es" to "Reduce el tamaño con calidad ajustable.", "fr" to "Réduisez la taille avec une qualité réglable.", "ar" to "قلل الحجم بجودة قابلة للتعديل."),
+            "Altere a largura mantendo a proporção." to mapOf("en" to "Change the width while preserving the aspect ratio.", "es" to "Cambia el ancho manteniendo la proporción.", "fr" to "Modifiez la largeur en conservant les proportions.", "ar" to "غيّر العرض مع الحفاظ على النسبة."),
+            "Converta para JPG, PNG ou WebP." to mapOf("en" to "Convert to JPG, PNG or WebP.", "es" to "Convierte a JPG, PNG o WebP.", "fr" to "Convertissez en JPG, PNG ou WebP.", "ar" to "حوّل إلى JPG أو PNG أو WebP."),
+            "Remova o fundo com IA e preserve transparência." to mapOf("en" to "Remove the background with AI and preserve transparency.", "es" to "Elimina el fondo con IA y conserva la transparencia.", "fr" to "Supprimez l’arrière-plan avec l’IA et préservez la transparence.", "ar" to "أزل الخلفية بالذكاء الاصطناعي مع الحفاظ على الشفافية."),
+
+            "Categoria preparada" to mapOf("en" to "Category ready", "es" to "Categoría preparada", "fr" to "Catégorie prête", "ar" to "الفئة جاهزة"),
+            "As ferramentas desta categoria serão adicionadas em breve." to mapOf("en" to "Tools in this category will be added soon.", "es" to "Las herramientas de esta categoría se añadirán pronto.", "fr" to "Les outils de cette catégorie seront ajoutés bientôt.", "ar" to "ستتم إضافة أدوات هذه الفئة قريبًا."),
+
+            "Resultados guardados" to mapOf("en" to "Saved results", "es" to "Resultados guardados", "fr" to "Résultats enregistrés", "ar" to "النتائج المحفوظة"),
+            "Ainda não existem resultados guardados." to mapOf("en" to "There are no saved results yet.", "es" to "Aún no hay resultados guardados.", "fr" to "Aucun résultat enregistré pour le moment.", "ar" to "لا توجد نتائج محفوظة بعد."),
+            "Limpar histórico" to mapOf("en" to "Clear history", "es" to "Borrar historial", "fr" to "Effacer l’historique", "ar" to "مسح السجل"),
+            "Histórico limpo." to mapOf("en" to "History cleared.", "es" to "Historial borrado.", "fr" to "Historique effacé.", "ar" to "تم مسح السجل."),
+            "Não foi possível abrir este resultado." to mapOf("en" to "Could not open this result.", "es" to "No se pudo abrir este resultado.", "fr" to "Impossible d’ouvrir ce résultat.", "ar" to "تعذر فتح هذه النتيجة."),
+
+            "ToolNexa Pro" to mapOf("en" to "ToolNexa Pro", "es" to "ToolNexa Pro", "fr" to "ToolNexa Pro", "ar" to "ToolNexa Pro"),
+            "ASSINATURA MENSAL" to mapOf("en" to "MONTHLY SUBSCRIPTION", "es" to "SUSCRIPCIÓN MENSUAL", "fr" to "ABONNEMENT MENSUEL", "ar" to "اشتراك شهري"),
+            "O teu acesso" to mapOf("en" to "Your access", "es" to "Tu acceso", "fr" to "Votre accès", "ar" to "وصولك"),
+            "Atualizar estado" to mapOf("en" to "Refresh status", "es" to "Actualizar estado", "fr" to "Actualiser l’état", "ar" to "تحديث الحالة"),
+            "Escolhe o teu plano" to mapOf("en" to "Choose your plan", "es" to "Elige tu plan", "fr" to "Choisissez votre forfait", "ar" to "اختر خطتك"),
+            "Começa grátis ou desbloqueia os recursos Pro." to mapOf("en" to "Start free or unlock Pro features.", "es" to "Empieza gratis o desbloquea las funciones Pro.", "fr" to "Commencez gratuitement ou débloquez les fonctionnalités Pro.", "ar" to "ابدأ مجانًا أو افتح ميزات Pro."),
+            "A carregar os planos..." to mapOf("en" to "Loading plans...", "es" to "Cargando planes...", "fr" to "Chargement des forfaits...", "ar" to "جارٍ تحميل الخطط..."),
+            "Nenhum plano ativo foi encontrado no billing." to mapOf("en" to "No active plan was found in billing.", "es" to "No se encontró ningún plan activo en la facturación.", "fr" to "Aucun forfait actif trouvé dans la facturation.", "ar" to "لم يتم العثور على خطة نشطة في الفوترة."),
+            "Preço não definido" to mapOf("en" to "Price not set", "es" to "Precio no definido", "fr" to "Prix non défini", "ar" to "السعر غير محدد"),
+            "Mais recursos para quem quer usar o ToolNexa a sério." to mapOf("en" to "More features for people who want to get serious with ToolNexa.", "es" to "Más recursos para quienes quieren usar ToolNexa en serio.", "fr" to "Plus de fonctionnalités pour ceux qui veulent utiliser ToolNexa sérieusement.", "ar" to "مزيد من الميزات لمن يريد استخدام ToolNexa بجدية."),
+            "O essencial para começar a explorar o ToolNexa." to mapOf("en" to "The essentials to start exploring ToolNexa.", "es" to "Lo esencial para empezar a explorar ToolNexa.", "fr" to "L’essentiel pour commencer à explorer ToolNexa.", "ar" to "الأساسيات لبدء استكشاف ToolNexa."),
+            "Renovação automática mensal" to mapOf("en" to "Automatic monthly renewal", "es" to "Renovación mensual automática", "fr" to "Renouvellement mensuel automatique", "ar" to "تجديد شهري تلقائي"),
+            "Sem compromisso" to mapOf("en" to "No commitment", "es" to "Sin compromiso", "fr" to "Sans engagement", "ar" to "دون التزام"),
+            "Assinar Pro" to mapOf("en" to "Subscribe to Pro", "es" to "Suscribirse a Pro", "fr" to "S’abonner à Pro", "ar" to "الاشتراك في Pro"),
+            "Plano atual sem mensalidade" to mapOf("en" to "Current plan with no monthly fee", "es" to "Plan actual sin mensualidad", "fr" to "Forfait actuel sans mensualité", "ar" to "الخطة الحالية بدون رسوم شهرية"),
+            "Pagamento processado de forma segura pelo PayPal. A tua identidade continua ligada ao Firebase." to mapOf("en" to "Payment is securely processed by PayPal. Your identity remains linked to Firebase.", "es" to "El pago se procesa de forma segura con PayPal. Tu identidad sigue vinculada a Firebase.", "fr" to "Le paiement est traité en toute sécurité par PayPal. Votre identité reste liée à Firebase.", "ar" to "تتم معالجة الدفع بأمان عبر PayPal. وتظل هويتك مرتبطة بـ Firebase."),
+
+            "Tipo de contacto" to mapOf("en" to "Contact type", "es" to "Tipo de contacto", "fr" to "Type de contact", "ar" to "نوع التواصل"),
+            "Ferramenta ou área" to mapOf("en" to "Tool or area", "es" to "Herramienta o área", "fr" to "Outil ou domaine", "ar" to "الأداة أو المجال"),
+            "Problema" to mapOf("en" to "Problem", "es" to "Problema", "fr" to "Problème", "ar" to "المشكلة"),
+            "Mensagem" to mapOf("en" to "Message", "es" to "Mensaje", "fr" to "Message", "ar" to "الرسالة"),
+            "Explique o problema, a ideia ou a sugestão..." to mapOf("en" to "Explain the problem, idea or suggestion...", "es" to "Explica el problema, la idea o la sugerencia...", "fr" to "Expliquez le problème, l’idée ou la suggestion...", "ar" to "اشرح المشكلة أو الفكرة أو الاقتراح..."),
+            "Incluir diagnóstico técnico (modelo do aparelho, Android, versão da aplicação e idioma)" to mapOf("en" to "Include technical diagnostics (device model, Android, app version and language)", "es" to "Incluir diagnóstico técnico (modelo del dispositivo, Android, versión de la app e idioma)", "fr" to "Inclure le diagnostic technique (modèle, Android, version de l’application et langue)", "ar" to "تضمين التشخيص الفني (طراز الجهاز وأندرويد وإصدار التطبيق واللغة)"),
+            "Não incluímos palavras-passe, tokens de autenticação, chaves privadas ou outros segredos. O email abre para revisão antes de ser enviado." to mapOf("en" to "We do not include passwords, authentication tokens, private keys or other secrets. The email opens for review before sending.", "es" to "No incluimos contraseñas, tokens de autenticación, claves privadas ni otros secretos. El correo se abre para revisión antes de enviarlo.", "fr" to "Nous n’incluons pas les mots de passe, jetons d’authentification, clés privées ou autres secrets. L’e-mail s’ouvre pour vérification avant envoi.", "ar" to "لا ندرج كلمات المرور أو رموز المصادقة أو المفاتيح الخاصة أو الأسرار الأخرى. يفتح البريد للمراجعة قبل الإرسال."),
+            "Escreva a sua mensagem." to mapOf("en" to "Write your message.", "es" to "Escribe tu mensaje.", "fr" to "Écrivez votre message.", "ar" to "اكتب رسالتك."),
+            "A sua aplicação de email abre com o relatório preenchido para rever antes de enviar." to mapOf("en" to "Your email app opens with the report filled in for review before sending.", "es" to "Tu aplicación de correo se abre con el informe completo para revisarlo antes de enviarlo.", "fr" to "Votre application e-mail s’ouvre avec le rapport rempli pour vérification avant l’envoi.", "ar" to "يفتح تطبيق البريد مع التقرير مكتملًا للمراجعة قبل الإرسال."),
+            "Escolha o tipo de contacto, a ferramenta relacionada e o problema específico. Ao tocar em Enviar, a sua aplicação de email abre com o relatório preenchido para rever antes de enviar." to mapOf("en" to "Choose the contact type, related tool and specific problem. Tap Send and your email app will open with the report filled in for review before sending.", "es" to "Elige el tipo de contacto, la herramienta relacionada y el problema específico. Pulsa Enviar y tu aplicación de correo abrirá el informe completo para revisarlo antes de enviarlo.", "fr" to "Choisissez le type de contact, l’outil concerné et le problème. Appuyez sur Envoyer pour ouvrir votre application e-mail avec le rapport rempli avant l’envoi.", "ar" to "اختر نوع التواصل والأداة المرتبطة والمشكلة المحددة. اضغط إرسال لفتح تطبيق البريد مع التقرير مكتملًا للمراجعة قبل الإرسال.")
+        )
+
     private val translations =
         mapOf(
             "Useful tools. One app." to
@@ -1048,6 +1115,10 @@ object I18n {
             return value
         }
 
+        extraTranslations[value]
+            ?.get(language)
+            ?.let { return it }
+
         translations[value]
             ?.get(language)
             ?.let { return it }
@@ -1245,8 +1316,58 @@ object I18n {
         }
 
         Regex(
-            """^Versão (.+) • conta protegida • Analytics ativo$"""
+            """^Categoria (.+)$"""
         ).matchEntire(value)?.let { match ->
+            val category =
+                match.groupValues[1]
+            val translated =
+                extraTranslations[category]
+                    ?.get(language)
+                    ?: category
+            return when (language) {
+                "en" -> "Category $translated"
+                "es" -> "Categoría $translated"
+                "fr" -> "Catégorie $translated"
+                "ar" -> "الفئة $translated"
+                else -> value
+            }
+        }
+
+        Regex(
+            """^(\\d+) resultado\(s\) recente\(s\)$"""
+        ).matchEntire(value)?.let { match ->
+            val n = match.groupValues[1]
+            return when (language) {
+                "en" -> "$n recent result(s)"
+                "es" -> "$n resultado(s) reciente(s)"
+                "fr" -> "$n résultat(s) récent(s)"
+                "ar" -> "$n نتيجة حديثة"
+                else -> value
+            }
+        }
+
+        Regex(
+            """^Plano (.+) disponibilizado pelo billing\.$"""
+        ).matchEntire(value)?.let { match ->
+            val name = match.groupValues[1]
+            return when (language) {
+                "en" -> "Plan $name provided by billing."
+                "es" -> "Plan $name proporcionado por facturación."
+                "fr" -> "Forfait $name fourni par la facturation."
+                "ar" -> "الخطة $name مقدمة من نظام الفوترة."
+                else -> value
+            }
+        }
+
+        Regex(
+            """^Preço não definido$"""
+        ).matchEntire(value)?.let {
+            return extraTranslations[value]
+                ?.get(language)
+                ?: value
+        }
+
+$dynMarker
             val v = match.groupValues[1]
             return when (language) {
                 "en" -> "Version $v • protected account • Analytics active"
