@@ -3960,7 +3960,12 @@ class BackgroundRemoverActivity : Activity() {
         )
 
         setContentView(root)
-        I18n.localizeWindow(this)
+
+        root.post {
+            if (!isFinishing) {
+                I18n.localizeWindow(this)
+            }
+        }
     }
 
     private fun body(): LinearLayout? =
