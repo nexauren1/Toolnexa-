@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: toolnexa-android-release-v2
+  group: toolnexa-android-release-v3
   cancel-in-progress: true
 
 permissions:
