@@ -1044,6 +1044,12 @@ class MainActivity : ComponentActivity() {
                     "Imagem",
                     "Remova o fundo com IA e preserve transparência.",
                     R.drawable.ic_tool_background
+                ),
+                ToolDefinition(
+                    "Audio to MIDI",
+                    "Áudio",
+                    "Converta uma melodia de áudio em notas MIDI editáveis.",
+                    android.R.drawable.ic_media_play
                 )
             ).filter {
                 it.name.contains(query.trim(), true) ||
@@ -1311,6 +1317,9 @@ class MainActivity : ComponentActivity() {
 
                 "Background Remover" ->
                     showBackgroundRemover()
+
+                "Audio to MIDI" ->
+                    showAudioToMidi()
             }
         }
 
@@ -1433,6 +1442,18 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+
+    private fun showAudioToMidi() {
+        analytics.event(
+            "tool_open_audio_to_midi"
+        )
+        startActivity(
+            Intent(
+                this,
+                AudioToMidiActivity::class.java
+            )
+        )
+    }
 
     private fun showImageConverter() {
         analytics.event("tool_open_workflow", "tool" to "converter")
