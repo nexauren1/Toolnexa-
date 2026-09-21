@@ -105,12 +105,12 @@ class BackgroundRemoverActivity : Activity() {
     private var renderTask: Future<*>? = null
     private var displayBitmap: Bitmap? = null
 
-    private val blue by lazy { getColor(R.color.toolnexa_blue) }
-    private val bg by lazy { getColor(R.color.toolnexa_bg) }
-    private val surface by lazy { getColor(R.color.toolnexa_surface) }
-    private val textColor by lazy { getColor(R.color.toolnexa_text) }
-    private val muted by lazy { getColor(R.color.toolnexa_muted) }
-    private val border by lazy { getColor(R.color.toolnexa_border) }
+    private val blue by lazy { getColor(com.toolnexa.app.R.color.toolnexa_blue) }
+    private val bg by lazy { getColor(com.toolnexa.app.R.color.toolnexa_bg) }
+    private val surface by lazy { getColor(com.toolnexa.app.R.color.toolnexa_surface) }
+    private val textColor by lazy { getColor(com.toolnexa.app.R.color.toolnexa_text) }
+    private val muted by lazy { getColor(com.toolnexa.app.R.color.toolnexa_muted) }
+    private val border by lazy { getColor(com.toolnexa.app.R.color.toolnexa_border) }
 
     enum class BrushMode {
         ERASE,
@@ -491,7 +491,7 @@ class BackgroundRemoverActivity : Activity() {
                 typeface =
                     android.graphics.Typeface.DEFAULT_BOLD
                 setTextColor(
-                    getColor(R.color.toolnexa_green)
+                    getColor(com.toolnexa.app.R.color.toolnexa_green)
                 )
                 setPadding(
                     0,
@@ -3911,10 +3911,10 @@ class BackgroundRemoverActivity : Activity() {
             }
 
         listOf(
-            R.color.toolnexa_green,
-            R.color.toolnexa_blue,
-            R.color.toolnexa_red,
-            R.color.toolnexa_yellow
+            com.toolnexa.app.R.color.toolnexa_green,
+            com.toolnexa.app.R.color.toolnexa_blue,
+            com.toolnexa.app.R.color.toolnexa_red,
+            com.toolnexa.app.R.color.toolnexa_yellow
         ).forEach { res ->
             rail.addView(
                 View(this).apply {
