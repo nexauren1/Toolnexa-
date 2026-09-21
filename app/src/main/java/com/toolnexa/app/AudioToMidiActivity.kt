@@ -515,7 +515,9 @@ class AudioToMidiActivity : Activity() {
         false
 
     private val previewPlayer =
-        MidiPreviewPlayer()
+        MidiPreviewPlayer(
+            cacheDir
+        )
 
     private fun showStage1() {
         buildBase("Audio → MIDI")
