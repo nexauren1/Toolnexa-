@@ -264,50 +264,48 @@ class MidiPreviewPlayer(
     fun stop(
         notify: Boolean = true
     ) {
-        mainHandler.post {
-            synchronized(this@MidiPreviewPlayer) {
-                requestId += 1L
-            }
+        synchronized(this) {
+            requestId += 1L
+        }
 
-            worker?.interrupt()
-            worker =
-                null
+        worker?.interrupt()
+        worker =
+            null
 
-            mainHandler.removeCallbacks(
-                progressTick
+        mainHandler.removeCallbacks(
+            progressTick
+        )
+
+        val current =
+            player
+
+        player =
+            null
+
+        val file =
+            previewFile
+
+        previewFile =
+            null
+
+        try {
+            current?.stop()
+        } catch (_: Exception) {
+        }
+
+        try {
+            current?.release()
+        } catch (_: Exception) {
+        }
+
+        file?.delete()
+
+        if (notify) {
+            clearCallbacks(
+                notifyStopped = true
             )
-
-            val current =
-                player
-
-            player =
-                null
-
-            val file =
-                previewFile
-
-            previewFile =
-                null
-
-            try {
-                current?.stop()
-            } catch (_: Exception) {
-            }
-
-            try {
-                current?.release()
-            } catch (_: Exception) {
-            }
-
-            file?.delete()
-
-            if (notify) {
-                clearCallbacks(
-                    notifyStopped = true
-                )
-            } else {
-                clearCallbacks()
-            }
+        } else {
+            clearCallbacks()
         }
     }
 
