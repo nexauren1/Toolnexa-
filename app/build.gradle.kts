@@ -11,9 +11,13 @@ android {
         applicationId = "com.toolnexa.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 43
-        versionName = "1.31.0"
+        versionCode = 44
+        versionName = "1.32.0"
     }
+
+    dynamicFeatures += setOf(
+        ":feature_business"
+    )
 
     buildFeatures {
         buildConfig = true
@@ -73,5 +77,8 @@ dependencies {
     )
     implementation(
         "com.google.android.gms:play-services-tflite-java:16.5.0"
+    )
+    implementation(
+        "com.google.android.play:feature-delivery:2.1.0"
     )
 }
