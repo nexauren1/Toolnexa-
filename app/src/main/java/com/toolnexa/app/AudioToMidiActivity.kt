@@ -54,6 +54,7 @@ class AudioToMidiActivity : Activity() {
     private var progressText: TextView? = null
     private var progressBar: ProgressBar? = null
     private var convertButton: Button? = null
+    private var sensitivityLabel: TextView? = null
 
     private val blue by lazy {
         getColor(R.color.toolnexa_blue)
@@ -253,11 +254,16 @@ class AudioToMidiActivity : Activity() {
 
         val sensitivityCard = card()
 
-        sensitivityCard.addView(
+        sensitivityLabel =
             title(
-                "Sensibilidade: $sensitivity%",
+                "Sensibilidade: " +
+                    sensitivity +
+                    "%",
                 17f
             )
+
+        sensitivityCard.addView(
+            sensitivityLabel
         )
 
         val seek =
@@ -277,12 +283,12 @@ class AudioToMidiActivity : Activity() {
                                     20,
                                     80
                                 )
-                            (
-                                sensitivityCard
-                                    .getChildAt(0)
-                                    as? TextView
-                                )?.text =
-                                "Sensibilidade: " +
+                            sensitivityLabel?.text =
+                                I18n.t(
+                                    this@AudioToMidiActivity,
+                                    "Sensibilidade"
+                                ) +
+                                    ": " +
                                     sensitivity +
                                     "%"
                         }
