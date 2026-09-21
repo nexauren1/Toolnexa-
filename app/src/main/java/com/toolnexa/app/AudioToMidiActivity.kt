@@ -1146,21 +1146,26 @@ class AudioToMidiActivity : Activity() {
 
                 var sampleRate =
                     format.getInteger(
-                        MediaFormat.KEY_SAMPLE_RATE,
-                        44100
+                        MediaFormat.KEY_SAMPLE_RATE
                     )
 
                 var channels =
                     format.getInteger(
-                        MediaFormat.KEY_CHANNEL_COUNT,
-                        1
+                        MediaFormat.KEY_CHANNEL_COUNT
                     )
 
                 var pcmEncoding =
-                    format.getInteger(
-                        MediaFormat.KEY_PCM_ENCODING,
+                    if (
+                        format.containsKey(
+                            MediaFormat.KEY_PCM_ENCODING
+                        )
+                    ) {
+                        format.getInteger(
+                            MediaFormat.KEY_PCM_ENCODING
+                        )
+                    } else {
                         android.media.AudioFormat.ENCODING_PCM_16BIT
-                    )
+                    }
 
                 val maxSamples =
                     max(
@@ -1257,22 +1262,43 @@ class AudioToMidiActivity : Activity() {
                                 codec.outputFormat
 
                             sampleRate =
-                                outputFormat.getInteger(
-                                    MediaFormat.KEY_SAMPLE_RATE,
+                                if (
+                                    outputFormat.containsKey(
+                                        MediaFormat.KEY_SAMPLE_RATE
+                                    )
+                                ) {
+                                    outputFormat.getInteger(
+                                        MediaFormat.KEY_SAMPLE_RATE
+                                    )
+                                } else {
                                     sampleRate
-                                )
+                                }
 
                             channels =
-                                outputFormat.getInteger(
-                                    MediaFormat.KEY_CHANNEL_COUNT,
+                                if (
+                                    outputFormat.containsKey(
+                                        MediaFormat.KEY_CHANNEL_COUNT
+                                    )
+                                ) {
+                                    outputFormat.getInteger(
+                                        MediaFormat.KEY_CHANNEL_COUNT
+                                    )
+                                } else {
                                     channels
-                                )
+                                }
 
                             pcmEncoding =
-                                outputFormat.getInteger(
-                                    MediaFormat.KEY_PCM_ENCODING,
+                                if (
+                                    outputFormat.containsKey(
+                                        MediaFormat.KEY_PCM_ENCODING
+                                    )
+                                ) {
+                                    outputFormat.getInteger(
+                                        MediaFormat.KEY_PCM_ENCODING
+                                    )
+                                } else {
                                     pcmEncoding
-                                )
+                                }
                         }
 
                         outputIndex >= 0 -> {
@@ -1317,10 +1343,17 @@ class AudioToMidiActivity : Activity() {
                             val duration =
                                 max(
                                     1L,
-                                    format.getLong(
-                                        MediaFormat.KEY_DURATION,
+                                    if (
+                                        format.containsKey(
+                                            MediaFormat.KEY_DURATION
+                                        )
+                                    ) {
+                                        format.getLong(
+                                            MediaFormat.KEY_DURATION
+                                        )
+                                    } else {
                                         1L
-                                    )
+                                    }
                                 )
 
                             val currentPts =
@@ -2341,8 +2374,9 @@ class AudioToMidiActivity : Activity() {
                 position: Double
             ): Double {
                 val left =
-                    position
-                        .floor()
+                    kotlin.math.floor(
+                        position
+                    )
                         .toInt()
                         .coerceIn(
                             1,
@@ -2730,13 +2764,14 @@ class AudioToMidiActivity : Activity() {
                         0x7F
                     ).toByte()
 
-            while (
-                {
-                    current =
-                        current shr 7
-                    current != 0
-                }()
-            ) {
+            while (true) {
+                current =
+                    current shr 7
+
+                if (current == 0L) {
+                    break
+                }
+
                 index--
 
                 buffer[index] =
@@ -2818,10 +2853,6 @@ class AudioToMidiActivity : Activity() {
                 size
             )
         }
-    }
-
-    private fun Int.floor(): Int {
-        return this
     }
 
     companion object {
