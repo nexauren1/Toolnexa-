@@ -51,6 +51,11 @@ class AudioToMidiActivity : Activity() {
     private var resultFile: File? = null
 
     private var sensitivity = 50
+    private var bpm = 120
+    private var transposeSemitones = 0
+    private var quantizeGrid = 0
+    private var detectionProfile = "melody"
+    private var cleanupEnabled = true
     private var progressText: TextView? = null
     private var progressBar: ProgressBar? = null
     private var convertButton: Button? = null
@@ -80,6 +85,18 @@ class AudioToMidiActivity : Activity() {
         getColor(R.color.toolnexa_border)
     }
 
+    private val audioAccent by lazy {
+        getColor(R.color.toolnexa_purple)
+    }
+
+    private val audioAccent2 by lazy {
+        getColor(R.color.toolnexa_cyan)
+    }
+
+    private val success by lazy {
+        getColor(R.color.toolnexa_green)
+    }
+
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         LanguageManager.apply(this)
@@ -93,76 +110,129 @@ class AudioToMidiActivity : Activity() {
     }
 
     private fun showStage1() {
-        buildBase(
-            "Audio → MIDI"
+        buildBase("Audio → MIDI")
+
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(20), dp(20), dp(20))
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(audioAccent, audioAccent2)
+            ).apply {
+                cornerRadius = dp(24).toFloat()
+            }
+        }
+
+        hero.addView(TextView(this).apply {
+            text = "TOOLNEXA STUDIO"
+            textSize = 11.5f
+            setTextColor(android.graphics.Color.WHITE)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            letterSpacing = 0.12f
+        })
+
+        hero.addView(TextView(this).apply {
+            text = "Audio → MIDI"
+            textSize = 30f
+            setTextColor(android.graphics.Color.WHITE)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setPadding(0, dp(8), 0, dp(4))
+        })
+
+        hero.addView(TextView(this).apply {
+            text = "Transforme melodias gravadas em MIDI editável, com controlo de BPM, afinação, quantização e limpeza."
+            textSize = 14.5f
+            setTextColor(android.graphics.Color.WHITE)
+            setLineSpacing(0f, 1.15f)
+        })
+
+        val badges = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(14), 0, 0)
+        }
+
+        badges.addView(pill("LOCAL", android.graphics.Color.WHITE, audioAccent))
+        badges.addView(
+            pill("MIDI", android.graphics.Color.WHITE, audioAccent2).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    dp(32)
+                ).apply {
+                    leftMargin = dp(8)
+                }
+            }
         )
 
-        addTitle("Audio → MIDI")
+        hero.addView(badges)
+        add(hero)
+
+        addTitle("Comece com o seu áudio")
         addText(
-            "Converta uma melodia gravada ou um instrumento " +
-                "em notas MIDI editáveis."
+            "Escolha uma gravação de voz, baixo, guitarra, piano ou outra linha musical. " +
+                "O processamento acontece no próprio aparelho."
         )
+
+        val input = card()
+
+        input.addView(TextView(this).apply {
+            text = "Ficheiro de áudio"
+            textSize = 18f
+            setTextColor(textColor)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        })
+
+        input.addView(
+            bodyText(
+                "MP3, WAV, M4A, OGG e outros formatos que o Android consiga descodificar."
+            ).apply {
+                setPadding(0, dp(6), 0, dp(12))
+            }
+        )
+
+        input.addView(
+            button("Escolher áudio", true).apply {
+                setOnClickListener {
+                    analytics.event("audio_to_midi_picker")
+
+                    startActivityForResult(
+                        Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            type = "audio/*"
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            addFlags(
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                            )
+                        },
+                        REQUEST_PICK
+                    )
+                }
+            }
+        )
+
+        add(input)
+
+        val power = card()
+        power.addView(title("O que esta versão faz", 17f))
+
+        listOf(
+            "4 perfis de deteção: Voz, Melodia, Baixo e Amplo",
+            "BPM configurável e quantização 1/8, 1/16 ou 1/32",
+            "Transposição de -12 a +12 semitons",
+            "Limpeza e união de notas para um MIDI mais editável"
+        ).forEach { feature ->
+            power.addView(
+                bodyText("• " + feature).apply {
+                    setPadding(0, dp(7), 0, 0)
+                }
+            )
+        }
+
+        add(power)
 
         add(
             infoCard(
                 "PROCESSAMENTO LOCAL",
-                "O áudio é descodificado no próprio aparelho. " +
-                    "Não enviamos o ficheiro para um servidor."
-            )
-        )
-
-        val input = card()
-        input.addView(
-            title(
-                "Começar com um áudio",
-                18f
-            )
-        )
-
-        input.addView(
-            bodyText(
-                "MP3, WAV, M4A, OGG e outros formatos que " +
-                    "o Android consiga descodificar."
-            )
-        )
-
-        val choose =
-            button(
-                "Escolher áudio",
-                true
-            )
-
-        choose.setOnClickListener {
-            analytics.event(
-                "audio_to_midi_picker"
-            )
-
-            startActivityForResult(
-                Intent(
-                    Intent.ACTION_OPEN_DOCUMENT
-                ).apply {
-                    type = "audio/*"
-                    addCategory(
-                        Intent.CATEGORY_OPENABLE
-                    )
-                    addFlags(
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                            Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-                    )
-                },
-                REQUEST_PICK
-            )
-        }
-
-        input.addView(choose)
-        add(input)
-
-        add(
-            infoCard(
-                "NOTAS IMPORTANTES",
-                "A primeira versão é otimizada para uma voz ou " +
-                    "um instrumento por vez. Áudio com vários " +
-                    "instrumentos pode precisar de edição no MIDI."
+                "O áudio é descodificado e analisado no aparelho. O ficheiro original não é enviado para um servidor."
             )
         )
 
@@ -222,124 +292,214 @@ class AudioToMidiActivity : Activity() {
     }
 
     private fun showStage2() {
-        buildBase(
-            "Configuração"
-        )
+        buildBase("Configuração")
 
-        addTitle(
-            "Preparar conversão"
-        )
-
+        addTitle("Audio → MIDI Studio")
         addText(
-            "Ajuste a sensibilidade. Valores mais altos " +
-                "ignoram trechos muito baixos."
+            "Escolha como o ToolNexa deve interpretar a gravação. As opções avançadas afetam o MIDI final."
         )
 
         val fileCard = card()
-
+        fileCard.addView(TextView(this).apply {
+            text = "ÁUDIO PRONTO"
+            textSize = 11.5f
+            setTextColor(audioAccent)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            letterSpacing = 0.08f
+        })
         fileCard.addView(
-            title(
-                selectedName,
-                17f
-            )
+            title(selectedName, 18f).apply {
+                setPadding(0, dp(7), 0, dp(3))
+            }
         )
-
         fileCard.addView(
-            bodyText(
-                "Modo: Melody MIDI • deteção de uma linha musical"
-            )
+            bodyText("Até " + MAX_SECONDS + "s • processamento local")
         )
-
         add(fileCard)
 
+        val profileCard = card()
+        profileCard.addView(title("Perfil de deteção", 17f))
+        profileCard.addView(
+            bodyText("Escolha o intervalo musical mais adequado ao seu áudio.")
+                .apply { setPadding(0, dp(5), 0, dp(10)) }
+        )
+        profileCard.addView(
+            choiceRow(
+                listOf(
+                    "voice" to "Voz",
+                    "melody" to "Melodia",
+                    "bass" to "Baixo",
+                    "wide" to "Amplo"
+                ),
+                detectionProfile
+            ) { key ->
+                detectionProfile = key
+            }
+        )
+        add(profileCard)
+
         val sensitivityCard = card()
-
-        sensitivityLabel =
-            title(
-                "Sensibilidade: " +
-                    sensitivity +
-                    "%",
-                17f
-            )
-
+        sensitivityLabel = title(
+            "Sensibilidade: " + sensitivity + "%",
+            17f
+        )
+        sensitivityCard.addView(sensitivityLabel)
         sensitivityCard.addView(
-            sensitivityLabel
+            bodyText("Controla quanto áudio fraco é ignorado durante a deteção.")
+                .apply { setPadding(0, dp(5), 0, dp(7)) }
         )
 
-        val seek =
+        sensitivityCard.addView(
             SeekBar(this).apply {
-                max = 100
-                progress = sensitivity
+                max = 60
+                progress = (sensitivity - 20).coerceIn(0, 60)
                 setOnSeekBarChangeListener(
-                    object :
-                        SeekBar.OnSeekBarChangeListener {
+                    object : SeekBar.OnSeekBarChangeListener {
                         override fun onProgressChanged(
                             seekBar: SeekBar?,
                             progress: Int,
                             fromUser: Boolean
                         ) {
-                            sensitivity =
-                                progress.coerceIn(
-                                    20,
-                                    80
-                                )
+                            sensitivity = (progress + 20).coerceIn(20, 80)
                             sensitivityLabel?.text =
-                                I18n.t(
-                                    this@AudioToMidiActivity,
-                                    "Sensibilidade"
-                                ) +
-                                    ": " +
-                                    sensitivity +
-                                    "%"
+                                I18n.t(this@AudioToMidiActivity, "Sensibilidade") +
+                                    ": " + sensitivity + "%"
                         }
 
-                        override fun onStartTrackingTouch(
-                            seekBar: SeekBar?
-                        ) = Unit
-
-                        override fun onStopTrackingTouch(
-                            seekBar: SeekBar?
-                        ) = Unit
+                        override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                        override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
                     }
                 )
             }
-
-        sensitivityCard.addView(
-            seek,
-            LinearLayout.LayoutParams(
-                -1,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
         )
-
-        sensitivityCard.addView(
-            bodyText(
-                "Recomendado: 40–60%. Use valores maiores " +
-                    "em gravações com ruído baixo."
-            )
-        )
-
         add(sensitivityCard)
 
-        val convert =
-            button(
-                "Converter para MIDI",
-                true
-            )
+        val advanced = card()
+        advanced.addView(title("Estúdio avançado", 17f))
+        advanced.addView(
+            bodyText("Configure o andamento e a forma como as notas serão organizadas no MIDI.")
+                .apply { setPadding(0, dp(5), 0, dp(10)) }
+        )
 
-        convertButton = convert
+        advanced.addView(
+            title(
+                I18n.t(this, "BPM") + ": " + bpm,
+                15.5f
+            ).apply { tag = "bpm_label" }
+        )
 
-        convert.setOnClickListener {
-            startConversion()
+        advanced.addView(
+            SeekBar(this).apply {
+                max = 120
+                progress = (bpm - 60).coerceIn(0, 120)
+                setOnSeekBarChangeListener(
+                    object : SeekBar.OnSeekBarChangeListener {
+                        override fun onProgressChanged(
+                            seekBar: SeekBar?,
+                            progress: Int,
+                            fromUser: Boolean
+                        ) {
+                            bpm = (progress + 60).coerceIn(60, 180)
+                            advanced.findViewWithTag<TextView>("bpm_label")?.text =
+                                I18n.t(this@AudioToMidiActivity, "BPM") +
+                                    ": " + bpm
+                        }
+                        override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                        override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+                    }
+                )
+            }
+        )
+
+        advanced.addView(
+            title(I18n.t(this, "Quantização"), 15.5f).apply {
+                setPadding(0, dp(8), 0, dp(5))
+            }
+        )
+        advanced.addView(
+            choiceRow(
+                listOf(
+                    "0" to "Desligada",
+                    "8" to "1/8",
+                    "16" to "1/16",
+                    "32" to "1/32"
+                ),
+                quantizeGrid.toString()
+            ) { key ->
+                quantizeGrid = key.toIntOrNull() ?: 0
+            }
+        )
+
+        advanced.addView(
+            title(
+                I18n.t(this, "Transposição") + ": " +
+                    transposeSemitones.toSignedString() + " st",
+                15.5f
+            ).apply {
+                tag = "transpose_label"
+                setPadding(0, dp(10), 0, dp(4))
+            }
+        )
+
+        advanced.addView(
+            SeekBar(this).apply {
+                max = 24
+                progress = (transposeSemitones + 12).coerceIn(0, 24)
+                setOnSeekBarChangeListener(
+                    object : SeekBar.OnSeekBarChangeListener {
+                        override fun onProgressChanged(
+                            seekBar: SeekBar?,
+                            progress: Int,
+                            fromUser: Boolean
+                        ) {
+                            transposeSemitones = (progress - 12).coerceIn(-12, 12)
+                            advanced.findViewWithTag<TextView>("transpose_label")?.text =
+                                I18n.t(this@AudioToMidiActivity, "Transposição") +
+                                    ": " +
+                                    transposeSemitones.toSignedString() +
+                                    " st"
+                        }
+                        override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                        override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+                    }
+                )
+            }
+        )
+
+        val cleanup = android.widget.CheckBox(this).apply {
+            text = "Limpeza inteligente"
+            textSize = 15f
+            setTextColor(textColor)
+            isChecked = cleanupEnabled
+            buttonTintList =
+                android.content.res.ColorStateList.valueOf(audioAccent)
+            setOnCheckedChangeListener { _, checked ->
+                cleanupEnabled = checked
+            }
         }
+        advanced.addView(cleanup)
+        advanced.addView(
+            bodyText(
+                "Remove notas muito curtas, junta repetições e evita sobreposição desnecessária."
+            ).apply {
+                setPadding(dp(2), 0, 0, 0)
+            }
+        )
 
-        add(convert)
+        add(advanced)
+
+        val action = button("Converter para MIDI", true).apply {
+            setOnClickListener {
+                startConversion()
+            }
+        }
+        convertButton = action
+        add(action)
 
         add(
             infoCard(
-                "RESULTADO",
-                "O ToolNexa vai criar um ficheiro .mid padrão, " +
-                    "compatível com DAWs e editores MIDI."
+                "DICA",
+                "Para voz use Voz. Para linhas graves use Baixo. Para um instrumento com notas altas e baixas use Amplo."
             )
         )
 
@@ -710,6 +870,117 @@ class AudioToMidiActivity : Activity() {
                 Toast.LENGTH_LONG
             ).show()
         }
+    }
+
+    private fun pill(
+        text: String,
+        fillColor: Int,
+        textColor: Int
+    ): TextView {
+        return TextView(this).apply {
+            this.text = text
+            textSize = 10.5f
+            setTextColor(textColor)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(dp(12), 0, dp(12), 0)
+            background =
+                android.graphics.drawable.GradientDrawable().apply {
+                    setColor(
+                        (
+                            fillColor and
+                                0x00FFFFFF
+                            ) or
+                            (
+                                0x22 shl 24
+                            )
+                    )
+                    setStroke(dp(1), fillColor)
+                    cornerRadius = dp(18).toFloat()
+                }
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(32)
+            )
+        }
+    }
+
+    private fun choiceRow(
+        options: List<Pair<String, String>>,
+        selectedKey: String,
+        onSelect: (String) -> Unit
+    ): LinearLayout {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val buttons = linkedMapOf<String, Button>()
+
+        fun refresh() {
+            buttons.forEach { (key, button) ->
+                val selected = key == selectedKeyHolder[0]
+                button.background =
+                    android.graphics.drawable.GradientDrawable().apply {
+                        setColor(
+                            if (selected) {
+                                audioAccent
+                            } else {
+                                0xFFF6F8FC.toInt()
+                            }
+                        )
+                        setStroke(
+                            dp(1),
+                            if (selected) {
+                                audioAccent
+                            } else {
+                                border
+                            }
+                        )
+                        cornerRadius = dp(12).toFloat()
+                    }
+                button.setTextColor(
+                    if (selected) {
+                        android.graphics.Color.WHITE
+                    } else {
+                        textColor
+                    }
+                )
+            }
+        }
+
+        val selectedKeyHolder = arrayOf(selectedKey)
+
+        options.forEachIndexed { index, pair ->
+            val button = Button(this).apply {
+                text = pair.second
+                textSize = 12.5f
+                isAllCaps = false
+                minHeight = dp(44)
+                stateListAnimator = null
+                setPadding(dp(7), 0, dp(7), 0)
+                setOnClickListener {
+                    selectedKeyHolder[0] = pair.first
+                    onSelect(pair.first)
+                    refresh()
+                }
+            }
+
+            val params = LinearLayout.LayoutParams(
+                0,
+                dp(44),
+                1f
+            ).apply {
+                if (index > 0) {
+                    leftMargin = dp(6)
+                }
+            }
+            row.addView(button, params)
+            buttons[pair.first] = button
+        }
+
+        refresh()
+        return row
     }
 
     private fun buildBase(
