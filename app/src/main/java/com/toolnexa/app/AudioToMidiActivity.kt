@@ -103,7 +103,387 @@ class AudioToMidiActivity : Activity() {
         super.onCreate(state)
         LanguageManager.apply(this)
         analytics.screen("audio_to_midi")
-        showStage1()
+
+        if (
+            BasicPitchModelManager.isInstalled(
+                this
+            )
+        ) {
+            showStage1()
+        } else {
+            showModelSetup()
+        }
+    }
+
+    private fun showModelSetup() {
+        buildBase(
+            "Audio → MIDI"
+        )
+
+        val hero =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.VERTICAL
+
+                setPadding(
+                    dp(20),
+                    dp(22),
+                    dp(20),
+                    dp(22)
+                )
+
+                background =
+                    android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                        intArrayOf(
+                            audioAccent,
+                            audioAccent2
+                        )
+                    ).apply {
+                        cornerRadius =
+                            dp(24).toFloat()
+                    }
+            }
+
+        hero.addView(
+            TextView(this).apply {
+                text =
+                    "TOOLNEXA AI MODEL"
+
+                textSize =
+                    11.5f
+
+                setTextColor(
+                    android.graphics.Color.WHITE
+                )
+
+                typeface =
+                    android.graphics.Typeface.DEFAULT_BOLD
+
+                letterSpacing =
+                    0.12f
+            }
+        )
+
+        hero.addView(
+            title(
+                I18n.t(
+                    this,
+                    "Preparar IA Neural"
+                ),
+                28f
+            ).apply {
+                setTextColor(
+                    android.graphics.Color.WHITE
+                )
+
+                setPadding(
+                    0,
+                    dp(8),
+                    0,
+                    dp(5)
+                )
+            }
+        )
+
+        hero.addView(
+            TextView(this).apply {
+                text =
+                    I18n.t(
+                        this@AudioToMidiActivity,
+                        "Baixe o modelo uma vez para ativar a transcrição polifónica. Depois ele fica guardado no aparelho."
+                    )
+
+                textSize =
+                    14.5f
+
+                setTextColor(
+                    android.graphics.Color.WHITE
+                )
+
+                setLineSpacing(
+                    0f,
+                    1.15f
+                )
+            }
+        )
+
+        add(
+            hero
+        )
+
+        val modelCard =
+            card()
+
+        modelCard.addView(
+            title(
+                "Basic Pitch",
+                19f
+            )
+        )
+
+        modelCard.addView(
+            bodyText(
+                I18n.t(
+                    this,
+                    "Modelo neural de transcrição musical"
+                )
+            ).apply {
+                setPadding(
+                    0,
+                    dp(5),
+                    0,
+                    dp(12)
+                )
+            }
+        )
+
+        val sizeRow =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.HORIZONTAL
+                gravity =
+                    Gravity.CENTER_VERTICAL
+            }
+
+        sizeRow.addView(
+            TextView(this).apply {
+                text =
+                    I18n.t(
+                        this@AudioToMidiActivity,
+                        "Tamanho do modelo"
+                    )
+
+                textSize =
+                    14f
+
+                setTextColor(
+                    muted
+                )
+            },
+            LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+            )
+        )
+
+        sizeRow.addView(
+            TextView(this).apply {
+                text =
+                    BasicPitchModelManager
+                        .displaySizeMb()
+
+                textSize =
+                    16f
+
+                setTextColor(
+                    audioAccent
+                )
+
+                typeface =
+                    android.graphics.Typeface.DEFAULT_BOLD
+            }
+        )
+
+        modelCard.addView(
+            sizeRow
+        )
+
+        modelCard.addView(
+            bodyText(
+                I18n.t(
+                    this,
+                    "O modelo é baixado uma vez e reutilizado nas próximas conversões."
+                )
+            ).apply {
+                setPadding(
+                    0,
+                    dp(8),
+                    0,
+                    0
+                )
+            }
+        )
+
+        val downloadProgress =
+            ProgressBar(
+                this,
+                null,
+                android.R.attr.progressBarStyleHorizontal
+            ).apply {
+                max =
+                    100
+                progress =
+                    0
+                visibility =
+                    View.GONE
+            }
+
+        modelCard.addView(
+            downloadProgress,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(10)
+            ).apply {
+                topMargin =
+                    dp(14)
+            }
+        )
+
+        val statusText =
+            bodyText(
+                I18n.t(
+                    this,
+                    "Pronto para download"
+                )
+            ).apply {
+                setPadding(
+                    0,
+                    dp(8),
+                    0,
+                    dp(0)
+                )
+            }
+
+        modelCard.addView(
+            statusText
+        )
+
+        add(
+            modelCard
+        )
+
+        val downloadButton =
+            button(
+                I18n.t(
+                    this,
+                    "Baixar modelo"
+                ) +
+                    " • " +
+                    BasicPitchModelManager
+                        .displaySizeMb(),
+                true
+            )
+
+        downloadButton.setOnClickListener {
+            downloadButton.isEnabled =
+                false
+
+            downloadProgress.visibility =
+                View.VISIBLE
+
+            statusText.text =
+                I18n.t(
+                    this@AudioToMidiActivity,
+                    "A preparar o download..."
+                )
+
+            BasicPitchModelManager.download(
+                context = this,
+                onProgress = {
+                    downloaded,
+                    total,
+                    percent ->
+                    val downloadedMb =
+                        downloaded /
+                            1_000_000.0
+
+                    val totalMb =
+                        total /
+                            1_000_000.0
+
+                    downloadProgress.progress =
+                        percent
+
+                    statusText.text =
+                        String.format(
+                            Locale.US,
+                            "%s %d%% • %.2f / %.2f MB",
+                            I18n.t(
+                                this@AudioToMidiActivity,
+                                "A baixar modelo..."
+                            ),
+                            percent,
+                            downloadedMb,
+                            totalMb
+                        )
+                },
+                onComplete = {
+                    statusText.text =
+                        I18n.t(
+                            this@AudioToMidiActivity,
+                            "Modelo instalado. A preparar a IA..."
+                        )
+
+                    downloadProgress.progress =
+                        100
+
+                    Toast.makeText(
+                        this,
+                        I18n.t(
+                            this@AudioToMidiActivity,
+                            "Modelo de IA instalado com sucesso."
+                        ),
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    showStage1()
+                },
+                onError = { message ->
+                    downloadButton.isEnabled =
+                        true
+
+                    statusText.text =
+                        message
+
+                    downloadProgress.visibility =
+                        View.VISIBLE
+                }
+            )
+        }
+
+        add(
+            downloadButton
+        )
+
+        add(
+            button(
+                I18n.t(
+                    this,
+                    "Usar modo local sem IA"
+                ),
+                false
+            ).apply {
+                setOnClickListener {
+                    conversionEngine =
+                        "local"
+
+                    showStage1()
+                }
+            }
+        )
+
+        add(
+            infoCard(
+                I18n.t(
+                    this,
+                    "MODELO LOCAL"
+                ),
+                I18n.t(
+                    this,
+                    "O modelo fica guardado no armazenamento privado do aplicativo. O áudio continua a ser processado no próprio aparelho."
+                )
+            )
+        )
+
+        root()?.post {
+            if (!isFinishing) {
+                I18n.localizeWindow(
+                    this
+                )
+            }
+        }
     }
 
     override fun onDestroy() {
