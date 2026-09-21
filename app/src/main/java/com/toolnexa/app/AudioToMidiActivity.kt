@@ -1580,7 +1580,6 @@ class AudioToMidiActivity : Activity() {
                     rightMargin =
                         dp(6)
                 }
-            )
         )
 
         editorActions.addView(
