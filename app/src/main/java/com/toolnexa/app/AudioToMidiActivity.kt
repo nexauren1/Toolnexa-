@@ -495,7 +495,7 @@ class AudioToMidiActivity : Activity() {
     override fun onDestroy() {
         neuralEngine?.close()
         neuralEngine = null
-        previewPlayer.stop()
+        previewPlayer?.stop()
         executor.shutdownNow()
         super.onDestroy()
     }
@@ -2066,7 +2066,7 @@ class AudioToMidiActivity : Activity() {
                 textSize =
                     12.5f
                 setOnClickListener {
-                    previewPlayer.stop()
+                    previewPlayer?.stop()
                 }
             },
             LinearLayout.LayoutParams(
