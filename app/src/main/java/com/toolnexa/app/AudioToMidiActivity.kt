@@ -56,6 +56,7 @@ class AudioToMidiActivity : Activity() {
     private var quantizeGrid = 0
     private var detectionProfile = "melody"
     private var cleanupEnabled = true
+    private var conversionEngine = "neural"
     private var progressText: TextView? = null
     private var progressBar: ProgressBar? = null
     private var convertButton: Button? = null
@@ -105,9 +106,13 @@ class AudioToMidiActivity : Activity() {
     }
 
     override fun onDestroy() {
+        neuralEngine?.close()
+        neuralEngine = null
         executor.shutdownNow()
         super.onDestroy()
     }
+
+    private var neuralEngine: BasicPitchWebEngine? = null
 
     private fun showStage1() {
         buildBase("Audio → MIDI")
@@ -151,7 +156,19 @@ class AudioToMidiActivity : Activity() {
             setPadding(0, dp(14), 0, 0)
         }
 
-        badges.addView(pill("LOCAL", android.graphics.Color.WHITE, audioAccent))
+        badges.addView(
+            pill("AI NEURAL", android.graphics.Color.WHITE, audioAccent)
+        )
+        badges.addView(
+            pill("LOCAL FALLBACK", android.graphics.Color.WHITE, audioAccent2).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    dp(32)
+                ).apply {
+                    leftMargin = dp(8)
+                }
+            }
+        )
         badges.addView(
             pill("MIDI", android.graphics.Color.WHITE, audioAccent2).apply {
                 layoutParams = LinearLayout.LayoutParams(
@@ -362,6 +379,33 @@ class AudioToMidiActivity : Activity() {
         )
         add(fileCard)
 
+        val engineCard = card()
+        engineCard.addView(
+            title(I18n.t(this, "Motor de conversão"), 17f)
+        )
+        engineCard.addView(
+            bodyText(
+                I18n.t(
+                    this,
+                    "A IA Neural faz transcrição polifónica. O Local rápido funciona sem descarregar o modelo e serve como fallback."
+                )
+            ).apply {
+                setPadding(0, dp(5), 0, dp(10))
+            }
+        )
+        engineCard.addView(
+            choiceRow(
+                listOf(
+                    "neural" to I18n.t(this, "IA Neural"),
+                    "local" to I18n.t(this, "Local rápido")
+                ),
+                conversionEngine
+            ) { key ->
+                conversionEngine = key
+            }
+        )
+        add(engineCard)
+
         val profileCard = card()
         profileCard.addView(title("Perfil de deteção", 17f))
         profileCard.addView(
@@ -561,45 +605,105 @@ class AudioToMidiActivity : Activity() {
 
         convertButton?.isEnabled = false
 
+        buildConversionScreen(options.engine)
+
+        if (options.engine == "neural") {
+            startNeuralConversion(uri, options)
+        } else {
+            startLocalConversion(uri, options, false)
+        }
+    }
+
+    private fun buildConversionScreen(
+        engine: String
+    ) {
         buildBase("A converter")
 
         val statusCard = card()
         statusCard.addView(
             TextView(this).apply {
-                text = "TOOLNEXA ENGINE"
+                text =
+                    if (engine == "neural") {
+                        "TOOLNEXA NEURAL"
+                    } else {
+                        "TOOLNEXA LOCAL"
+                    }
                 textSize = 11.5f
                 setTextColor(audioAccent)
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                typeface =
+                    android.graphics.Typeface.DEFAULT_BOLD
                 letterSpacing = 0.08f
             }
         )
         statusCard.addView(
-            title("A criar o seu MIDI", 24f).apply {
+            title(
+                if (engine == "neural") {
+                    I18n.t(this, "Transcrição neural")
+                } else {
+                    I18n.t(this, "A criar o seu MIDI")
+                },
+                24f
+            ).apply {
                 setPadding(0, dp(7), 0, dp(2))
             }
         )
         statusCard.addView(
-            bodyText("Descodificação → análise → limpeza → exportação")
+            bodyText(
+                if (engine == "neural") {
+                    I18n.t(
+                        this,
+                        "Modelo neural → notas → pitch bends → limpeza → MIDI"
+                    )
+                } else {
+                    I18n.t(
+                        this,
+                        "Descodificação → análise → limpeza → exportação"
+                    )
+                }
+            )
         )
         add(statusCard)
 
-        progressBar = ProgressBar(
-            this,
-            null,
-            android.R.attr.progressBarStyleHorizontal
-        ).apply {
-            max = 100
-            progress = 0
-        }
-        add(progressBar!!, 12)
+        progressBar =
+            ProgressBar(
+                this,
+                null,
+                android.R.attr.progressBarStyleHorizontal
+            ).apply {
+                max = 100
+                progress = 0
+            }
 
-        progressText = bodyText("A preparar o áudio...")
+        add(
+            progressBar!!,
+            12
+        )
+
+        progressText =
+            bodyText(
+                I18n.t(this, "A preparar o áudio...")
+            )
+
         add(progressText!!)
 
         add(
             infoCard(
-                "PROCESSAMENTO EM SEGUNDO PLANO",
-                "A conversão corre fora da interface para manter o app responsivo."
+                if (engine == "neural") {
+                    I18n.t(this, "IA NEURAL")
+                } else {
+                    I18n.t(this, "LOCAL RÁPIDO")
+                },
+                if (engine == "neural") {
+                    I18n.t(
+                        this,
+                        "O modelo é obtido pela internet quando necessário. O áudio permanece no aparelho."
+                    )
+                } else {
+                    I18n.t(
+                        this,
+                        "Este modo não precisa de descarregar um modelo."
+                    )
+                }
             )
         )
 
@@ -608,63 +712,300 @@ class AudioToMidiActivity : Activity() {
                 I18n.localizeWindow(this)
             }
         }
+    }
+
+    private fun startNeuralConversion(
+        uri: Uri,
+        options: ConversionOptions
+    ) {
+        val range =
+            detectionRange(
+                options.profile
+            )
+
+        val normalized =
+            (
+                options.sensitivity -
+                    20
+                ).coerceIn(
+                    0,
+                    60
+                ) / 60f
+
+        val onsetThreshold =
+            (
+                0.68f -
+                    normalized *
+                    0.28f
+                ).coerceIn(
+                    0.35f,
+                    0.68f
+                )
+
+        val frameThreshold =
+            (
+                0.46f -
+                    normalized *
+                    0.20f
+                ).coerceIn(
+                    0.24f,
+                    0.46f
+                )
+
+        val minNoteFrames =
+            if (options.cleanup) {
+                5
+            } else {
+                3
+            }
+
+        neuralEngine?.close()
+
+        neuralEngine =
+            BasicPitchWebEngine(
+                activity = this,
+                audioUri = uri,
+                minMidi = range.first,
+                maxMidi = range.second,
+                onsetThreshold = onsetThreshold,
+                frameThreshold = frameThreshold,
+                minNoteLengthFrames = minNoteFrames,
+                maxSeconds = MAX_SECONDS,
+                onProgress = { progress, message ->
+                    if (!isFinishing) {
+                        progressBar?.progress =
+                            progress
+                        progressText?.text =
+                            message +
+                                " " +
+                                progress +
+                                "%"
+                    }
+                },
+                onSuccess = { notes, durationSeconds ->
+                    val engine = neuralEngine
+                    neuralEngine = null
+                    engine?.close()
+
+                    executor.execute {
+                        try {
+                            val baseNotes =
+                                notes.map { note ->
+                                    NoteEvent(
+                                        startSeconds =
+                                            note.startSeconds,
+                                        durationSeconds =
+                                            note.durationSeconds,
+                                        pitch =
+                                            note.pitch,
+                                        velocity =
+                                            (
+                                                35 +
+                                                    note.amplitude *
+                                                    83.0
+                                                ).roundToInt()
+                                                    .coerceIn(
+                                                        35,
+                                                        118
+                                                    ),
+                                        pitchBends =
+                                            note.pitchBends
+                                    )
+                                }
+
+                            val enhanced =
+                                enhanceNotes(
+                                    baseNotes,
+                                    options,
+                                    durationSeconds.coerceAtLeast(
+                                        MIN_SECONDS
+                                    )
+                                )
+
+                            if (enhanced.isEmpty()) {
+                                throw IllegalStateException(
+                                    I18n.t(
+                                        this@AudioToMidiActivity,
+                                        "A IA não encontrou notas musicais claras."
+                                    )
+                                )
+                            }
+
+                            val file =
+                                File(
+                                    cacheDir,
+                                    "toolnexa-audio-midi-" +
+                                        System.currentTimeMillis() +
+                                        ".mid"
+                                )
+
+                            MidiFileWriter.write(
+                                file,
+                                enhanced,
+                                options.bpm
+                            )
+
+                            resultFile = file
+
+                            runOnUiThread {
+                                if (!isFinishing) {
+                                    showResult(
+                                        file,
+                                        TranscriptionResult(
+                                            enhanced
+                                        ),
+                                        durationSeconds,
+                                        options,
+                                        "neural"
+                                    )
+                                }
+                            }
+                        } catch (error: Exception) {
+                            runOnUiThread {
+                                if (!isFinishing) {
+                                    Toast.makeText(
+                                        this,
+                                        error.message
+                                            ?: "Não foi possível gerar o MIDI neural.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+
+                                    startLocalConversion(
+                                        uri,
+                                        options,
+                                        true
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                onError = { message ->
+                    neuralEngine = null
+
+                    if (!isFinishing) {
+                        Toast.makeText(
+                            this,
+                            message +
+                                " " +
+                                I18n.t(
+                                    this,
+                                    "A usar o motor local como fallback."
+                                ),
+                            Toast.LENGTH_LONG
+                        ).show()
+
+                        startLocalConversion(
+                            uri,
+                            options,
+                            true
+                        )
+                    }
+                }
+            )
+
+        neuralEngine?.start()
+    }
+
+    private fun startLocalConversion(
+        uri: Uri,
+        options: ConversionOptions,
+        fallbackFromNeural: Boolean
+    ) {
+        buildConversionScreen(
+            "local"
+        )
+
+        if (fallbackFromNeural) {
+            progressText?.text =
+                I18n.t(
+                    this,
+                    "A IA Neural não está disponível. A usar o motor local..."
+                )
+        }
 
         executor.execute {
             try {
-                val decoded = AudioDecoder.decode(
-                    this,
-                    uri,
-                    MAX_SECONDS
-                ) { progress ->
-                    runOnUiThread {
-                        if (!isFinishing) {
-                            progressBar?.progress = progress
-                            progressText?.text =
-                                I18n.t(this, "A analisar áudio...") + " " + progress + "%"
+                val decoded =
+                    AudioDecoder.decode(
+                        this,
+                        uri,
+                        MAX_SECONDS
+                    ) { progress ->
+                        runOnUiThread {
+                            if (!isFinishing) {
+                                progressBar?.progress =
+                                    progress
+
+                                progressText?.text =
+                                    I18n.t(
+                                        this,
+                                        "A analisar áudio..."
+                                    ) +
+                                        " " +
+                                        progress +
+                                        "%"
+                            }
                         }
                     }
-                }
 
-                val range = detectionRange(options.profile)
-                val threshold =
-                    PitchTranscriber.thresholdForSensitivity(
-                        options.sensitivity
+                val range =
+                    detectionRange(
+                        options.profile
                     )
 
-                val detected = PitchTranscriber.transcribe(
-                    decoded.samples,
-                    decoded.sampleRate,
-                    threshold,
-                    range.first,
-                    range.second
-                ) { progress ->
-                    runOnUiThread {
-                        if (!isFinishing) {
-                            progressBar?.progress = progress
-                            progressText?.text =
-                                I18n.t(this, "A detetar notas...") + " " + progress + "%"
+                val threshold =
+                    PitchTranscriber
+                        .thresholdForSensitivity(
+                            options.sensitivity
+                        )
+
+                val detected =
+                    PitchTranscriber.transcribe(
+                        decoded.samples,
+                        decoded.sampleRate,
+                        threshold,
+                        range.first,
+                        range.second
+                    ) { progress ->
+                        runOnUiThread {
+                            if (!isFinishing) {
+                                progressBar?.progress =
+                                    progress
+
+                                progressText?.text =
+                                    I18n.t(
+                                        this,
+                                        "A detetar notas..."
+                                    ) +
+                                        " " +
+                                        progress +
+                                        "%"
+                            }
                         }
                     }
-                }
 
-                val enhanced = enhanceNotes(
-                    detected.notes,
-                    options,
-                    decoded.durationSeconds
-                )
+                val enhanced =
+                    enhanceNotes(
+                        detected.notes,
+                        options,
+                        decoded.durationSeconds
+                    )
 
                 if (enhanced.isEmpty()) {
                     throw IllegalStateException(
-                        "Não foram encontradas notas musicais claras. Tente outro perfil, ajuste a sensibilidade ou use uma gravação mais limpa."
+                        "Não foram encontradas notas musicais claras. " +
+                            "Tente outro perfil, ajuste a sensibilidade ou use uma gravação mais limpa."
                     )
                 }
 
-                val file = File(
-                    cacheDir,
-                    "toolnexa-audio-midi-" +
-                        System.currentTimeMillis() +
-                        ".mid"
-                )
+                val file =
+                    File(
+                        cacheDir,
+                        "toolnexa-audio-midi-" +
+                            System.currentTimeMillis() +
+                            ".mid"
+                    )
 
                 MidiFileWriter.write(
                     file,
@@ -672,15 +1013,19 @@ class AudioToMidiActivity : Activity() {
                     options.bpm
                 )
 
-                resultFile = file
+                resultFile =
+                    file
 
                 runOnUiThread {
                     if (!isFinishing) {
                         showResult(
                             file,
-                            TranscriptionResult(enhanced),
+                            TranscriptionResult(
+                                enhanced
+                            ),
                             decoded.durationSeconds,
-                            options
+                            options,
+                            "local"
                         )
                     }
                 }
@@ -689,9 +1034,11 @@ class AudioToMidiActivity : Activity() {
                     if (!isFinishing) {
                         Toast.makeText(
                             this,
-                            error.message ?: "Não foi possível converter o áudio.",
+                            error.message
+                                ?: "Não foi possível converter o áudio.",
                             Toast.LENGTH_LONG
                         ).show()
+
                         showStage2()
                     }
                 }
@@ -703,7 +1050,8 @@ class AudioToMidiActivity : Activity() {
         file: File,
         result: TranscriptionResult,
         durationSeconds: Double,
-        options: ConversionOptions
+        options: ConversionOptions,
+        engineName: String
     ) {
         buildBase("Resultado")
 
@@ -770,6 +1118,21 @@ class AudioToMidiActivity : Activity() {
                     I18n.t(this, "BPM") + ": " +
                     options.bpm
             ).apply { setPadding(0, dp(5), 0, 0) }
+        )
+
+        stats.addView(
+            bodyText(
+                I18n.t(this, "Motor") + ": " +
+                    engineLabel(engineName) +
+                    " • " +
+                    I18n.t(this, "Pitch bends") +
+                    ": " +
+                    result.notes.count {
+                        it.pitchBends.isNotEmpty()
+                    }
+            ).apply {
+                setPadding(0, dp(5), 0, 0)
+            }
         )
 
         stats.addView(
@@ -841,7 +1204,17 @@ class AudioToMidiActivity : Activity() {
         add(
             infoCard(
                 "MOTOR ATUAL",
-                "A versão atual usa análise espectral local. Os perfis e o pós-processamento melhoram a preparação do MIDI, enquanto uma futura versão poderá adicionar uma rede de transcrição polifónica dedicada."
+                if (engineName == "neural") {
+                    I18n.t(
+                        this,
+                        "O resultado foi criado pelo motor neural Basic Pitch, com transcrição polifónica e informação de pitch bend. A análise neural exige acesso à internet para obter o modelo."
+                    )
+                } else {
+                    I18n.t(
+                        this,
+                        "O resultado foi criado pelo motor local de análise espectral. O modo neural pode ser usado quando o modelo estiver disponível."
+                    )
+                }
             )
         )
 
@@ -1104,6 +1477,19 @@ class AudioToMidiActivity : Activity() {
         return row
     }
 
+    private fun engineLabel(
+        engine: String
+    ): String {
+        return I18n.t(
+            this,
+            if (engine == "neural") {
+                "IA Neural"
+            } else {
+                "Local rápido"
+            }
+        )
+    }
+
     private fun currentOptions(): ConversionOptions {
         return ConversionOptions(
             detectionProfile,
@@ -1111,7 +1497,8 @@ class AudioToMidiActivity : Activity() {
             bpm,
             transposeSemitones,
             quantizeGrid,
-            cleanupEnabled
+            cleanupEnabled,
+            conversionEngine
         )
     }
 
@@ -1431,7 +1818,8 @@ class AudioToMidiActivity : Activity() {
         val bpm: Int,
         val transposeSemitones: Int,
         val quantizeGrid: Int,
-        val cleanup: Boolean
+        val cleanup: Boolean,
+        val engine: String
     )
 
     private fun buildBase(
@@ -1786,7 +2174,8 @@ class AudioToMidiActivity : Activity() {
         val startSeconds: Double,
         val durationSeconds: Double,
         val pitch: Int,
-        val velocity: Int
+        val velocity: Int,
+        val pitchBends: List<Int> = emptyList()
     )
 
     private data class TranscriptionResult(
