@@ -425,8 +425,6 @@ class BasicPitchNativeEngine(
                 }
             )
 
-            var unknown88Seen = 0
-
             for (
                 index
                 in 0 until
@@ -439,6 +437,10 @@ class BasicPitchNativeEngine(
 
                 val shape =
                     tensor.shape()
+
+                if (shape.size < 2) {
+                    continue
+                }
 
                 val frames =
                     shape[
@@ -453,89 +455,41 @@ class BasicPitchNativeEngine(
                         outputs[index]!!
                     )
 
-                if (
-                    freqs == 264 ||
+                when (
                     roleForTensor(
                         tensor.name(),
+                        index,
                         freqs
-                    ) == Role.CONTOUR
-                ) {
-                    contourRows.addMatrix(
-                        values,
-                        frames,
-                        freqs,
-                        trimOverlap = true
                     )
-                    continue
-                }
-
-                if (freqs != 88) {
-                    continue
-                }
-
-                val name =
-                    tensor.name()
-                        .lowercase()
-
-                val role =
-                    when {
-                        name.contains(
-                            "statefulpartitionedcall:0"
-                        ) ||
-                            name.contains(
-                                "onset"
-                            ) ||
-                            name == "identity" -> {
-                            Role.ONSET
-                        }
-
-                        name.contains(
-                            "statefulpartitionedcall:1"
-                        ) ||
-                            name.contains(
-                                "contour"
-                            ) ||
-                            name.contains(
-                                "identity_1"
-                            ) -> {
-                            Role.CONTOUR
-                        }
-
-                        name.contains(
-                            "statefulpartitionedcall:2"
-                        ) ||
-                            name.contains(
-                                "note"
-                            ) ||
-                            name.contains(
-                                "identity_2"
-                            ) -> {
-                            Role.NOTE
-                        }
-
-                        unknown88Seen++ == 0 -> {
-                            Role.ONSET
-                        }
-
-                        else -> {
-                            Role.NOTE
-                        }
+                ) {
+                    Role.CONTOUR -> {
+                        contourRows.addMatrix(
+                            values,
+                            frames,
+                            freqs,
+                            trimOverlap = true
+                        )
                     }
 
-                if (role == Role.NOTE) {
-                    noteRows.addMatrix(
-                        values,
-                        frames,
-                        freqs,
-                        trimOverlap = true
-                    )
-                } else {
-                    onsetRows.addMatrix(
-                        values,
-                        frames,
-                        freqs,
-                        trimOverlap = true
-                    )
+                    Role.NOTE -> {
+                        noteRows.addMatrix(
+                            values,
+                            frames,
+                            freqs,
+                            trimOverlap = true
+                        )
+                    }
+
+                    Role.ONSET -> {
+                        onsetRows.addMatrix(
+                            values,
+                            frames,
+                            freqs,
+                            trimOverlap = true
+                        )
+                    }
+
+                    null -> Unit
                 }
             }
 
@@ -690,41 +644,25 @@ class BasicPitchNativeEngine(
 
     private fun roleForTensor(
         name: String,
+        index: Int,
         frequencyCount: Int
     ): Role? {
+        val normalized =
+            name.lowercase()
+
         if (
-            frequencyCount != 264 &&
+            frequencyCount == 264
+        ) {
+            return Role.CONTOUR
+        }
+
+        if (
             frequencyCount != 88
         ) {
             return null
         }
 
-        val normalized =
-            name.lowercase()
-
         return when {
-            normalized.contains(
-                "statefulpartitionedcall:0"
-            ) ||
-                normalized.contains(
-                    "onset"
-                ) ||
-                normalized == "identity" -> {
-                Role.ONSET
-            }
-
-            normalized.contains(
-                "statefulpartitionedcall:1"
-            ) ||
-                normalized.contains(
-                    "contour"
-                ) ||
-                normalized.contains(
-                    "identity_1"
-                ) -> {
-                Role.CONTOUR
-            }
-
             normalized.contains(
                 "statefulpartitionedcall:2"
             ) ||
@@ -735,6 +673,26 @@ class BasicPitchNativeEngine(
                     "identity_2"
                 ) -> {
                 Role.NOTE
+            }
+
+            normalized.contains(
+                "statefulpartitionedcall:1"
+            ) ||
+                normalized.contains(
+                    "onset"
+                ) ||
+                normalized.contains(
+                    "identity_1"
+                ) -> {
+                Role.ONSET
+            }
+
+            index == 0 -> {
+                Role.NOTE
+            }
+
+            index == 1 -> {
+                Role.ONSET
             }
 
             else -> null
