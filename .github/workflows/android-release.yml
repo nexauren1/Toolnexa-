@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: toolnexa-android-release
+  group: toolnexa-android-release-v2
   cancel-in-progress: true
 
 permissions:
@@ -16,6 +16,7 @@ permissions:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       TOOLNEXA_KEYSTORE_BASE64: ${{ secrets.TOOLNEXA_KEYSTORE_BASE64 }}
       TOOLNEXA_STORE_PASSWORD: ${{ secrets.TOOLNEXA_STORE_PASSWORD }}
@@ -109,7 +110,7 @@ jobs:
           set -euo pipefail
           NOTES="ToolNexa Android v$VERSION
 
-          Firebase Authentication with Google, e-mail/password and international phone SMS verification, Firebase Analytics, image tools, Cloudflare Worker integration, Background Remover using Cloudflare Images / BiRefNet, Nexauren X user storage, and Firebase update notifications."
+          Firebase Authentication with Google, e-mail/password and international phone SMS verification, Firebase Analytics, image tools, local Audio to MIDI melody conversion, Cloudflare Worker integration, Background Remover using Cloudflare Images / BiRefNet, Nexauren X user storage, and Firebase update notifications."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" toolnexa.apk --clobber
             gh release edit "$TAG" --title "ToolNexa Android v$VERSION" --notes "$NOTES"
