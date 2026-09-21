@@ -3961,7 +3961,8 @@ class BackgroundRemoverActivity : Activity() {
 
         setContentView(root)
 
-        root.post {
+        val contentRoot = root
+        contentRoot?.post {
             if (!isFinishing) {
                 I18n.localizeWindow(this)
             }
