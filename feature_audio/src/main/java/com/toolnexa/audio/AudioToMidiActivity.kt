@@ -318,7 +318,7 @@ class AudioToMidiActivity : Activity() {
             ProgressBar(
                 this,
                 null,
-                android.com.toolnexa.app.R.attr.progressBarStyleHorizontal
+                android.R.attr.progressBarStyleHorizontal
             ).apply {
                 max =
                     100
@@ -1106,7 +1106,7 @@ class AudioToMidiActivity : Activity() {
             ProgressBar(
                 this,
                 null,
-                android.com.toolnexa.app.R.attr.progressBarStyleHorizontal
+                android.R.attr.progressBarStyleHorizontal
             ).apply {
                 max = 100
                 progress = 0
