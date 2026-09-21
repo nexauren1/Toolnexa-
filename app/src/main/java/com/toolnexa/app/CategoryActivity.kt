@@ -732,6 +732,26 @@ class CategoryActivity : Activity() {
             )
 
             when (tool.id) {
+                "business-invoice-maker",
+                "business-receipt-maker",
+                "business-quote-maker",
+                "business-profit-calculator",
+                "business-expense-tracker",
+                "business-plan",
+                "business-proposal",
+                "business-contract-maker",
+                "business-name-generator",
+                "business-pricing-calculator" -> {
+                    startActivity(
+                        Intent(
+                            this,
+                            BusinessToolActivity::class.java
+                        ).apply {
+                            putExtra("tool_id", tool.id)
+                        }
+                    )
+                }
+
                 "background-remover" -> {
                     startActivity(
                         Intent(
