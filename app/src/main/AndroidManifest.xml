@@ -48,6 +48,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".BusinessToolActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".BackgroundRemoverActivity"
             android:exported="false" />
 
