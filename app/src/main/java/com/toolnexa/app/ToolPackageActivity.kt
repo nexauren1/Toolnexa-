@@ -234,12 +234,18 @@ class ToolPackageActivity : Activity() {
     private fun openTarget() {
         packageManager.prepareActivity()
 
+        val targetClass =
+            targetToolId?.let {
+                ToolPackageCatalog
+                    .activityClassFor(it)
+            }
+
         val intent =
-            if (targetToolId != null) {
+            if (targetClass != null) {
                 Intent().apply {
                     setClassName(
                         this@ToolPackageActivity,
-                        "com.toolnexa.business.BusinessToolActivity"
+                        targetClass
                     )
                     putExtra(
                         "tool_id",
