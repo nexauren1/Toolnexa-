@@ -21,6 +21,7 @@ class BasicPitchWebEngine(
     private val onsetThreshold: Float,
     private val frameThreshold: Float,
     private val minNoteLengthFrames: Int,
+    private val maxSeconds: Int,
     private val onProgress: (Int, String) -> Unit,
     private val onSuccess:
         (List<NeuralNote>, Double) -> Unit,
@@ -135,6 +136,10 @@ class BasicPitchWebEngine(
 
             val configuredHtml =
                 HTML
+                    .replace(
+                        "__MAX_SECONDS_TOKEN__",
+                        maxSeconds.toString()
+                    )
                     .replace(
                         "ONSET_THRESHOLD_TOKEN",
                         onsetThreshold.toString()
@@ -681,8 +686,23 @@ async function run() {
       "Modelo neural carregado. A preparar o áudio..."
     );
 
-    const audio =
+    let audio =
       await readAudio();
+
+    const maxSamples =
+      22050 *
+      __MAX_SECONDS_TOKEN__;
+
+    if (
+      audio.length >
+        maxSamples
+    ) {
+      audio =
+        audio.slice(
+          0,
+          maxSamples
+        );
+    }
 
     setState(
       "loading",
