@@ -153,7 +153,6 @@ class PlansActivity : Activity() {
         )
 
         setContentView(root)
-        I18n.localizeWindow(this)
 
         val back =
             TextView(this).apply {
@@ -432,6 +431,12 @@ class PlansActivity : Activity() {
         )
 
         showPlansLoading()
+
+        root.post {
+            if (!isFinishing) {
+                I18n.localizeWindow(this)
+            }
+        }
     }
 
     private fun showPlansLoading() {
@@ -490,6 +495,12 @@ class PlansActivity : Activity() {
                         error.message
                             ?: "Não foi possível carregar os planos."
                     )
+
+                    plansContainer?.post {
+                        if (!isFinishing) {
+                            I18n.localizeWindow(this)
+                        }
+                    }
                 }
             }
         }.start()
@@ -555,6 +566,12 @@ class PlansActivity : Activity() {
                         14
                 }
             )
+        }
+
+        plansContainer?.post {
+            if (!isFinishing) {
+                I18n.localizeWindow(this)
+            }
         }
     }
 
