@@ -169,7 +169,7 @@ class ToolPackageActivity : Activity() {
             status.text =
                 "Baixando pacote..."
             packageManager.download(
-                packageInfo.module,
+                packageInfo,
                 onProgress = {
                     runOnUiThread {
                         progress.progress = it
@@ -201,11 +201,14 @@ class ToolPackageActivity : Activity() {
         if (
             packageManager.isInstalled(
                 packageInfo.module
+            ) &&
+            !packageManager.needsUpdate(
+                packageInfo
             )
         ) {
             progress.progress = 100
             status.text =
-                "Pacote já instalado. Abrindo..."
+                "Pacote instalado e atualizado."
             button.text = "Abrir ferramentas"
             button.setOnClickListener {
                 openTarget()
@@ -214,6 +217,15 @@ class ToolPackageActivity : Activity() {
                 { openTarget() },
                 220
             )
+        } else if (
+            packageManager.isInstalled(
+                packageInfo.module
+            )
+        ) {
+            progress.progress = 0
+            status.text =
+                "Nova versão do pacote disponível."
+            button.text = "Atualizar pacote"
         }
 
         setContentView(root)
