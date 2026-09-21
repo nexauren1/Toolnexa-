@@ -1429,7 +1429,22 @@ class AudioToMidiActivity : Activity() {
             AudioMidiPianoRollView(
                 this,
                 editorDurationSeconds,
-                editorNotes
+                editorNotes.map {
+                    AudioMidiPianoRollView.Note(
+                        startSeconds =
+                            it.startSeconds,
+                        durationSeconds =
+                            it.durationSeconds,
+                        pitch =
+                            it.pitch,
+                        velocity =
+                            it.velocity,
+                        pitchBends =
+                            it.pitchBends,
+                        channel =
+                            it.channel
+                    )
+                }
             ) {
                 changed ->
                 editorNotes =
