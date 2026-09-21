@@ -248,7 +248,7 @@ class HistoryActivity : Activity() {
                     Intent(Intent.ACTION_VIEW).apply {
                         setDataAndType(
                             uri,
-                            "image/*"
+                            mimeTypeForEntry(entry)
                         )
                         addFlags(
                             Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -281,6 +281,48 @@ class HistoryActivity : Activity() {
             .translationY(0f)
             .setDuration(220)
             .start()
+    }
+
+    private fun mimeTypeForEntry(
+        entry: HistoryEntry
+    ): String {
+        val name =
+            entry.name.lowercase(
+                Locale.ROOT
+            )
+
+        return when {
+            name.endsWith(".mid") ||
+                name.endsWith(".midi") ->
+                "audio/midi"
+
+            name.endsWith(".mp3") ->
+                "audio/mpeg"
+
+            name.endsWith(".wav") ->
+                "audio/wav"
+
+            name.endsWith(".m4a") ->
+                "audio/mp4"
+
+            name.endsWith(".ogg") ->
+                "audio/ogg"
+
+            name.endsWith(".flac") ->
+                "audio/flac"
+
+            else ->
+                if (
+                    entry.tool.contains(
+                        "Audio",
+                        ignoreCase = true
+                    )
+                ) {
+                    "audio/*"
+                } else {
+                    "image/*"
+                }
+        }
     }
 
     private fun styleSecondary(button: Button) {
