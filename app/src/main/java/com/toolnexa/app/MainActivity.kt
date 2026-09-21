@@ -43,16 +43,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var toolbarTitle: TextView
     private lateinit var updateManager: UpdateManager
 
-    private val compressor by lazy {
-        ImageCompressor(this)
-    }
-
-    private var selectedImage: Uri? = null
-    private var selectedResizeImage: Uri? = null
-    private var compressorPreview: ImageView? = null
-    private var resizerPreview: ImageView? = null
-    private var qualityValue = 82
-
     private val auth by lazy {
         FirebaseAuth.getInstance()
     }
@@ -1283,37 +1273,7 @@ class MainActivity : ComponentActivity() {
                     tool.id
             )
 
-            when (tool.id) {
-                "business-invoice-maker",
-                "business-receipt-maker",
-                "business-quote-maker",
-                "business-profit-calculator",
-                "business-expense-tracker",
-                "business-plan",
-                "business-proposal",
-                "business-contract-maker",
-                "business-name-generator",
-                "business-pricing-calculator" -> {
-                    openBusinessToolFromHome(
-                        tool.id
-                    )
-                }
-
-                "image-compressor" ->
-                    showImageCompressor()
-
-                "image-resizer" ->
-                    showImageResizer()
-
-                "image-converter" ->
-                    showImageConverter()
-
-                "background-remover" ->
-                    showBackgroundRemover()
-
-                "audio-to-midi" ->
-                    showAudioToMidi()
-            }
+            openToolFromHome(tool)
         }
 
         row.addView(
@@ -1395,6 +1355,38 @@ class MainActivity : ComponentActivity() {
         box.animate().alpha(1f).setDuration(260).start()
     }
 
+    private fun openToolFromHome(
+        tool: ToolDefinition
+    ) {
+        val packageInfo =
+            ToolPackageCatalog.forCategory(
+                tool.category
+            )
+
+        if (packageInfo == null) {
+            toast(
+                "Esta ferramenta ainda não está disponível."
+            )
+            return
+        }
+
+        startActivity(
+            Intent(
+                this,
+                CategoryActivity::class.java
+            ).apply {
+                putExtra(
+                    "category",
+                    tool.category
+                )
+                putExtra(
+                    "tool_id",
+                    tool.id
+                )
+            }
+        )
+    }
+
     private fun showCategory(category: String) {
         startActivity(
             Intent(this, CategoryActivity::class.java).apply {
@@ -1412,18 +1404,7 @@ class MainActivity : ComponentActivity() {
             )
         )
     }
-    private fun showBackgroundRemover() {
-        analytics.event(
-            "tool_open_backend",
-            "tool" to "background_remover"
-        )
-        startActivity(
-            Intent(
-                this,
-                BackgroundRemoverActivity::class.java
-            )
-        )
-    }
+
 
     private fun showPlans() {
         analytics.event("plans_open")
@@ -1436,26 +1417,9 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    private fun showAudioToMidi() {
-        analytics.event(
-            "tool_open_audio_to_midi"
-        )
-        startActivity(
-            Intent(
-                this,
-                AudioToMidiActivity::class.java
-            )
-        )
-    }
 
-    private fun showImageConverter() {
-        analytics.event("tool_open_workflow", "tool" to "converter")
-        startActivity(
-            Intent(this, ToolWorkflowActivity::class.java).apply {
-                putExtra("tool", "converter")
-            }
-        )
-    }
+
+
 
     private fun showCategories() {
         toolbarTitle.text = "Categorias"
@@ -1478,23 +1442,9 @@ class MainActivity : ComponentActivity() {
         content.addView(space(24))
     }
 
-    private fun showImageCompressor() {
-        analytics.event("tool_open_workflow", "tool" to "compressor")
-        startActivity(
-            Intent(this, ToolWorkflowActivity::class.java).apply {
-                putExtra("tool", "compressor")
-            }
-        )
-    }
 
-    private fun showImageResizer() {
-        analytics.event("tool_open_workflow", "tool" to "resizer")
-        startActivity(
-            Intent(this, ToolWorkflowActivity::class.java).apply {
-                putExtra("tool", "resizer")
-            }
-        )
-    }
+
+
 
     private fun showAccount() {
         toolbarTitle.text = "Conta"
@@ -2332,27 +2282,7 @@ class MainActivity : ComponentActivity() {
             .start()
     }
 
-    private fun pickImage() {
-        analytics.event("image_picker_start")
-        val intent =
-            Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                type = "image/*"
-                addCategory(
-                    Intent.CATEGORY_OPENABLE
-                )
-                addFlags(
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-                addFlags(
-                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-                )
-            }
 
-        startActivityForResult(
-            intent,
-            REQUEST_PICK_IMAGE
-        )
-    }
 
     @Deprecated(
         "Uses the classic Activity result callback in v1."
@@ -2470,221 +2400,9 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        if (
-            requestCode != REQUEST_PICK_IMAGE &&
-            requestCode != REQUEST_PICK_RESIZE_IMAGE
-        ) {
-            return
-        }
 
-        val uri = data?.data ?: return
 
-        if (requestCode == REQUEST_PICK_RESIZE_IMAGE) {
-            selectedResizeImage = uri
-            analytics.event("resize_image_selected")
-        } else {
-            selectedImage = uri
-            analytics.event("image_selected")
-        }
 
-        try {
-            contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-        } catch (_: Exception) {
-        }
-
-        if (
-            requestCode == REQUEST_PICK_RESIZE_IMAGE
-        ) {
-            showImageResizer()
-
-            val preview = resizerPreview
-
-            Thread {
-                val bitmap =
-                    compressor.decodeSampled(uri)
-
-                runOnUiThread {
-                    if (bitmap != null) {
-                        preview?.setImageBitmap(bitmap)
-                    }
-                    toast(
-                        if (bitmap != null) {
-                            "Imagem selecionada."
-                        } else {
-                            "Não foi possível ler a imagem."
-                        }
-                    )
-                }
-            }.start()
-            return
-        }
-
-        if (
-            toolbarTitle.text.toString() !=
-            "Image Compressor"
-        ) {
-            showImageCompressor()
-        }
-
-        val preview = compressorPreview
-
-        Thread {
-            val bitmap =
-                compressor.decodeSampled(uri)
-
-            runOnUiThread {
-                if (bitmap != null) {
-                    preview?.setImageBitmap(
-                        bitmap
-                    )
-                    toast(
-                        "Imagem selecionada."
-                    )
-                } else {
-                    toast(
-                        "Não foi possível ler a imagem."
-                    )
-                }
-            }
-        }.start()
-    }
-
-    private fun pickResizeImage() {
-        val intent =
-            Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                type = "image/*"
-                addCategory(Intent.CATEGORY_OPENABLE)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-            }
-
-        startActivityForResult(
-            intent,
-            REQUEST_PICK_RESIZE_IMAGE
-        )
-    }
-
-    private fun showProcessingDialog(
-        message: String
-    ): android.app.AlertDialog {
-        val layout = LinearLayout(this)
-        layout.orientation = LinearLayout.HORIZONTAL
-        layout.gravity = Gravity.CENTER_VERTICAL
-        layout.setPadding(
-            dp(24),
-            dp(20),
-            dp(24),
-            dp(20)
-        )
-
-        val gear = TextView(this)
-        gear.text = "⚙"
-        gear.textSize = 32f
-        gear.setTextColor(blue)
-        gear.gravity = Gravity.CENTER
-
-        val label = TextView(this)
-        label.text = message
-        label.textSize = 16f
-        label.setTextColor(textColor)
-        label.setPadding(dp(18), 0, 0, 0)
-
-        layout.addView(
-            gear,
-            LinearLayout.LayoutParams(
-                dp(48),
-                dp(48)
-            )
-        )
-        layout.addView(
-            label,
-            LinearLayout.LayoutParams(
-                0,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                1f
-            )
-        )
-
-        val dialog =
-            android.app.AlertDialog.Builder(this)
-                .setView(layout)
-                .setCancelable(false)
-                .create()
-
-        dialog.setOnShowListener {
-            gear.animate()
-                .rotationBy(360f)
-                .setDuration(850)
-                .setInterpolator(
-                    android.view.animation.LinearInterpolator()
-                )
-                .setListener(
-                    object : android.animation.Animator.AnimatorListener {
-                        override fun onAnimationStart(
-                            animation: android.animation.Animator
-                        ) = Unit
-
-                        override fun onAnimationEnd(
-                            animation: android.animation.Animator
-                        ) {
-                            if (dialog.isShowing) {
-                                gear.rotation = 0f
-                                gear.animate()
-                                    .rotationBy(360f)
-                                    .setDuration(850)
-                                    .setInterpolator(
-                                        android.view.animation.LinearInterpolator()
-                                    )
-                                    .start()
-                            }
-                        }
-
-                        override fun onAnimationCancel(
-                            animation: android.animation.Animator
-                        ) = Unit
-
-                        override fun onAnimationRepeat(
-                            animation: android.animation.Animator
-                        ) = Unit
-                    }
-                )
-                .start()
-        }
-
-        dialog.show()
-        return dialog
-    }
-
-    private fun shareFile(file: File) {
-        analytics.event("share_started")
-        val uri = FileProvider.getUriForFile(
-            this,
-            "com.toolnexa.app.fileprovider",
-            file
-        )
-
-        val send =
-            Intent(Intent.ACTION_SEND).apply {
-                type = "image/jpeg"
-                putExtra(
-                    Intent.EXTRA_STREAM,
-                    uri
-                )
-                addFlags(
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            }
-
-        startActivity(
-            Intent.createChooser(
-                send,
-                "Compartilhar imagem"
-            )
-        )
-    }
 
     private fun card(): LinearLayout {
         return LinearLayout(this).apply {
@@ -2853,12 +2571,9 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        private const val REQUEST_PICK_IMAGE =
-            401
-        private const val REQUEST_PICK_RESIZE_IMAGE =
-            402
         private const val REQUEST_LOGIN =
             403
+
         private const val REQUEST_SETTINGS_FOLDER =
             404
     }
