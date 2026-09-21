@@ -760,83 +760,10 @@ class CategoryActivity : Activity() {
                     tool.name
             )
 
-            when (tool.id) {
-                "business-invoice-maker",
-                "business-receipt-maker",
-                "business-quote-maker",
-                "business-profit-calculator",
-                "business-expense-tracker",
-                "business-plan",
-                "business-proposal",
-                "business-contract-maker",
-                "business-name-generator",
-                "business-pricing-calculator" -> {
-                    openBusinessTool(
-                        tool.id,
-                        definition.name
-                    )
-                }
-
-                "background-remover" -> {
-                    startActivity(
-                        Intent(
-                            this,
-                            BackgroundRemoverActivity::class.java
-                        )
-                    )
-                }
-
-                "audio-to-midi" -> {
-                    startActivity(
-                        Intent(
-                            this,
-                            AudioToMidiActivity::class.java
-                        )
-                    )
-                }
-
-                "image-compressor" -> {
-                    startActivity(
-                        Intent(
-                            this,
-                            ToolWorkflowActivity::class.java
-                        ).apply {
-                            putExtra(
-                                "tool",
-                                "compressor"
-                            )
-                        }
-                    )
-                }
-
-                "image-resizer" -> {
-                    startActivity(
-                        Intent(
-                            this,
-                            ToolWorkflowActivity::class.java
-                        ).apply {
-                            putExtra(
-                                "tool",
-                                "resizer"
-                            )
-                        }
-                    )
-                }
-
-                "image-converter" -> {
-                    startActivity(
-                        Intent(
-                            this,
-                            ToolWorkflowActivity::class.java
-                        ).apply {
-                            putExtra(
-                                "tool",
-                                "converter"
-                            )
-                        }
-                    )
-                }
-            }
+            openTool(
+                tool.id,
+                definition.name
+            )
         }
 
         row.addView(
