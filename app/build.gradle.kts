@@ -11,8 +11,8 @@ android {
         applicationId = "com.toolnexa.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 38
-        versionName = "1.28.1"
+        versionCode = 39
+        versionName = "1.29.0"
     }
 
     buildFeatures {
@@ -69,6 +69,9 @@ dependencies {
         "androidx.core:core-ktx:1.19.0"
     )
     implementation(
-        "org.tensorflow:tensorflow-lite:2.17.0"
+        "com.google.android.gms:play-services-base:18.11.0"
+    )
+    implementation(
+        "com.google.android.gms:play-services-tflite-java:16.5.0"
     )
 }
