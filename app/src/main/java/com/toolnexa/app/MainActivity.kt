@@ -2177,6 +2177,12 @@ class MainActivity : ComponentActivity() {
                 )
             }
         )
+
+        content.post {
+            if (!isFinishing) {
+                I18n.localizeWindow(this)
+            }
+        }
     }
 
     private fun toolRow(
