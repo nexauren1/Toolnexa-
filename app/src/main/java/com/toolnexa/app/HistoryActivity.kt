@@ -118,7 +118,6 @@ class HistoryActivity : Activity() {
         )
 
         setContentView(root)
-        I18n.localizeWindow(this)
 
         val entries = NexaurenHistory.list(this)
 
@@ -175,6 +174,12 @@ class HistoryActivity : Activity() {
                     setMargins(0, dp(14), 0, 0)
                 }
             )
+        }
+
+        root.post {
+            if (!isFinishing) {
+                I18n.localizeWindow(this)
+            }
         }
     }
 
