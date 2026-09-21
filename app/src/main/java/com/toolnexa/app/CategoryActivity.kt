@@ -232,7 +232,6 @@ class CategoryActivity : Activity() {
         )
 
         setContentView(root)
-        I18n.localizeWindow(this)
 
         val tools =
             CategoryCatalog.toolsFor(
@@ -563,6 +562,12 @@ class CategoryActivity : Activity() {
         )
 
         renderTools("")
+
+        root.post {
+            if (!isFinishing) {
+                I18n.localizeWindow(this)
+            }
+        }
     }
 
         private fun addToolGridCard(
