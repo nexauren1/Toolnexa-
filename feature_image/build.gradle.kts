@@ -13,4 +13,7 @@ android {
 
 dependencies {
     implementation(project(":app"))
+    implementation(
+        "com.google.firebase:firebase-auth"
+    )
 }
