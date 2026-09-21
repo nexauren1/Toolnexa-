@@ -1,9 +1,13 @@
 package com.toolnexa.app
 
 import android.content.Context
-import android.util.Base64
+import com.google.android.gms.common.moduleinstall.ModuleInstall
+import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
+import com.google.android.gms.tasks.Tasks
+import com.google.android.gms.tflite.TfLite
 import org.tensorflow.lite.DataType
-import org.tensorflow.lite.Interpreter
+import org.tensorflow.lite.InterpreterApi
+import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.Executors
@@ -120,59 +124,94 @@ class BasicPitchNativeEngine(
         executor.shutdownNow()
     }
 
-    private fun loadModel(): Interpreter {
-        val modelBuffer =
-            loadModelFile()
+    private fun loadModel(): InterpreterApi {
+        val modelFile =
+            BasicPitchModelManager.modelFile(
+                appContext
+            )
+
+        if (
+            !BasicPitchModelManager.isInstalled(
+                appContext
+            ) ||
+            !modelFile.exists()
+        ) {
+            throw IllegalStateException(
+                "O modelo de IA ainda não foi instalado."
+            )
+        }
+
+        ensureTfLiteRuntime()
 
         val options =
-            Interpreter.Options().apply {
-                setNumThreads(
-                    max(
-                        2,
-                        min(
-                            4,
-                            Runtime.getRuntime()
-                                .availableProcessors()
+            InterpreterApi.Options()
+                .setRuntime(
+                    InterpreterApi.Options.TfLiteRuntime.FROM_SYSTEM_ONLY
+                )
+                .apply {
+                    setNumThreads(
+                        max(
+                            2,
+                            min(
+                                4,
+                                Runtime.getRuntime()
+                                    .availableProcessors()
+                            )
                         )
                     )
-                )
-            }
+                }
 
-        return Interpreter(
-            modelBuffer,
+        return InterpreterApi.create(
+            modelFile,
             options
         )
     }
 
-    private fun loadModelFile(): ByteBuffer {
-        val encoded =
-            appContext.assets.open(
-                MODEL_ASSET
-            ).use { input ->
-                input.readBytes()
-            }
-
-        val decoded =
-            Base64.decode(
-                encoded,
-                Base64.NO_WRAP
+    private fun ensureTfLiteRuntime() {
+        val moduleInstallClient =
+            ModuleInstall.getClient(
+                appContext
             )
 
-        return ByteBuffer
-            .allocateDirect(
-                decoded.size
+        val tfLiteApi =
+            TfLite.getClient(
+                appContext
             )
-            .order(
-                ByteOrder.nativeOrder()
+
+        val availability =
+            Tasks.await(
+                moduleInstallClient
+                    .areModulesAvailable(
+                        tfLiteApi
+                    )
             )
-            .apply {
-                put(decoded)
-                rewind()
-            }
+
+        if (
+            !availability
+                .areModulesAvailable()
+        ) {
+            Tasks.await(
+                moduleInstallClient
+                    .installModules(
+                        ModuleInstallRequest
+                            .newBuilder()
+                            .addApi(
+                                tfLiteApi
+                            )
+                            .build()
+                    )
+            )
+        }
+
+        Tasks.await(
+            TfLite.initialize(
+                appContext
+            )
+        )
     }
 
     private fun transcribe(
-        interpreter: Interpreter,
+        interpreter: InterpreterApi,
         audio: FloatArray,
         durationSeconds: Double
     ) {
@@ -435,29 +474,43 @@ class BasicPitchNativeEngine(
                 val role =
                     when {
                         name.contains(
-                            "onset"
-                        ) -> Role.ONSET
-
-                        name.contains(
-                            "note"
-                        ) -> Role.NOTE
-
-                        name.contains(
-                            "identity_2"
-                        ) -> Role.ONSET
-
-                        name.contains(
-                            "identity_1"
-                        ) -> Role.NOTE
-
-                        name == "identity" ->
-                            Role.ONSET
-
-                        unknown88Seen++ == 0 ->
+                            "statefulpartitionedcall:1"
+                        ) ||
+                            name.contains(
+                                "identity_1"
+                            ) ||
+                            name.contains(
+                                "note"
+                            ) -> {
                             Role.NOTE
+                        }
 
-                        else ->
+                        name.contains(
+                            "statefulpartitionedcall:2"
+                        ) ||
+                            name.contains(
+                                "identity_2"
+                            ) ||
+                            name.contains(
+                                "onset"
+                            ) -> {
                             Role.ONSET
+                        }
+
+                        name.contains(
+                            "statefulpartitionedcall:0"
+                        ) ||
+                            name == "identity" -> {
+                            Role.CONTOUR
+                        }
+
+                        unknown88Seen++ == 0 -> {
+                            Role.NOTE
+                        }
+
+                        else -> {
+                            Role.ONSET
+                        }
                     }
 
                 if (role == Role.NOTE) {
@@ -1591,7 +1644,8 @@ class BasicPitchNativeEngine(
 
     private enum class Role {
         NOTE,
-        ONSET
+        ONSET,
+        CONTOUR
     }
 
     private data class OnsetCandidate(
@@ -1722,9 +1776,6 @@ class BasicPitchNativeEngine(
     }
 
     private companion object {
-        const val MODEL_ASSET =
-            "basic_pitch_nmp.tflite.b64"
-
         const val TARGET_SAMPLE_RATE =
             22050
 
