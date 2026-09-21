@@ -1570,8 +1570,9 @@ class AudioToMidiActivity : Activity() {
                             0.5,
                             editorDurationSeconds
                         )
-                },
-                LinearLayout.LayoutParams(
+                )
+            },
+            LinearLayout.LayoutParams(
                     0,
                     dp(44),
                     1f
