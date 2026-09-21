@@ -1,13 +1,11 @@
 package com.toolnexa.app
 
 import android.content.Context
+import android.util.Base64
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
-import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.MappedByteBuffer
-import java.nio.channels.FileChannel
 import java.util.concurrent.Executors
 import kotlin.math.abs
 import kotlin.math.exp
@@ -146,24 +144,31 @@ class BasicPitchNativeEngine(
         )
     }
 
-    private fun loadModelFile(): MappedByteBuffer {
-        val descriptor =
-            appContext.assets.openFd(
+    private fun loadModelFile(): ByteBuffer {
+        val encoded =
+            appContext.assets.open(
                 MODEL_ASSET
+            ).use { input ->
+                input.readBytes()
+            }
+
+        val decoded =
+            Base64.decode(
+                encoded,
+                Base64.NO_WRAP
             )
 
-        FileInputStream(
-            descriptor.fileDescriptor
-        ).use { input ->
-            val channel =
-                input.channel
-
-            return channel.map(
-                FileChannel.MapMode.READ_ONLY,
-                descriptor.startOffset,
-                descriptor.declaredLength
+        return ByteBuffer
+            .allocateDirect(
+                decoded.size
             )
-        }
+            .order(
+                ByteOrder.nativeOrder()
+            )
+            .apply {
+                put(decoded)
+                rewind()
+            }
     }
 
     private fun transcribe(
@@ -1717,7 +1722,7 @@ class BasicPitchNativeEngine(
 
     private companion object {
         const val MODEL_ASSET =
-            "basic_pitch_nmp.tflite"
+            "basic_pitch_nmp.tflite.b64"
 
         const val TARGET_SAMPLE_RATE =
             22050
