@@ -4,7 +4,7 @@ import android.content.Context
 import com.google.android.gms.common.moduleinstall.ModuleInstall
 import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
 import com.google.android.gms.tasks.Tasks
-import com.google.android.gms.tflite.TfLite
+import com.google.android.gms.tflite.java.TfLite
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.InterpreterApi
 import java.io.File
