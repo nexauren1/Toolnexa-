@@ -480,45 +480,45 @@ class BasicPitchNativeEngine(
                 val role =
                     when {
                         name.contains(
+                            "statefulpartitionedcall:0"
+                        ) ||
+                            name.contains(
+                                "onset"
+                            ) ||
+                            name == "identity" -> {
+                            Role.ONSET
+                        }
+
+                        name.contains(
                             "statefulpartitionedcall:1"
                         ) ||
                             name.contains(
-                                "identity_1"
+                                "contour"
                             ) ||
                             name.contains(
-                                "note"
+                                "identity_1"
                             ) -> {
-                            Role.NOTE
+                            Role.CONTOUR
                         }
 
                         name.contains(
                             "statefulpartitionedcall:2"
                         ) ||
                             name.contains(
-                                "identity_2"
+                                "note"
                             ) ||
                             name.contains(
-                                "onset"
+                                "identity_2"
                             ) -> {
-                            Role.ONSET
-                        }
-
-                        name.contains(
-                            "statefulpartitionedcall:0"
-                        ) ||
-                            name == "identity" ||
-                            name.contains(
-                                "contour"
-                            ) -> {
-                            Role.CONTOUR
-                        }
-
-                        unknown88Seen++ == 0 -> {
                             Role.NOTE
                         }
 
-                        else -> {
+                        unknown88Seen++ == 0 -> {
                             Role.ONSET
+                        }
+
+                        else -> {
+                            Role.NOTE
                         }
                     }
 
@@ -706,35 +706,35 @@ class BasicPitchNativeEngine(
             normalized.contains(
                 "statefulpartitionedcall:0"
             ) ||
-                normalized == "identity" ||
                 normalized.contains(
-                    "contour"
-                ) -> {
-                Role.CONTOUR
+                    "onset"
+                ) ||
+                normalized == "identity" -> {
+                Role.ONSET
             }
 
             normalized.contains(
                 "statefulpartitionedcall:1"
             ) ||
                 normalized.contains(
-                    "identity_1"
+                    "contour"
                 ) ||
                 normalized.contains(
-                    "note"
+                    "identity_1"
                 ) -> {
-                Role.NOTE
+                Role.CONTOUR
             }
 
             normalized.contains(
                 "statefulpartitionedcall:2"
             ) ||
                 normalized.contains(
-                    "identity_2"
+                    "note"
                 ) ||
                 normalized.contains(
-                    "onset"
+                    "identity_2"
                 ) -> {
-                Role.ONSET
+                Role.NOTE
             }
 
             else -> null
