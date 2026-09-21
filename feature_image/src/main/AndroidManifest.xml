@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:dist="http://schemas.android.com/apk/distribution">
+
+    <dist:module
+        dist:title="@string/feature_image_title">
+        <dist:delivery>
+            <dist:on-demand />
+        </dist:delivery>
+        <dist:fusing
+            dist:include="true" />
+    </dist:module>
+
+    <application>
+        <activity
+            android:name=".ToolWorkflowActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".BackgroundRemoverActivity"
+            android:exported="false" />
+    </application>
+</manifest>
