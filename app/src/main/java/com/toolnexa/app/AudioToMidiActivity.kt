@@ -495,30 +495,13 @@ class AudioToMidiActivity : Activity() {
     override fun onDestroy() {
         neuralEngine?.close()
         neuralEngine = null
-        previewPlayer?.stop()
+        previewPlayer?.release()
         executor.shutdownNow()
         super.onDestroy()
     }
 
-    private var neuralEngine: BasicPitchNativeEngine? = null
-
-    private var editorView:
-        AudioMidiPianoRollView? = null
-
-    private var editorNotes =
-        mutableListOf<NoteEvent>()
-
-    private var editorDurationSeconds =
-        0.0
-
-    private var editorBpm =
-        120
-
-    private var editorDirty =
-        false
-
-    private var midiWriteInProgress =
-        false
+    private var neuralEngine:
+        BasicPitchNativeEngine? = null
 
     private var previewPlayer:
         MidiPreviewPlayer? = null
@@ -810,7 +793,20 @@ class AudioToMidiActivity : Activity() {
                 ),
                 conversionEngine
             ) { key ->
-                conversionEngine = key
+                if (
+                    key == "neural"
+                ) {
+                    ProGate.runOrUpgrade(
+                        this,
+                        "IA Neural"
+                    ) {
+                        conversionEngine =
+                            key
+                    }
+                } else {
+                    conversionEngine =
+                        key
+                }
             }
         )
         add(engineCard)
@@ -831,7 +827,20 @@ class AudioToMidiActivity : Activity() {
                 ),
                 detectionProfile
             ) { key ->
-                detectionProfile = key
+                if (
+                    key == "wide"
+                ) {
+                    ProGate.runOrUpgrade(
+                        this,
+                        "Perfil Amplo"
+                    ) {
+                        detectionProfile =
+                            key
+                    }
+                } else {
+                    detectionProfile =
+                        key
+                }
             }
         )
         add(profileCard)
@@ -924,7 +933,24 @@ class AudioToMidiActivity : Activity() {
                 ),
                 quantizeGrid.toString()
             ) { key ->
-                quantizeGrid = key.toIntOrNull() ?: 0
+                val grid =
+                    key.toIntOrNull() ?: 0
+
+                if (
+                    grid == 16 ||
+                    grid == 32
+                ) {
+                    ProGate.runOrUpgrade(
+                        this,
+                        "Quantização " + key
+                    ) {
+                        quantizeGrid =
+                            grid
+                    }
+                } else {
+                    quantizeGrid =
+                        grid
+                }
             }
         )
 
@@ -1551,26 +1577,19 @@ class AudioToMidiActivity : Activity() {
         options: ConversionOptions,
         engineName: String
     ) {
-        buildBase("Resultado")
+        buildBase(
+            "Resultado"
+        )
 
-        editorNotes =
+        val notes =
             result.notes.map {
                 it.copy()
-            }.toMutableList()
+            }
 
-        editorDurationSeconds =
+        val duration =
             durationSeconds.coerceAtLeast(
                 MIN_SECONDS
             )
-
-        editorBpm =
-            options.bpm
-
-        editorDirty =
-            false
-
-        midiWriteInProgress =
-            false
 
         val hero =
             LinearLayout(this).apply {
@@ -1598,17 +1617,13 @@ class AudioToMidiActivity : Activity() {
             TextView(this).apply {
                 text =
                     "CONVERSÃO CONCLUÍDA"
-
                 textSize =
                     11.5f
-
                 setTextColor(
                     android.graphics.Color.WHITE
                 )
-
                 typeface =
                     android.graphics.Typeface.DEFAULT_BOLD
-
                 letterSpacing =
                     0.08f
             }
@@ -1617,18 +1632,14 @@ class AudioToMidiActivity : Activity() {
         hero.addView(
             TextView(this).apply {
                 text =
-                    "MIDI pronto para editar"
-
+                    "MIDI pronto"
                 textSize =
                     29f
-
                 setTextColor(
                     android.graphics.Color.WHITE
                 )
-
                 typeface =
                     android.graphics.Typeface.DEFAULT_BOLD
-
                 setPadding(
                     0,
                     dp(7),
@@ -1641,11 +1652,15 @@ class AudioToMidiActivity : Activity() {
         hero.addView(
             TextView(this).apply {
                 text =
-                    "Agora pode ouvir e ajustar as notas antes de exportar."
+                    "A conversão terminou. Use a prévia para ouvir o resultado antes de exportar."
                 textSize =
                     14.5f
                 setTextColor(
                     android.graphics.Color.WHITE
+                )
+                setLineSpacing(
+                    0f,
+                    1.1f
                 )
             }
         )
@@ -1662,170 +1677,259 @@ class AudioToMidiActivity : Activity() {
             )
         )
 
-        val summary =
-            bodyText(
-                I18n.t(
-                    this,
-                    "Notas"
-                ) +
-                    ": " +
-                    editorNotes.size +
-                    "   •   " +
-                    I18n.t(
-                        this,
-                        "Duração"
-                    ) +
-                    ": " +
-                    formatDuration(
-                        editorDurationSeconds
-                    )
-            ).apply {
-                tag =
-                    "editor_summary"
-                setPadding(
-                    0,
-                    dp(7),
-                    0,
-                    0
-                )
-            }
-
         stats.addView(
-            summary
+            bodyText(
+                "Notas: " +
+                    notes.size +
+                    "   •   Duração: " +
+                    formatDuration(
+                        duration
+                    )
+            )
         )
 
-        val pitches =
-            editorNotes.map {
-                it.pitch
-            }
-
         if (
-            pitches.isNotEmpty()
+            notes.isNotEmpty()
         ) {
+            val minPitch =
+                notes.minOf {
+                    it.pitch
+                }
+
+            val maxPitch =
+                notes.maxOf {
+                    it.pitch
+                }
+
             stats.addView(
                 bodyText(
-                    I18n.t(
-                        this,
-                        "Extensão"
-                    ) +
-                        ": " +
+                    "Extensão: " +
                         noteName(
-                            pitches.minOrNull()
-                                ?: 0
+                            minPitch
                         ) +
                         " – " +
                         noteName(
-                            pitches.maxOrNull()
-                                ?: 0
+                            maxPitch
                         )
-                ).apply {
-                    setPadding(
-                        0,
-                        dp(5),
-                        0,
-                        0
-                    )
-                }
+                )
+            )
+
+            stats.addView(
+                bodyText(
+                    "Tonalidade estimada: " +
+                        estimateKey(
+                            notes
+                        ) +
+                        " • BPM: " +
+                        options.bpm
+                )
+            )
+
+            stats.addView(
+                bodyText(
+                    "Motor: " +
+                        engineLabel(
+                            engineName
+                        ) +
+                        " • Pitch bends: " +
+                        notes.count {
+                            it.pitchBends.isNotEmpty()
+                        }
+                )
             )
         }
 
-        stats.addView(
-            bodyText(
-                I18n.t(
-                    this,
-                    "Tonalidade estimada"
-                ) +
-                    ": " +
-                    estimateKey(
-                        editorNotes
-                    ) +
-                    " • " +
-                    I18n.t(
-                        this,
-                        "BPM"
-                    ) +
-                    ": " +
-                    editorBpm
-            ).apply {
-                setPadding(
-                    0,
-                    dp(5),
-                    0,
-                    0
-                )
-            }
-        )
-
-        stats.addView(
-            bodyText(
-                I18n.t(
-                    this,
-                    "Motor"
-                ) +
-                    ": " +
-                    engineLabel(
-                        engineName
-                    ) +
-                    " • " +
-                    I18n.t(
-                        this,
-                        "Pitch bends"
-                    ) +
-                    ": " +
-                    editorNotes.count {
-                        it.pitchBends.isNotEmpty()
-                    }
-            ).apply {
-                setPadding(
-                    0,
-                    dp(5),
-                    0,
-                    0
-                )
-            }
-        )
-
         add(stats)
 
-        val editorCard =
+        val previewCard =
             card()
 
-        editorCard.addView(
+        previewCard.addView(
             title(
-                "Piano Roll",
+                "Prévia MIDI",
                 19f
             )
         )
 
-        editorCard.addView(
+        previewCard.addView(
             bodyText(
-                "Toque numa nota para selecionar. Arraste para mudar o tempo e a altura; arraste pela extremidade para mudar a duração."
+                "Ouça o MIDI sintetizado antes de exportar. A prévia usa o áudio gerado localmente e não altera o ficheiro original."
             ).apply {
                 setPadding(
                     0,
-                    dp(6),
+                    dp(5),
                     0,
                     dp(10)
                 )
             }
         )
 
-        val horizontal =
-            HorizontalScrollView(
-                this
+        val visual =
+            MidiPreviewView(
+                this,
+                notes,
+                duration,
+                audioAccent,
+                audioAccent2
+            )
+
+        previewCard.addView(
+            visual,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(145)
             ).apply {
-                isHorizontalScrollBarEnabled =
-                    true
-                overScrollMode =
-                    View.OVER_SCROLL_IF_CONTENT_SCROLLS
+                bottomMargin =
+                    dp(12)
+            }
+        )
+
+        val status =
+            bodyText(
+                "Prévia pronta para preparar..."
+            ).apply {
+                setTextColor(
+                    textColor
+                )
             }
 
-        val roll =
-            AudioMidiPianoRollView(
-                this,
-                editorDurationSeconds,
-                editorNotes.map {
-                    AudioMidiPianoRollView.Note(
+        previewCard.addView(
+            status
+        )
+
+        val seek =
+            SeekBar(this).apply {
+                max =
+                    1000
+                progress =
+                    0
+            }
+
+        previewCard.addView(
+            seek,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(44)
+            )
+        )
+
+        val time =
+            bodyText(
+                "0:00 / " +
+                    formatDuration(
+                        duration
+                    )
+            ).apply {
+                setPadding(
+                    0,
+                    0,
+                    0,
+                    dp(8)
+                )
+            }
+
+        previewCard.addView(
+            time
+        )
+
+        var ready =
+            false
+
+        var seeking =
+            false
+
+        val playButton =
+            button(
+                "▶ Reproduzir prévia",
+                true
+            )
+
+        val stopButton =
+            button(
+                "■ Parar",
+                false
+            )
+
+        val controls =
+            LinearLayout(this).apply {
+                orientation =
+                    LinearLayout.HORIZONTAL
+                gravity =
+                    android.view.Gravity.CENTER_VERTICAL
+            }
+
+        controls.addView(
+            playButton,
+            LinearLayout.LayoutParams(
+                0,
+                dp(50),
+                1f
+            ).apply {
+                rightMargin =
+                    dp(6)
+            }
+        )
+
+        controls.addView(
+            stopButton,
+            LinearLayout.LayoutParams(
+                0,
+                dp(50),
+                1f
+            ).apply {
+                leftMargin =
+                    dp(0)
+            }
+        )
+
+        previewCard.addView(
+            controls
+        )
+
+        add(previewCard)
+
+        playButton.setOnClickListener {
+            val player =
+                previewPlayer
+
+            if (
+                player == null
+            ) {
+                return@setOnClickListener
+            }
+
+            if (
+                player.isPlaying()
+            ) {
+                player.pause()
+
+                playButton.text =
+                    "▶ Continuar"
+                return@setOnClickListener
+            }
+
+            if (
+                ready
+            ) {
+                player.resume()
+
+                playButton.text =
+                    "❚❚ Pausar"
+                return@setOnClickListener
+            }
+
+            playButton.isEnabled =
+                false
+
+            playButton.text =
+                "A preparar..."
+
+            status.text =
+                "A gerar o áudio da prévia..."
+
+            player.play(
+                notes.map {
+                    MidiPreviewPlayer.PreviewNote(
                         startSeconds =
                             it.startSeconds,
                         durationSeconds =
@@ -1835,252 +1939,219 @@ class AudioToMidiActivity : Activity() {
                         velocity =
                             it.velocity,
                         pitchBends =
-                            it.pitchBends,
-                        channel =
-                            it.channel
+                            it.pitchBends
+                    )
+                },
+                duration,
+                onPrepared = { totalMs ->
+                    ready =
+                        true
+                    playButton.isEnabled =
+                        true
+                    playButton.text =
+                        "❚❚ Pausar"
+                    status.text =
+                        "Prévia em reprodução"
+
+                    seek.max =
+                        totalMs.coerceAtLeast(
+                            1
+                        )
+
+                    time.text =
+                        "0:00 / " +
+                            formatTimeMs(
+                                totalMs
+                            )
+                },
+                onProgress = { currentMs, totalMs ->
+                    if (
+                        !seeking
+                    ) {
+                        seek.max =
+                            totalMs.coerceAtLeast(
+                                1
+                            )
+
+                        seek.progress =
+                            currentMs.coerceIn(
+                                0,
+                                totalMs.coerceAtLeast(
+                                    1
+                                )
+                            )
+
+                        time.text =
+                            formatTimeMs(
+                                currentMs
+                            ) +
+                                " / " +
+                                formatTimeMs(
+                                    totalMs
+                                )
+                    }
+                },
+                onStopped = {
+                    playButton.isEnabled =
+                        true
+                    playButton.text =
+                        "▶ Reproduzir prévia"
+                    status.text =
+                        "Prévia parada"
+                    seek.progress =
+                        0
+                    time.text =
+                        "0:00 / " +
+                            formatDuration(
+                                duration
+                            )
+                }
+            )
+        }
+
+        stopButton.setOnClickListener {
+            previewPlayer?.stop()
+        }
+
+        seek.setOnSeekBarChangeListener(
+            object :
+                SeekBar.OnSeekBarChangeListener {
+
+                override fun onStartTrackingTouch(
+                    seekBar: SeekBar?
+                ) {
+                    seeking =
+                        true
+                }
+
+                override fun onStopTrackingTouch(
+                    seekBar: SeekBar?
+                ) {
+                    seeking =
+                        false
+
+                    previewPlayer?.seekTo(
+                        seekBar?.progress
+                            ?: 0
                     )
                 }
-            ) {
-                changed ->
-                editorNotes =
-                    changed.map {
-                        NoteEvent(
-                            startSeconds =
-                                it.startSeconds,
-                            durationSeconds =
-                                it.durationSeconds,
-                            pitch =
-                                it.pitch,
-                            velocity =
-                                it.velocity,
-                            pitchBends =
-                                it.pitchBends,
-                            channel =
-                                it.channel
-                        )
-                    }.toMutableList()
 
-                editorDirty =
-                    true
-
-                summary.text =
-                    I18n.t(
-                        this@AudioToMidiActivity,
-                        "Notas"
-                    ) +
-                        ": " +
-                        editorNotes.size +
-                        "   •   " +
-                        I18n.t(
-                            this@AudioToMidiActivity,
-                            "Duração"
-                        ) +
-                        ": " +
-                        formatDuration(
-                            editorDurationSeconds
-                        )
+                override fun onProgressChanged(
+                    seekBar: SeekBar?,
+                    progress: Int,
+                    fromUser: Boolean
+                ) {
+                    if (
+                        fromUser &&
+                        ready &&
+                        seeking
+                    ) {
+                        time.text =
+                            formatTimeMs(
+                                progress
+                            ) +
+                                " / " +
+                                formatTimeMs(
+                                    seekBar?.max
+                                        ?: 1
+                                )
+                    }
+                }
             }
+        )
 
-        editorView =
-            roll
+        val pro =
+            card()
 
-        val rollWidth =
-            max(
-                dp(900),
-                (
-                    dp(46) +
-                        editorDurationSeconds *
-                        72f
-                    ).roundToInt()
-            )
-
-        horizontal.addView(
-            roll,
-            ViewGroup.LayoutParams(
-                rollWidth,
-                dp(430)
+        pro.addView(
+            title(
+                "Recursos Pro",
+                18f
             )
         )
 
-        editorCard.addView(
-            horizontal,
-            LinearLayout.LayoutParams(
-                -1,
-                dp(430)
+        pro.addView(
+            bodyText(
+                "Toque numa função Pro para ver as opções do upgrade."
             )
         )
 
-        val editorActions =
-            LinearLayout(this).apply {
-                orientation =
-                    LinearLayout.HORIZONTAL
-                gravity =
-                    Gravity.CENTER_VERTICAL
-            }
-
-        fun editorAction(
-            label: String,
-            onClick: () -> Unit
+        fun proFeature(
+            name: String,
+            description: String
         ): Button {
             return button(
-                label,
+                name + "  •  PRO",
                 false
             ).apply {
                 textSize =
-                    12.5f
-                minHeight =
-                    dp(44)
+                    13f
                 setOnClickListener {
-                    onClick()
+                    ProGate.runOrUpgrade(
+                        this@AudioToMidiActivity,
+                        name
+                    ) {
+                        Toast.makeText(
+                            this@AudioToMidiActivity,
+                            "Recurso Pro disponível para esta conta.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
             }
         }
 
-        editorActions.addView(
-            editorAction(
-                "Adicionar"
-            ) {
-                roll.addNote(
-                    startSeconds =
-                        (
-                            roll.selectedNote()
-                                ?.let {
-                                    it.startSeconds +
-                                        it.durationSeconds
-                                }
-                                ?: 0.0
-                            ).coerceAtMost(
-                                max(
-                                    0.0,
-                                    editorDurationSeconds -
-                                        0.5
-                                )
-                            ),
-                    pitch =
-                        roll.selectedNote()
-                            ?.pitch
-                            ?: 60,
-                    durationSeconds =
-                        min(
-                            0.5,
-                            editorDurationSeconds
-                        )
-                )
-            },
-            LinearLayout.LayoutParams(
-                    0,
-                    dp(44),
-                    1f
-                ).apply {
-                    rightMargin =
-                        dp(6)
-                }
+        pro.addView(
+            bodyText(
+                "IA Neural"
+            )
         )
-
-        editorActions.addView(
-            editorAction(
-                "Duplicar"
-            ) {
-                roll.duplicateSelected()
-            },
-            LinearLayout.LayoutParams(
-                0,
-                dp(44),
-                1f
-            ).apply {
-                rightMargin =
-                    dp(6)
-            }
-        )
-
-        editorActions.addView(
-            editorAction(
-                "Apagar"
-            ) {
-                roll.deleteSelected()
-            },
-            LinearLayout.LayoutParams(
-                0,
-                dp(44),
-                1f
+        pro.addView(
+            proFeature(
+                "Conversão inteligente",
+                "Transcrição com IA"
             )
         )
 
-        editorCard.addView(
-            editorActions
-        )
-
-        val previewActions =
-            LinearLayout(this).apply {
-                orientation =
-                    LinearLayout.HORIZONTAL
-                gravity =
-                    Gravity.CENTER_VERTICAL
+        pro.addView(
+            bodyText(
+                "Fluxo avançado"
+            ).apply {
                 setPadding(
                     0,
-                    dp(10),
+                    dp(8),
                     0,
                     0
                 )
             }
-
-        previewActions.addView(
-            button(
-                "▶ Reproduzir prévia",
-                true
-            ).apply {
-                textSize =
-                    12.5f
-
-                setOnClickListener {
-                    previewPlayer?.play(
-                        editorNotes.map {
-                            AudioMidiPianoRollView.Note(
-                                it.startSeconds,
-                                it.durationSeconds,
-                                it.pitch,
-                                it.velocity,
-                                it.pitchBends,
-                                it.channel
-                            )
-                        },
-                        editorDurationSeconds
-                    )
-                }
-            },
-            LinearLayout.LayoutParams(
-                0,
-                dp(48),
-                1f
-            ).apply {
-                rightMargin =
-                    dp(6)
-            }
         )
 
-        previewActions.addView(
-            button(
-                "■ Parar",
-                false
-            ).apply {
-                textSize =
-                    12.5f
-                setOnClickListener {
-                    previewPlayer?.stop()
-                }
-            },
-            LinearLayout.LayoutParams(
-                0,
-                dp(48),
-                1f
+        listOf(
+            "Conversão em lote",
+            "Detecção multi-instrumento",
+            "MIDI multicanal",
+            "Exportação MIDI avançada"
+        ).forEach { feature ->
+            pro.addView(
+                proFeature(
+                    feature,
+                    ""
+                )
             )
-        )
+        }
 
-        editorCard.addView(
-            previewActions
-        )
+        add(pro)
 
-        add(editorCard)
+        if (
+            result.notes.isEmpty()
+        ) {
+            add(
+                infoCard(
+                    "SEM NOTAS",
+                    "Não foram encontradas notas suficientes nesta conversão."
+                )
+            )
+        }
 
         add(
             button(
@@ -2088,7 +2159,9 @@ class AudioToMidiActivity : Activity() {
                 true
             ).apply {
                 setOnClickListener {
-                    exportEditedMidi()
+                    exportMidi(
+                        file
+                    )
                 }
             }
         )
@@ -2099,7 +2172,9 @@ class AudioToMidiActivity : Activity() {
                 false
             ).apply {
                 setOnClickListener {
-                    saveEditedMidi()
+                    saveMidi(
+                        file
+                    )
                 }
             }
         )
@@ -2110,7 +2185,9 @@ class AudioToMidiActivity : Activity() {
                 false
             ).apply {
                 setOnClickListener {
-                    shareEditedMidi()
+                    shareMidi(
+                        file
+                    )
                 }
             }
         )
@@ -2126,8 +2203,6 @@ class AudioToMidiActivity : Activity() {
                         null
                     resultFile =
                         null
-                    editorView =
-                        null
                     showStage1()
                 }
             }
@@ -2135,14 +2210,18 @@ class AudioToMidiActivity : Activity() {
 
         add(
             infoCard(
-                "EDIÇÃO ANTES DA EXPORTAÇÃO",
-                "A conversão gera um rascunho MIDI no aparelho. Pode ouvir a prévia e ajustar as notas no piano roll antes de criar o ficheiro final."
+                "PRÉVIA ANTES DA EXPORTAÇÃO",
+                "O Piano Roll foi removido. O ToolNexa agora mostra uma visualização simples das notas e uma prévia de áudio mais rápida, com reprodução, pausa, avanço e paragem."
             )
         )
 
         root()?.post {
-            if (!isFinishing) {
-                I18n.localizeWindow(this)
+            if (
+                !isFinishing
+            ) {
+                I18n.localizeWindow(
+                    this
+                )
             }
         }
     }
@@ -2511,6 +2590,31 @@ class AudioToMidiActivity : Activity() {
 
         refresh()
         return row
+    }
+
+    private fun formatTimeMs(
+        milliseconds: Int
+    ): String {
+        val safe =
+            milliseconds.coerceAtLeast(
+                0
+            )
+
+        val totalSeconds =
+            safe / 1000
+
+        val minutes =
+            totalSeconds / 60
+
+        val seconds =
+            totalSeconds % 60
+
+        return String.format(
+            Locale.US,
+            "%d:%02d",
+            minutes,
+            seconds
+        )
     }
 
     private fun engineLabel(
