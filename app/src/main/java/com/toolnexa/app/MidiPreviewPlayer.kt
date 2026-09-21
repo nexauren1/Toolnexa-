@@ -12,7 +12,9 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-class MidiPreviewPlayer {
+class MidiPreviewPlayer(
+    private val cacheDir: File
+) {
 
     private var player:
         MediaPlayer? = null
@@ -60,12 +62,23 @@ class MidiPreviewPlayer {
             return
         }
 
+        val lastNoteEnd =
+            notes.maxOfOrNull {
+                it.startSeconds +
+                    it.durationSeconds
+            } ?: 0.0
+
         val duration =
-            durationSeconds
-                .coerceIn(
+            minOf(
+                durationSeconds.coerceIn(
                     0.1,
                     300.0
-                )
+                ),
+                (lastNoteEnd + 0.35)
+                    .coerceAtLeast(
+                        0.5
+                    )
+            )
 
         synchronized(lock) {
             running =
@@ -86,6 +99,7 @@ class MidiPreviewPlayer {
 
                     synchronized(lock) {
                         if (!running) {
+                            file.delete()
                             return@Thread
                         }
 
@@ -240,10 +254,15 @@ class MidiPreviewPlayer {
                     1L
                 )
 
+        if (!cacheDir.exists()) {
+            cacheDir.mkdirs()
+        }
+
         val file =
             File.createTempFile(
                 "toolnexa-midi-preview-",
-                ".wav"
+                ".wav",
+                cacheDir
             )
 
         BufferedOutputStream(
