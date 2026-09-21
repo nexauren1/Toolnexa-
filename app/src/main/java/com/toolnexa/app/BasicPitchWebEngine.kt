@@ -385,7 +385,13 @@ class BasicPitchWebEngine(
                 webView?.stopLoading()
                 webView?.destroy()
                 webView = null
-                onSuccess(notes)
+                onSuccess(
+                    notes,
+                    state.optDouble(
+                        "durationSeconds",
+                        0.0
+                    )
+                )
             }
         } catch (error: Exception) {
             fail(
