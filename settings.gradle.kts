@@ -17,3 +17,5 @@ dependencyResolutionManagement {
 rootProject.name = "ToolNexa"
 include(":app")
 include(":feature_business")
+include(":feature_image")
+include(":feature_audio")
