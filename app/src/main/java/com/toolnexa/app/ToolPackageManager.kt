@@ -8,21 +8,36 @@ import com.google.android.play.core.splitinstall.SplitInstallRequest
 import com.google.android.play.core.splitinstall.SplitInstallSessionState
 import com.google.android.play.core.splitinstall.model.SplitInstallSessionStatus
 
+/**
+ * Registry of downloadable category packages.
+ *
+ * Each package maps to one Play Feature Delivery dynamic-feature module.
+ * New tools are released by increasing the package version together with
+ * the normal app release. Google Play updates installed feature modules
+ * automatically when a new App Bundle is published.
+ */
 object ToolPackageCatalog {
 
     data class Package(
         val category: String,
         val module: String,
-        val version: Int,
+        val version: Int
+    ) {
         val toolCount: Int
-    )
+            get() = ToolRegistry.countFor(category)
+    }
 
+    /*
+     * Only categories that already have a real dynamic-feature module
+     * are enabled here. As each new category is migrated to its own
+     * feature module, add one entry below. This prevents the app from
+     * showing a download button for a module that does not exist yet.
+     */
     private val packages = listOf(
         Package(
             category = "Business",
             module = "feature_business",
-            version = 1,
-            toolCount = 10
+            version = 1
         )
     )
 
@@ -33,6 +48,10 @@ object ToolPackageCatalog {
                 ignoreCase = true
             )
         }
+    }
+
+    fun all(): List<Package> {
+        return packages
     }
 }
 
@@ -64,12 +83,16 @@ class ToolPackageManager(
 
         val listener =
             object :
-                com.google.android.play.core.splitinstall.SplitInstallStateUpdatedListener {
+                com.google.android.play.core.splitinstall
+                    .SplitInstallStateUpdatedListener {
 
                 override fun onStateUpdate(
                     state: SplitInstallSessionState
                 ) {
-                    if (!state.moduleNames().contains(module)) {
+                    if (
+                        !state.moduleNames()
+                            .contains(module)
+                    ) {
                         return
                     }
 
@@ -80,35 +103,46 @@ class ToolPackageManager(
                                 state.totalBytesToDownload()
                             val downloaded =
                                 state.bytesDownloaded()
+
                             val percent =
                                 if (total > 0L) {
                                     (
                                         downloaded * 100L /
                                             total
-                                        ).toInt().coerceIn(
-                                            0,
-                                            100
-                                        )
+                                        ).toInt()
+                                            .coerceIn(
+                                                0,
+                                                100
+                                            )
                                 } else {
                                     0
                                 }
+
                             onProgress(percent)
                         }
 
                         SplitInstallSessionStatus.INSTALLED -> {
-                            manager.unregisterListener(this)
+                            manager.unregisterListener(
+                                this
+                            )
+
                             SplitCompat.installActivity(
                                 activity
                             )
+
                             onProgress(100)
                             onInstalled()
                         }
 
                         SplitInstallSessionStatus.FAILED,
                         SplitInstallSessionStatus.CANCELED -> {
-                            manager.unregisterListener(this)
+                            manager.unregisterListener(
+                                this
+                            )
+
                             onError(
-                                "Não foi possível instalar o pacote. Verifique a internet e tente novamente."
+                                "Não foi possível instalar o pacote. " +
+                                    "Verifique a internet e tente novamente."
                             )
                         }
                     }
@@ -125,9 +159,13 @@ class ToolPackageManager(
 
         manager.startInstall(request)
             .addOnFailureListener {
-                manager.unregisterListener(listener)
+                manager.unregisterListener(
+                    listener
+                )
+
                 onError(
-                    "O pacote ainda não está disponível nesta versão da app."
+                    "O pacote ainda não está disponível " +
+                        "nesta versão da app."
                 )
             }
     }
