@@ -16,6 +16,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Space
 import android.widget.TextView
+import android.widget.Toast
 import kotlin.math.roundToInt
 
 class CategoryActivity : Activity() {
