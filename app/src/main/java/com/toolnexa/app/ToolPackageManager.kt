@@ -61,6 +61,43 @@ class ToolPackageManager(
     private val manager: SplitInstallManager =
         SplitInstallManagerFactory.create(activity)
 
+    private val preferences =
+        activity.getSharedPreferences(
+            "tool_packages",
+            Activity.MODE_PRIVATE
+        )
+
+    fun installedVersion(
+        packageInfo: ToolPackageCatalog.Package
+    ): Int {
+        if (!isInstalled(packageInfo.module)) {
+            return 0
+        }
+
+        return preferences.getInt(
+            "version_" + packageInfo.module,
+            0
+        )
+    }
+
+    fun needsUpdate(
+        packageInfo: ToolPackageCatalog.Package
+    ): Boolean {
+        return installedVersion(packageInfo) <
+            packageInfo.version
+    }
+
+    private fun markInstalled(
+        packageInfo: ToolPackageCatalog.Package
+    ) {
+        preferences.edit()
+            .putInt(
+                "version_" + packageInfo.module,
+                packageInfo.version
+            )
+            .apply()
+    }
+
     fun prepareActivity() {
         SplitCompat.installActivity(activity)
     }
@@ -70,12 +107,14 @@ class ToolPackageManager(
     }
 
     fun download(
-        module: String,
+        packageInfo: ToolPackageCatalog.Package,
         onProgress: (Int) -> Unit,
         onInstalled: () -> Unit,
         onError: (String) -> Unit
     ) {
+        val module = packageInfo.module
         if (isInstalled(module)) {
+            markInstalled(packageInfo)
             onProgress(100)
             onInstalled()
             return
@@ -130,6 +169,7 @@ class ToolPackageManager(
                                 activity
                             )
 
+                            markInstalled(packageInfo)
                             onProgress(100)
                             onInstalled()
                         }
