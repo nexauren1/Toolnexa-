@@ -789,7 +789,7 @@ class CategoryActivity : Activity() {
             .start()
     }
 
-    private fun openBusinessTool(
+    private fun openTool(
         toolId: String,
         category: String
     ) {
@@ -798,12 +798,25 @@ class CategoryActivity : Activity() {
                 category
             )
 
+        if (packageInfo == null) {
+            android.widget.Toast.makeText(
+                this,
+                "Este pacote de ferramentas ainda não está disponível.",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        val manager =
+            ToolPackageManager(this)
+
         if (
-            packageInfo != null &&
-            !ToolPackageManager(this)
-                .isInstalled(
-                    packageInfo.module
-                )
+            !manager.isInstalled(
+                packageInfo.module
+            ) ||
+            manager.needsUpdate(
+                packageInfo
+            )
         ) {
             startActivity(
                 Intent(
@@ -823,11 +836,17 @@ class CategoryActivity : Activity() {
             return
         }
 
+        val targetClass =
+            ToolPackageCatalog
+                .activityClassFor(
+                    toolId
+                ) ?: return
+
         startActivity(
             Intent().apply {
                 setClassName(
                     this@CategoryActivity,
-                    "com.toolnexa.business.BusinessToolActivity"
+                    targetClass
                 )
                 putExtra(
                     "tool_id",
