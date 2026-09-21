@@ -289,6 +289,9 @@ object ProGate {
             }
         )
 
+        var dialog:
+            AlertDialog? = null
+
         val cancel =
             Button(activity).apply {
                 text =
@@ -309,9 +312,6 @@ object ProGate {
                 dp(activity, 46)
             )
         )
-
-        var dialog:
-            AlertDialog? = null
 
         dialog =
             AlertDialog.Builder(
