@@ -16,7 +16,4 @@ https://github.com/spotify/basic-pitch
 Package:
 https://www.npmjs.com/package/@spotify/basic-pitch
 
-The Basic Pitch TFLite model is fetched from the official Spotify Basic Pitch
-repository at build time and bundled into the Android application assets. At
-runtime the model executes locally on the device; the Audio → MIDI feature does
-not require a WebView, JavaScript runtime, or model CDN access.
+The Basic Pitch TFLite model is downloaded on demand from the official Spotify Basic Pitch repository and stored in the application's private storage. At runtime the model executes locally on the device through the LiteRT runtime provided by Google Play services; the Audio → MIDI feature does not use a WebView or JavaScript runtime.
