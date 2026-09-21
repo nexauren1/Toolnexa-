@@ -2260,120 +2260,6 @@ class AudioToMidiActivity : Activity() {
         }
     }
 
-    private fun exportEditedMidi() {
-        prepareEditedMidi { file ->
-            exportMidi(
-                file
-            )
-        }
-    }
-
-    private fun saveEditedMidi() {
-        prepareEditedMidi { file ->
-            saveMidi(
-                file
-            )
-        }
-    }
-
-    private fun shareEditedMidi() {
-        prepareEditedMidi { file ->
-            shareMidi(
-                file
-            )
-        }
-    }
-
-    private fun prepareEditedMidi(
-        onReady: (File) -> Unit
-    ) {
-        if (midiWriteInProgress) {
-            Toast.makeText(
-                this,
-                "A preparar o MIDI...",
-                Toast.LENGTH_SHORT
-            ).show()
-            return
-        }
-
-        val existing =
-            resultFile
-
-        if (
-            !editorDirty &&
-            existing != null &&
-            existing.exists()
-        ) {
-            onReady(
-                existing
-            )
-            return
-        }
-
-        midiWriteInProgress =
-            true
-
-        val notes =
-            editorNotes.map {
-                it.copy()
-            }
-
-        val duration =
-            editorDurationSeconds
-
-        val outputName =
-            selectedName
-
-        executor.execute {
-            try {
-                val file =
-                    File(
-                        cacheDir,
-                        "toolnexa-audio-midi-edit-" +
-                            System.currentTimeMillis() +
-                            ".mid"
-                    )
-
-                MidiFileWriter.write(
-                    file,
-                    notes,
-                    editorBpm
-                )
-
-                resultFile =
-                    file
-
-                editorDirty =
-                    false
-
-                runOnUiThread {
-                    midiWriteInProgress =
-                        false
-
-                    if (!isFinishing) {
-                        onReady(
-                            file
-                        )
-                    }
-                }
-            } catch (
-                error: Exception
-            ) {
-                runOnUiThread {
-                    midiWriteInProgress =
-                        false
-
-                    Toast.makeText(
-                        this,
-                        error.message
-                            ?: "Não foi possível preparar o MIDI editado.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-        }
-    }
-
     private fun shareMidi(
         file: File
     ) {
@@ -2518,7 +2404,8 @@ class AudioToMidiActivity : Activity() {
     private fun choiceRow(
         options: List<Pair<String, String>>,
         selectedKey: String,
-        onSelect: (String) -> Unit
+        onSelect: (String) -> Unit,
+        proKeys: Set<String> = emptySet()
     ): LinearLayout {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -2569,9 +2456,29 @@ class AudioToMidiActivity : Activity() {
                 stateListAnimator = null
                 setPadding(dp(7), 0, dp(7), 0)
                 setOnClickListener {
-                    selectedKeyHolder[0] = pair.first
-                    onSelect(pair.first)
-                    refresh()
+                    if (
+                        pair.first in
+                            proKeys
+                    ) {
+                        ProGate.runOrUpgrade(
+                            this@AudioToMidiActivity,
+                            pair.second
+                        ) {
+                            selectedKeyHolder[0] =
+                                pair.first
+                            onSelect(
+                                pair.first
+                            )
+                            refresh()
+                        }
+                    } else {
+                        selectedKeyHolder[0] =
+                            pair.first
+                        onSelect(
+                            pair.first
+                        )
+                        refresh()
+                    }
                 }
             }
 
