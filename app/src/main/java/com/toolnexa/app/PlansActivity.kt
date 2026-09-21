@@ -793,9 +793,10 @@ class PlansActivity : Activity() {
                 if (isPro) {
                     listOf(
                         "Tudo do plano Free",
-                        "Ferramentas e recursos Pro",
-                        "Novos recursos Pro",
-                        "Acesso contínuo enquanto ativo"
+                        "IA Neural no Audio → MIDI",
+                        "Perfil Amplo de deteção",
+                        "Quantização 1/16 e 1/32",
+                        "Recursos avançados do ToolNexa"
                     )
                 } else {
                     listOf(
