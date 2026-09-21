@@ -22,7 +22,8 @@ class BasicPitchWebEngine(
     private val frameThreshold: Float,
     private val minNoteLengthFrames: Int,
     private val onProgress: (Int, String) -> Unit,
-    private val onSuccess: (List<NeuralNote>) -> Unit,
+    private val onSuccess:
+        (List<NeuralNote>, Double) -> Unit,
     private val onError: (String) -> Unit
 ) {
 
@@ -470,6 +471,7 @@ const state = {
   progress: 0,
   message: "A preparar o motor neural...",
   notes: [],
+  durationSeconds: 0,
   error: ""
 };
 
@@ -756,6 +758,10 @@ async function run() {
       noteFramesToTime(
         withBends
       );
+
+    state.durationSeconds =
+      audio.length /
+      22050;
 
     const prepared =
       timed
