@@ -1,6 +1,8 @@
 package com.toolnexa.app
 
 import android.media.MediaPlayer
+import android.os.Handler
+import android.os.Looper
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -16,6 +18,19 @@ class MidiPreviewPlayer(
     private val cacheDir: File
 ) {
 
+    data class PreviewNote(
+        val startSeconds: Double,
+        val durationSeconds: Double,
+        val pitch: Int,
+        val velocity: Int,
+        val pitchBends: List<Int> = emptyList()
+    )
+
+    private val mainHandler =
+        Handler(
+            Looper.getMainLooper()
+        )
+
     private var player:
         MediaPlayer? = null
 
@@ -25,21 +40,58 @@ class MidiPreviewPlayer(
     private var worker:
         Thread? = null
 
-    @Volatile
-    private var running =
-        false
+    private var requestId =
+        0L
 
-    private val lock =
-        Any()
+    private val progressTick =
+        object : Runnable {
+            override fun run() {
+                val current =
+                    player
+
+                if (
+                    current != null &&
+                    current.isPlaying
+                ) {
+                    onProgress?.invoke(
+                        current.currentPosition,
+                        current.duration
+                    )
+
+                    mainHandler.postDelayed(
+                        this,
+                        100L
+                    )
+                }
+            }
+        }
+
+    private var onProgress:
+        ((currentMs: Int, totalMs: Int) -> Unit)? =
+        null
+
+    private var onPrepared:
+        ((totalMs: Int) -> Unit)? =
+        null
+
+    private var onStopped:
+        (() -> Unit)? =
+        null
 
     fun play(
         sourceNotes:
-            List<AudioMidiPianoRollView.Note>,
+            List<PreviewNote>,
         durationSeconds: Double,
+        onPrepared:
+            ((totalMs: Int) -> Unit)? = null,
+        onProgress:
+            ((currentMs: Int, totalMs: Int) -> Unit)? = null,
         onStopped:
             (() -> Unit)? = null
     ) {
-        stop()
+        stop(
+            notify = false
+        )
 
         val notes =
             sourceNotes
@@ -62,7 +114,7 @@ class MidiPreviewPlayer(
             return
         }
 
-        val lastNoteEnd =
+        val lastEnd =
             notes.maxOfOrNull {
                 it.startSeconds +
                     it.durationSeconds
@@ -74,16 +126,24 @@ class MidiPreviewPlayer(
                     0.1,
                     300.0
                 ),
-                (lastNoteEnd + 0.35)
-                    .coerceAtLeast(
-                        0.5
-                    )
+                max(
+                    0.5,
+                    lastEnd + 0.35
+                )
             )
 
-        synchronized(lock) {
-            running =
-                true
-        }
+        this.onPrepared =
+            onPrepared
+        this.onProgress =
+            onProgress
+        this.onStopped =
+            onStopped
+
+        val currentRequest =
+            synchronized(this) {
+                requestId += 1L
+                requestId
+            }
 
         worker =
             Thread {
@@ -94,154 +154,343 @@ class MidiPreviewPlayer(
                     file =
                         createPreviewWav(
                             notes,
-                            duration
+                            duration,
+                            currentRequest
                         )
 
-                    synchronized(lock) {
-                        if (!running) {
-                            file.delete()
-                            return@Thread
-                        }
-
-                        previewFile =
-                            file
+                    if (
+                        file == null ||
+                        !isCurrent(
+                            currentRequest
+                        )
+                    ) {
+                        file?.delete()
+                        return@Thread
                     }
 
-                    val localPlayer =
-                        MediaPlayer().apply {
-                            setDataSource(
-                                file.absolutePath
+                    mainHandler.post {
+                        if (
+                            !isCurrent(
+                                currentRequest
                             )
-
-                            setOnCompletionListener {
-                                finishPlayback(
-                                    this,
-                                    file,
-                                    onStopped
-                                )
-                            }
-
-                            setOnErrorListener { mp, _, _ ->
-                                finishPlayback(
-                                    mp,
-                                    file,
-                                    onStopped
-                                )
-                                true
-                            }
-
-                            prepare()
+                        ) {
+                            file?.delete()
+                            return@post
                         }
 
-                    synchronized(lock) {
-                        if (!running) {
-                            try {
-                                localPlayer.release()
-                            } catch (_: Exception) {
-                            }
-                            return@Thread
-                        }
-
-                        player =
-                            localPlayer
+                        preparePlayerOnMain(
+                            file,
+                            currentRequest
+                        )
                     }
-
-                    localPlayer.start()
-                } catch (
-                    error: Exception
-                ) {
-                    synchronized(lock) {
-                        running =
-                            false
-                    }
-
+                } catch (_: Exception) {
                     file?.delete()
 
-                    onStopped?.invoke()
+                    mainHandler.post {
+                        if (
+                            isCurrent(
+                                currentRequest
+                            )
+                        ) {
+                            clearCallbacks()
+                            onStopped?.invoke()
+                        }
+                    }
                 }
             }
 
         worker?.start()
     }
 
-    fun stop() {
-        val localPlayer:
-            MediaPlayer?
-        val localFile:
-            File?
+    fun pause() {
+        mainHandler.post {
+            try {
+                player?.pause()
+                emitProgress()
+            } catch (_: Exception) {
+            }
+        }
+    }
 
-        synchronized(lock) {
-            running =
-                false
+    fun resume() {
+        mainHandler.post {
+            try {
+                val current =
+                    player
 
-            localPlayer =
-                player
+                if (
+                    current != null
+                ) {
+                    current.start()
+                    scheduleProgress()
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
 
-            localFile =
-                previewFile
+    fun seekTo(
+        positionMs: Int
+    ) {
+        mainHandler.post {
+            try {
+                val current =
+                    player
 
-            player =
-                null
+                if (
+                    current != null
+                ) {
+                    current.seekTo(
+                        positionMs.coerceIn(
+                            0,
+                            current.duration
+                        )
+                    )
+                    emitProgress()
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
 
-            previewFile =
-                null
+    fun isPlaying(): Boolean {
+        return try {
+            player?.isPlaying == true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun stop(
+        notify: Boolean = true
+    ) {
+        mainHandler.post {
+            synchronized(this@MidiPreviewPlayer) {
+                requestId += 1L
+            }
 
             worker?.interrupt()
             worker =
                 null
-        }
 
-        try {
-            localPlayer?.stop()
-        } catch (_: Exception) {
-        }
+            mainHandler.removeCallbacks(
+                progressTick
+            )
 
-        try {
-            localPlayer?.release()
-        } catch (_: Exception) {
-        }
+            val current =
+                player
 
-        localFile?.delete()
-    }
+            player =
+                null
 
-    private fun finishPlayback(
-        mediaPlayer:
-            MediaPlayer,
-        file: File?,
-        onStopped:
-            (() -> Unit)?
-    ) {
-        synchronized(lock) {
-            if (
-                player ===
-                    mediaPlayer
-            ) {
-                player =
-                    null
+            val file =
+                previewFile
 
-                running =
-                    false
+            previewFile =
+                null
 
-                previewFile =
-                    null
+            try {
+                current?.stop()
+            } catch (_: Exception) {
+            }
+
+            try {
+                current?.release()
+            } catch (_: Exception) {
+            }
+
+            file?.delete()
+
+            if (notify) {
+                clearCallbacks(
+                    notifyStopped = true
+                )
+            } else {
+                clearCallbacks()
             }
         }
+    }
+
+    fun release() {
+        stop()
+    }
+
+    private fun preparePlayerOnMain(
+        file: File,
+        currentRequest: Long
+    ) {
+        try {
+            val mediaPlayer =
+                MediaPlayer()
+
+            mediaPlayer.setDataSource(
+                file.absolutePath
+            )
+
+            mediaPlayer.setOnPreparedListener {
+                if (
+                    !isCurrent(
+                        currentRequest
+                    )
+                ) {
+                    try {
+                        it.release()
+                    } catch (_: Exception) {
+                    }
+                    file.delete()
+                    return@setOnPreparedListener
+                }
+
+                previewFile =
+                    file
+
+                player =
+                    it
+
+                onPrepared?.invoke(
+                    it.duration
+                )
+
+                emitProgress()
+
+                it.start()
+
+                scheduleProgress()
+            }
+
+            mediaPlayer.setOnCompletionListener {
+                if (
+                    isCurrent(
+                        currentRequest
+                    )
+                ) {
+                    previewFile?.delete()
+                    previewFile =
+                        null
+
+                    player =
+                        null
+
+                    try {
+                        it.release()
+                    } catch (_: Exception) {
+                    }
+
+                    clearCallbacks(
+                        notifyStopped = true
+                    )
+                } else {
+                    try {
+                        it.release()
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+
+            mediaPlayer.setOnErrorListener { mp, _, _ ->
+                if (
+                    isCurrent(
+                        currentRequest
+                    )
+                ) {
+                    try {
+                        mp.release()
+                    } catch (_: Exception) {
+                    }
+
+                    file.delete()
+
+                    player =
+                        null
+
+                    previewFile =
+                        null
+
+                    clearCallbacks(
+                        notifyStopped = true
+                    )
+                } else {
+                    try {
+                        mp.release()
+                    } catch (_: Exception) {
+                    }
+                }
+
+                true
+            }
+
+            mediaPlayer.prepareAsync()
+        } catch (_: Exception) {
+            file.delete()
+            clearCallbacks(
+                notifyStopped = true
+            )
+        }
+    }
+
+    private fun scheduleProgress() {
+        mainHandler.removeCallbacks(
+            progressTick
+        )
+        mainHandler.post(
+            progressTick
+        )
+    }
+
+    private fun emitProgress() {
+        val current =
+            player ?: return
 
         try {
-            mediaPlayer.release()
+            onProgress?.invoke(
+                current.currentPosition,
+                current.duration
+            )
         } catch (_: Exception) {
         }
+    }
 
-        file?.delete()
+    private fun clearCallbacks(
+        notifyStopped: Boolean = false
+    ) {
+        mainHandler.removeCallbacks(
+            progressTick
+        )
 
-        onStopped?.invoke()
+        val callback =
+            onStopped
+
+        onProgress =
+            null
+        onPrepared =
+            null
+        onStopped =
+            null
+
+        if (
+            notifyStopped
+        ) {
+            callback?.invoke()
+        }
+    }
+
+    private fun isCurrent(
+        currentRequest: Long
+    ): Boolean {
+        return synchronized(this) {
+            requestId ==
+                currentRequest
+        }
     }
 
     private fun createPreviewWav(
         notes:
-            List<AudioMidiPianoRollView.Note>,
-        durationSeconds: Double
-    ): File {
+            List<PreviewNote>,
+        durationSeconds:
+            Double,
+        currentRequest:
+            Long
+    ): File? {
         val sampleRate =
             44100
 
@@ -254,7 +503,17 @@ class MidiPreviewPlayer(
                     1L
                 )
 
-        if (!cacheDir.exists()) {
+        if (
+            !isCurrent(
+                currentRequest
+            )
+        ) {
+            return null
+        }
+
+        if (
+            !cacheDir.exists()
+        ) {
             cacheDir.mkdirs()
         }
 
@@ -265,200 +524,293 @@ class MidiPreviewPlayer(
                 cacheDir
             )
 
-        BufferedOutputStream(
-            FileOutputStream(
-                file
-            ),
-            64 * 1024
-        ).use { output ->
-            writeWavHeader(
-                output,
-                sampleRate,
-                totalFrames
-            )
+        try {
+            BufferedOutputStream(
+                FileOutputStream(file),
+                64 * 1024
+            ).use { output ->
 
-            val chunkFrames =
-                4096
-
-            val pcm =
-                ByteBuffer
-                    .allocate(
-                        chunkFrames * 2
-                    )
-                    .order(
-                        ByteOrder.LITTLE_ENDIAN
-                    )
-
-            var frame =
-                0L
-
-            while (
-                frame <
-                    totalFrames &&
-                isRunning()
-            ) {
-                pcm.clear()
-
-                val count =
-                    minOf(
-                        chunkFrames,
-                        (
-                            totalFrames -
-                                frame
-                            ).toInt()
-                    )
-
-                val chunkStart =
-                    frame.toDouble() /
-                        sampleRate
-
-                val chunkEnd =
-                    (
-                        frame +
-                            count
-                        ).toDouble() /
-                        sampleRate
-
-                val activeNotes =
-                    notes.filter {
-                        it.startSeconds <
-                            chunkEnd &&
-                            (
-                                it.startSeconds +
-                                    it.durationSeconds
-                                ) >
-                                chunkStart
-                    }
-
-                val activeGain =
-                    0.22 /
-                        max(
-                            1.0,
-                            sqrt(
-                                activeNotes.size
-                                    .toDouble()
-                            )
-                        )
-
-                for (
-                    index
-                    in 0 until count
-                ) {
-                    val time =
-                        (
-                            frame +
-                                index
-                            ).toDouble() /
-                            sampleRate
-
-                    var sample =
-                        0.0
-
-                    for (
-                        note
-                        in activeNotes
-                    ) {
-                        val noteEnd =
-                            note.startSeconds +
-                                note.durationSeconds
-
-                        if (
-                            time <
-                                note.startSeconds ||
-                            time >=
-                                noteEnd
-                        ) {
-                            continue
-                        }
-
-                        val relative =
-                            time -
-                                note.startSeconds
-
-                        val frequency =
-                            midiToHz(
-                                note.pitch
-                            ) *
-                                2.0.pow(
-                                    bendAt(
-                                        note,
-                                        relative
-                                    ) /
-                                        12.0
-                                )
-
-                        val phase =
-                            2.0 *
-                                PI *
-                                frequency *
-                                relative
-
-                        val envelope =
-                            envelope(
-                                relative,
-                                note.durationSeconds
-                            )
-
-                        val velocity =
-                            (
-                                note.velocity /
-                                    127.0
-                                ).coerceIn(
-                                    0.0,
-                                    1.0
-                                )
-
-                        sample +=
-                            (
-                                sin(
-                                    phase
-                                ) +
-                                    sin(
-                                        phase * 2.0
-                                    ) * 0.12 +
-                                    sin(
-                                        phase * 3.0
-                                    ) * 0.05
-                                ) *
-                                velocity *
-                                envelope *
-                                activeGain
-                    }
-
-                    val pcmSample =
-                        (
-                            sample.coerceIn(
-                                -0.85,
-                                0.85
-                            ) *
-                                Short.MAX_VALUE
-                            ).toInt()
-                                .toShort()
-
-                    pcm.putShort(
-                        pcmSample
-                    )
-                }
-
-                output.write(
-                    pcm.array(),
-                    0,
-                    count * 2
+                writeWavHeader(
+                    output,
+                    sampleRate,
+                    totalFrames
                 )
 
-                frame +=
-                    count
+                val chunkFrames =
+                    4096
+
+                val pcm =
+                    ByteBuffer
+                        .allocate(
+                            chunkFrames * 2
+                        )
+                        .order(
+                            ByteOrder.LITTLE_ENDIAN
+                        )
+
+                var frame =
+                    0L
+
+                while (
+                    frame <
+                        totalFrames
+                ) {
+                    if (
+                        !isCurrent(
+                            currentRequest
+                        )
+                    ) {
+                        return null
+                    }
+
+                    pcm.clear()
+
+                    val count =
+                        minOf(
+                            chunkFrames,
+                            (
+                                totalFrames -
+                                    frame
+                                ).toInt()
+                        )
+
+                    val chunkStart =
+                        frame.toDouble() /
+                            sampleRate
+
+                    val chunkEnd =
+                        (
+                            frame + count
+                        ).toDouble() /
+                            sampleRate
+
+                    val activeNotes =
+                        notes.filter {
+                            it.startSeconds <
+                                chunkEnd &&
+                                (
+                                    it.startSeconds +
+                                        it.durationSeconds
+                                    ) >
+                                    chunkStart
+                        }
+
+                    val activeGain =
+                        0.28 /
+                            max(
+                                1.0,
+                                sqrt(
+                                    activeNotes.size
+                                        .toDouble()
+                                )
+                            )
+
+                    for (
+                        index
+                        in 0 until count
+                    ) {
+                        val time =
+                            (
+                                frame +
+                                    index
+                                ).toDouble() /
+                                sampleRate
+
+                        var sample =
+                            0.0
+
+                        for (
+                            note
+                            in activeNotes
+                        ) {
+                            val noteEnd =
+                                note.startSeconds +
+                                    note.durationSeconds
+
+                            if (
+                                time <
+                                    note.startSeconds ||
+                                time >=
+                                    noteEnd
+                            ) {
+                                continue
+                            }
+
+                            val relative =
+                                time -
+                                    note.startSeconds
+
+                            val frequency =
+                                midiToHz(
+                                    note.pitch
+                                ) *
+                                    2.0.pow(
+                                        bendAt(
+                                            note,
+                                            relative
+                                        ) /
+                                            12.0
+                                    )
+
+                            val phase =
+                                2.0 *
+                                    PI *
+                                    frequency *
+                                    relative
+
+                            val envelope =
+                                envelope(
+                                    relative,
+                                    note.durationSeconds
+                                )
+
+                            val velocity =
+                                (
+                                    note.velocity /
+                                        127.0
+                                    ).coerceIn(
+                                        0.0,
+                                        1.0
+                                    )
+
+                            sample +=
+                                (
+                                    sin(
+                                        phase
+                                    ) +
+                                        sin(
+                                            phase * 2.0
+                                        ) * 0.10 +
+                                        sin(
+                                            phase * 3.0
+                                        ) * 0.035
+                                    ) *
+                                    velocity *
+                                    envelope *
+                                    activeGain
+                        }
+
+                        val pcmSample =
+                            (
+                                sample.coerceIn(
+                                    -0.90,
+                                    0.90
+                                ) *
+                                    Short.MAX_VALUE
+                                ).toInt()
+                                .toShort()
+
+                        pcm.putShort(
+                            pcmSample
+                        )
+                    }
+
+                    output.write(
+                        pcm.array(),
+                        0,
+                        count * 2
+                    )
+
+                    frame +=
+                        count
+                }
             }
+
+            return file
+        } catch (error: Exception) {
+            file.delete()
+            throw error
+        }
+    }
+
+    private fun bendAt(
+        note:
+            PreviewNote,
+        relativeSeconds:
+            Double
+    ): Double {
+        if (
+            note.pitchBends.isEmpty()
+        ) {
+            return 0.0
         }
 
-        return file
+        val ratio =
+            (
+                relativeSeconds /
+                    note.durationSeconds.coerceAtLeast(
+                        0.001
+                    )
+                ).coerceIn(
+                    0.0,
+                    1.0
+                )
+
+        val index =
+            (
+                ratio *
+                    (
+                        note.pitchBends.size -
+                            1
+                        )
+                ).toInt()
+                .coerceIn(
+                    0,
+                    note.pitchBends.lastIndex
+                )
+
+        return note.pitchBends[index] /
+            3.0
+    }
+
+    private fun envelope(
+        time: Double,
+        duration: Double
+    ): Double {
+        val attack =
+            (
+                time / 0.012
+                ).coerceIn(
+                    0.0,
+                    1.0
+                )
+
+        val release =
+            (
+                (
+                    duration -
+                        time
+                    ) / 0.08
+                ).coerceIn(
+                    0.0,
+                    1.0
+                )
+
+        return minOf(
+            attack,
+            release
+        )
+    }
+
+    private fun midiToHz(
+        midi: Int
+    ): Double {
+        return 440.0 *
+            2.0.pow(
+                (
+                    midi - 69
+                    ) /
+                    12.0
+            )
     }
 
     private fun writeWavHeader(
         output:
             BufferedOutputStream,
-        sampleRate: Int,
-        frames: Long
+        sampleRate:
+            Int,
+        frames:
+            Long
     ) {
         val dataSize =
             frames * 2L
@@ -481,10 +833,22 @@ class MidiPreviewPlayer(
         ) {
             output.write(
                 byteArrayOf(
-                    (value and 0xFF).toByte(),
-                    ((value shr 8) and 0xFF).toByte(),
-                    ((value shr 16) and 0xFF).toByte(),
-                    ((value shr 24) and 0xFF).toByte()
+                    (
+                        value and
+                            0xFF
+                        ).toByte(),
+                    (
+                        value shr 8 and
+                            0xFF
+                        ).toByte(),
+                    (
+                        value shr 16 and
+                            0xFF
+                        ).toByte(),
+                    (
+                        value shr 24 and
+                            0xFF
+                        ).toByte()
                 )
             )
         }
@@ -494,8 +858,14 @@ class MidiPreviewPlayer(
         ) {
             output.write(
                 byteArrayOf(
-                    (value and 0xFF).toByte(),
-                    ((value shr 8) and 0xFF).toByte()
+                    (
+                        value and
+                            0xFF
+                        ).toByte(),
+                    (
+                        value shr 8 and
+                            0xFF
+                        ).toByte()
                 )
             )
         }
@@ -507,110 +877,16 @@ class MidiPreviewPlayer(
         writeInt32(16)
         writeInt16(1)
         writeInt16(1)
-        writeInt32(sampleRate.toLong())
         writeInt32(
-            sampleRate.toLong() * 2L
+            sampleRate.toLong()
+        )
+        writeInt32(
+            sampleRate.toLong() *
+                2L
         )
         writeInt16(2)
         writeInt16(16)
         writeAscii("data")
         writeInt32(dataSize)
-    }
-
-    private fun bendAt(
-        note:
-            AudioMidiPianoRollView.Note,
-        relativeSeconds: Double
-    ): Double {
-        val bends =
-            note.pitchBends
-
-        if (
-            bends.isEmpty()
-        ) {
-            return 0.0
-        }
-
-        val ratio =
-            (
-                relativeSeconds /
-                    note.durationSeconds.coerceAtLeast(
-                        0.001
-                    )
-                ).coerceIn(
-                    0.0,
-                    1.0
-                )
-
-        val index =
-            (
-                ratio *
-                    (
-                        bends.size -
-                            1
-                        )
-                ).toInt()
-                    .coerceIn(
-                        0,
-                        bends.lastIndex
-                    )
-
-        return bends[
-            index
-        ] /
-            3.0
-    }
-
-    private fun envelope(
-        time: Double,
-        duration: Double
-    ): Double {
-        val attack =
-            (
-                time /
-                    0.018
-                ).coerceIn(
-                    0.0,
-                    1.0
-                )
-
-        val release =
-            (
-                (
-                    duration -
-                        time
-                    ) /
-                    0.06
-                ).coerceIn(
-                    0.0,
-                    1.0
-                )
-
-        return minOf(
-            attack,
-            release,
-            1.0
-        ).coerceAtLeast(
-            0.0
-        )
-    }
-
-    private fun midiToHz(
-        midi: Int
-    ): Double {
-        return 440.0 *
-            2.0.pow(
-                (
-                    midi -
-                        69
-                    ) /
-                    12.0
-            )
-    }
-
-    private fun isRunning(): Boolean {
-        synchronized(lock) {
-            return running
-        }
     }
 }
