@@ -38,6 +38,16 @@ object ToolPackageCatalog {
             category = "Business",
             module = "feature_business",
             version = 1
+        ),
+        Package(
+            category = "Imagem",
+            module = "feature_image",
+            version = 1
+        ),
+        Package(
+            category = "Áudio",
+            module = "feature_audio",
+            version = 1
         )
     )
 
@@ -52,6 +62,37 @@ object ToolPackageCatalog {
 
     fun all(): List<Package> {
         return packages
+    }
+
+    fun activityClassFor(
+        toolId: String
+    ): String? {
+        return when (toolId) {
+            "business-invoice-maker",
+            "business-receipt-maker",
+            "business-quote-maker",
+            "business-profit-calculator",
+            "business-expense-tracker",
+            "business-plan",
+            "business-proposal",
+            "business-contract-maker",
+            "business-name-generator",
+            "business-pricing-calculator" ->
+                "com.toolnexa.business.BusinessToolActivity"
+
+            "image-compressor",
+            "image-resizer",
+            "image-converter" ->
+                "com.toolnexa.image.ToolWorkflowActivity"
+
+            "background-remover" ->
+                "com.toolnexa.image.BackgroundRemoverActivity"
+
+            "audio-to-midi" ->
+                "com.toolnexa.audio.AudioToMidiActivity"
+
+            else -> null
+        }
     }
 }
 
