@@ -2121,7 +2121,7 @@ class AudioToMidiActivity : Activity() {
                 false
             ).apply {
                 setOnClickListener {
-                    previewPlayer.stop()
+                    previewPlayer?.stop()
                     selectedUri =
                         null
                     resultFile =
