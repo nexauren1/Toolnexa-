@@ -193,9 +193,9 @@ object ProGate {
                     if (
                         requireLogin
                     ) {
-                        "Para usar "$featureName", inicia sessão e verifica o teu acesso ao plano Pro."
+                        "Para usar \"$featureName\", inicia sessão e verifica o teu acesso ao plano Pro."
                     } else {
-                        ""$featureName" está disponível no plano Pro."
+                        "\"$featureName\" está disponível no plano Pro."
                     }
 
                 textSize =
