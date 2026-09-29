@@ -78,6 +78,29 @@ class SupportActivity : Activity() {
 
         scroll.addView(body)
 
+        val brandRail = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+
+        listOf(
+            R.color.toolnexa_red,
+            R.color.toolnexa_blue,
+            R.color.toolnexa_purple,
+            R.color.toolnexa_cyan
+        ).forEach { colorRes ->
+            brandRail.addView(
+                View(this).apply {
+                    setBackgroundColor(getColor(colorRes))
+                },
+                LinearLayout.LayoutParams(0, dp(4), 1f)
+            )
+        }
+
+        root.addView(
+            brandRail,
+            LinearLayout.LayoutParams(-1, dp(4))
+        )
+
         root.addView(
             scroll,
             LinearLayout.LayoutParams(
@@ -326,14 +349,15 @@ class SupportActivity : Activity() {
                     )
                 isAllCaps = false
                 setTextColor(Color.WHITE)
-                background =
-                    android.graphics.drawable.GradientDrawable().apply {
-                        setColor(blue)
-                        cornerRadius =
-                            dp(14).toFloat()
-                    }
+                background = android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                    intArrayOf(blue, getColor(R.color.toolnexa_red))
+                ).apply {
+                    cornerRadius = dp(15).toFloat()
+                }
                 minHeight = dp(54)
                 stateListAnimator = null
+                elevation = dp(2).toFloat()
             }
 
         send.setOnClickListener {
