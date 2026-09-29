@@ -2,6 +2,9 @@ package com.toolnexa.app
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.view.View
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.Button
@@ -66,10 +69,31 @@ class ToolPackageActivity : Activity() {
             )
         }
 
+        val brandRail = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+
+        listOf(
+            R.color.toolnexa_red,
+            R.color.toolnexa_blue,
+            R.color.toolnexa_purple,
+            R.color.toolnexa_cyan
+        ).forEach { colorRes ->
+            brandRail.addView(
+                View(this).apply { setBackgroundColor(getColor(colorRes)) },
+                LinearLayout.LayoutParams(0, dp(4), 1f)
+            )
+        }
+
+        root.addView(
+            brandRail,
+            LinearLayout.LayoutParams(-1, dp(4))
+        )
+
         root.addView(
             TextView(this).apply {
                 text =
-                    "Pacote " + packageInfo.category
+                    "TOOLNEXA  /  PACKAGE " + packageInfo.category
                 textSize = 28f
                 gravity = Gravity.CENTER
                 setTextColor(
@@ -132,7 +156,7 @@ class ToolPackageActivity : Activity() {
             progress,
             LinearLayout.LayoutParams(
                 -1,
-                dp(12)
+                dp(10)
             )
         )
 
@@ -154,6 +178,20 @@ class ToolPackageActivity : Activity() {
 
         val button = Button(this).apply {
             text = "Baixar pacote"
+            isAllCaps = false
+            setTextColor(Color.WHITE)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(
+                    getColor(R.color.toolnexa_blue),
+                    getColor(R.color.toolnexa_red)
+                )
+            ).apply {
+                cornerRadius = dp(15).toFloat()
+            }
+            stateListAnimator = null
+            elevation = dp(2).toFloat()
         }
 
         root.addView(
