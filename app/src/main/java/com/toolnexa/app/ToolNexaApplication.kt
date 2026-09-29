@@ -2,12 +2,36 @@ package com.toolnexa.app
 
 import android.app.Activity
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.Network
 import android.os.Bundle
 
 class ToolNexaApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        AutoUpdateChecker.check(this)
+
+        val connectivity =
+            getSystemService(
+                ConnectivityManager::class.java
+            )
+
+        try {
+            connectivity.registerDefaultNetworkCallback(
+                object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(
+                        network: Network
+                    ) {
+                        AutoUpdateChecker.check(
+                            applicationContext
+                        )
+                    }
+                }
+            )
+        } catch (_: Exception) {
+        }
 
         registerActivityLifecycleCallbacks(
             object :
