@@ -72,20 +72,7 @@ jobs:
               android.signingConfigs.getByName("ciRelease")
           EOF
 
-          for module in feature_business feature_image feature_audio; do
-            cat >> "$module/build.gradle.kts" <<'EOF'
 
-            android.signingConfigs.create("ciRelease") {
-                storeFile = file("../app/signing/toolnexa-upload.p12")
-                storePassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
-                keyAlias = System.getenv("TOOLNEXA_KEY_ALIAS")
-                keyPassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
-            }
-
-            android.buildTypes.getByName("release").signingConfig =
-                android.signingConfigs.getByName("ciRelease")
-            EOF
-          done
 
       - name: Build APK
         run: |
@@ -138,6 +125,20 @@ jobs:
           test -s package-output/toolnexa-feature_business.apk
           test -s package-output/toolnexa-feature_image.apk
           test -s package-output/toolnexa-feature_audio.apk
+
+      - name: Sign feature packages
+        if: hashFiles('app/signing/toolnexa-upload.p12') != ''
+        run: |
+          set -euo pipefail
+
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+          test -x "$APKSIGNER"
+
+          for apk in             package-output/toolnexa-feature_business.apk             package-output/toolnexa-feature_image.apk             package-output/toolnexa-feature_audio.apk; do
+            "$APKSIGNER" sign               --ks app/signing/toolnexa-upload.p12               --ks-key-alias "$TOOLNEXA_KEY_ALIAS"               --ks-pass env:TOOLNEXA_STORE_PASSWORD               --key-pass env:TOOLNEXA_STORE_PASSWORD               "$apk"
+
+            "$APKSIGNER" verify "$apk"
+          done
 
       - name: Build package manifest
         run: |
