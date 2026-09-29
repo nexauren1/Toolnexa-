@@ -2,6 +2,12 @@
 
 ToolNexa is a native Android utility app focused on practical tools with a clean, light and mobile-first experience.
 
+## v1.34.1
+
+- Fixed category package loading for GitHub APK installs.
+- Added split-package updates so installed tool modules can update without replacing the base APK.
+- Added automatic package update notifications when the device is online.
+
 ## v1.34.0
 
 - New Word Counter tool for words, characters, lines and estimated reading time.

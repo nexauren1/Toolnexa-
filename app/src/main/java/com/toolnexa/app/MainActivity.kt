@@ -106,6 +106,16 @@ class MainActivity : ComponentActivity() {
         analytics.screen("home")
 
         if (auth.currentUser == null) {
+            if (
+                intent.getStringExtra("open_screen") ==
+                    "update_base"
+            ) {
+                updateManager.checkForUpdate(
+                    showErrors = true
+                )
+                return
+            }
+
             analytics.event(
                 "auth_guard_blocked_main"
             )
@@ -125,14 +135,23 @@ class MainActivity : ComponentActivity() {
 
         when (intent.getStringExtra("open_tool")) {
             "text-word-counter" -> showWordCounter()
+
             else -> {
-                if (
-                    intent.getStringExtra("open_screen") ==
-                        "settings"
+                when (
+                    intent.getStringExtra("open_screen")
                 ) {
-                    showSettings()
-                } else {
-                    showHome()
+                    "settings" -> showSettings()
+
+                    "update_base" -> {
+                        showHome()
+                        root.post {
+                            updateManager.checkForUpdate(
+                                showErrors = true
+                            )
+                        }
+                    }
+
+                    else -> showHome()
                 }
             }
         }
@@ -181,8 +200,11 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
 
+        AutoUpdateChecker.check(this)
+
         if (::updateManager.isInitialized) {
             updateManager.retryInstallAfterSettings()
+            updateManager.checkForUpdate()
         }
     }
 

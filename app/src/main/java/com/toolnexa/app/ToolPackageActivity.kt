@@ -26,6 +26,7 @@ class ToolPackageActivity : Activity() {
         TextView
 
     private var targetToolId: String? = null
+    private var forceUpdate = false
 
     private val packageManager by lazy {
         ToolPackageManager(this)
@@ -42,6 +43,12 @@ class ToolPackageActivity : Activity() {
 
         targetToolId =
             intent.getStringExtra("tool_id")
+
+        forceUpdate =
+            intent.getBooleanExtra(
+                "force_update",
+                false
+            )
 
         packageInfo =
             ToolPackageCatalog.forCategory(
@@ -240,13 +247,11 @@ class ToolPackageActivity : Activity() {
             packageManager.isInstalled(
                 packageInfo.module
             ) &&
-            !packageManager.needsUpdate(
-                packageInfo
-            )
+            !forceUpdate
         ) {
             progress.progress = 100
             status.text =
-                "Pacote instalado e atualizado."
+                "Pacote instalado e pronto."
             button.text = "Abrir ferramentas"
             button.setOnClickListener {
                 openTarget()
@@ -262,7 +267,7 @@ class ToolPackageActivity : Activity() {
         ) {
             progress.progress = 0
             status.text =
-                "Nova versão do pacote disponível."
+                "Nova versão disponível. Baixe apenas este pacote."
             button.text = "Atualizar pacote"
         }
 
