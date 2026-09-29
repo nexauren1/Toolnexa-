@@ -106,6 +106,16 @@ class MainActivity : ComponentActivity() {
         analytics.screen("home")
 
         if (auth.currentUser == null) {
+            if (
+                intent.getStringExtra("open_screen") ==
+                    "update_base"
+            ) {
+                updateManager.checkForUpdate(
+                    showErrors = true
+                )
+                return
+            }
+
             analytics.event(
                 "auth_guard_blocked_main"
             )
