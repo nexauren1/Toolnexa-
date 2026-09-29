@@ -798,7 +798,7 @@ class CategoryActivity : Activity() {
             )
 
         if (packageInfo == null) {
-            if (toolId == "text-word-counter") {
+            if (toolId == "text-word-counter" || toolId == "text-case-converter") {
                 startActivity(
                     Intent(
                         this,
