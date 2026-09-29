@@ -128,10 +128,10 @@ class LoginActivity : ComponentActivity() {
             }
 
         listOf(
-            R.color.toolnexa_green,
-            R.color.toolnexa_blue,
             R.color.toolnexa_red,
-            R.color.toolnexa_yellow
+            R.color.toolnexa_blue,
+            R.color.toolnexa_purple,
+            R.color.toolnexa_cyan
         ).forEach { colorRes ->
             brandRail.addView(
                 View(this).apply {
