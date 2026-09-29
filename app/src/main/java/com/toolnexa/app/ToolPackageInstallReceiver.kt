@@ -25,8 +25,14 @@ class ToolPackageInstallReceiver : BroadcastReceiver() {
                 Context.MODE_PRIVATE
             )
 
+        val status =
+            intent.getIntExtra(
+                PackageInstaller.EXTRA_STATUS,
+                PackageInstaller.STATUS_FAILURE
+            )
+
         if (
-            resultCode ==
+            status ==
                 PackageInstaller.STATUS_SUCCESS
         ) {
             prefs.edit()
