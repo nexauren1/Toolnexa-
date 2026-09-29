@@ -113,6 +113,13 @@ object ToolRegistry {
             id = "text-word-counter"
         ),
         ToolDefinition(
+            name = "Text Case Converter",
+            category = "Texto",
+            description = "Converta textos para maiúsculas, minúsculas e formatos de título e frase.",
+            icon = android.R.drawable.ic_menu_edit,
+            id = "text-case-converter"
+        ),
+        ToolDefinition(
             name = "Audio to MIDI",
             category = "Áudio",
             description =
