@@ -4,10 +4,6 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - "feature_business/**"
-      - "feature_image/**"
-      - "feature_audio/**"
   workflow_dispatch:
 
 concurrency:
@@ -76,6 +72,21 @@ jobs:
               android.signingConfigs.getByName("ciRelease")
           EOF
 
+          for module in feature_business feature_image feature_audio; do
+            cat >> "$module/build.gradle.kts" <<'EOF'
+
+android.signingConfigs.create("ciRelease") {
+    storeFile = file("../app/signing/toolnexa-upload.p12")
+    storePassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
+    keyAlias = System.getenv("TOOLNEXA_KEY_ALIAS")
+    keyPassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
+}
+
+android.buildTypes.getByName("release").signingConfig =
+    android.signingConfigs.getByName("ciRelease")
+EOF
+          done
+
       - name: Build APK
         run: |
           set -euo pipefail
@@ -104,6 +115,76 @@ jobs:
           name: ToolNexa-v${{ steps.version.outputs.version }}
           path: toolnexa.apk
           if-no-files-found: error
+
+
+      - name: Build feature packages
+        run: |
+          set -euo pipefail
+
+          if [ -f app/signing/toolnexa-upload.p12 ]; then
+            gradle :feature_business:assembleRelease :feature_image:assembleRelease :feature_audio:assembleRelease
+            BUILD_TYPE=release
+          else
+            gradle :feature_business:assembleDebug :feature_image:assembleDebug :feature_audio:assembleDebug
+            BUILD_TYPE=debug
+          fi
+
+          mkdir -p package-output
+
+          find "feature_business/build/outputs/apk/$BUILD_TYPE" -maxdepth 1 -type f -name '*.apk' -print -quit             | xargs -I{} cp "{}" package-output/toolnexa-feature_business.apk
+          find "feature_image/build/outputs/apk/$BUILD_TYPE" -maxdepth 1 -type f -name '*.apk' -print -quit             | xargs -I{} cp "{}" package-output/toolnexa-feature_image.apk
+          find "feature_audio/build/outputs/apk/$BUILD_TYPE" -maxdepth 1 -type f -name '*.apk' -print -quit             | xargs -I{} cp "{}" package-output/toolnexa-feature_audio.apk
+
+          test -s package-output/toolnexa-feature_business.apk
+          test -s package-output/toolnexa-feature_image.apk
+          test -s package-output/toolnexa-feature_audio.apk
+
+      - name: Build package manifest
+        run: |
+          set -euo pipefail
+          VERSION_CODE=$(grep -E 'versionCode = ' app/build.gradle.kts | head -1 | awk '{print $3}')
+          VERSION_NAME=$(grep -E 'versionName = "' app/build.gradle.kts | head -1 | cut -d '"' -f2)
+
+          BUSINESS_REV=$(git rev-parse HEAD:feature_business)
+          IMAGE_REV=$(git rev-parse HEAD:feature_image)
+          AUDIO_REV=$(git rev-parse HEAD:feature_audio)
+
+          mkdir -p package-output
+          cat > package-output/toolnexa-packages.json <<EOF
+          {
+            "baseVersionCode": $VERSION_CODE,
+            "baseVersionName": "$VERSION_NAME",
+            "packages": {
+              "feature_business": {
+                "category": "Business",
+                "revision": "$BUSINESS_REV",
+                "asset": "toolnexa-feature_business.apk"
+              },
+              "feature_image": {
+                "category": "Imagem",
+                "revision": "$IMAGE_REV",
+                "asset": "toolnexa-feature_image.apk"
+              },
+              "feature_audio": {
+                "category": "Áudio",
+                "revision": "$AUDIO_REV",
+                "asset": "toolnexa-feature_audio.apk"
+              }
+            }
+          }
+          EOF
+
+      - name: Publish ToolNexa tool packages
+        run: |
+          set -euo pipefail
+          export GH_TOKEN="$GITHUB_TOKEN"
+
+          if gh release view tool-packages >/dev/null 2>&1; then
+            gh release upload tool-packages               package-output/toolnexa-feature_business.apk               package-output/toolnexa-feature_image.apk               package-output/toolnexa-feature_audio.apk               package-output/toolnexa-packages.json               --clobber
+            gh release edit tool-packages               --title "ToolNexa Tool Packages"               --notes "Current split packages for ToolNexa base version $VERSION_NAME."
+          else
+            gh release create tool-packages               package-output/toolnexa-feature_business.apk               package-output/toolnexa-feature_image.apk               package-output/toolnexa-feature_audio.apk               package-output/toolnexa-packages.json               --title "ToolNexa Tool Packages"               --notes "Current split packages for the ToolNexa base app."               --latest=false
+          fi
 
       - name: Publish GitHub Release
         env:
