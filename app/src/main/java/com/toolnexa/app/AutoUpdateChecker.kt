@@ -387,9 +387,7 @@ object AutoUpdateChecker {
                         0
                     )
 
-            info.splitNames
-                ?.contains(module)
-                == true
+            info.splitNames?.contains(module) == true
         } catch (_: Exception) {
             false
         }
