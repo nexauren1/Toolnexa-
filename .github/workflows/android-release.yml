@@ -181,7 +181,8 @@ EOF
 
           if gh release view tool-packages >/dev/null 2>&1; then
             gh release upload tool-packages               package-output/toolnexa-feature_business.apk               package-output/toolnexa-feature_image.apk               package-output/toolnexa-feature_audio.apk               package-output/toolnexa-packages.json               --clobber
-            gh release edit tool-packages               --title "ToolNexa Tool Packages"               --notes "Current split packages for ToolNexa base version $VERSION_NAME."
+            CURRENT_VERSION=$(grep -E 'versionName = "' app/build.gradle.kts | head -1 | cut -d '"' -f2)
+            gh release edit tool-packages               --title "ToolNexa Tool Packages"               --notes "Current split packages for ToolNexa base version $CURRENT_VERSION."
           else
             gh release create tool-packages               package-output/toolnexa-feature_business.apk               package-output/toolnexa-feature_image.apk               package-output/toolnexa-feature_audio.apk               package-output/toolnexa-packages.json               --title "ToolNexa Tool Packages"               --notes "Current split packages for the ToolNexa base app."               --latest=false
           fi
