@@ -837,18 +837,19 @@ class PlansActivity : Activity() {
                         setTextColor(
                             android.graphics.Color.WHITE
                         )
-                        background =
-                            GradientDrawable().apply {
-                                setColor(
-                                    getColor(
-                                        R.color.toolnexa_blue
-                                    )
-                                )
-                                cornerRadius =
-                                    14f
-                            }
-                        stateListAnimator =
-                            null
+                        background = GradientDrawable(
+                            GradientDrawable.Orientation.LEFT_RIGHT,
+                            intArrayOf(
+                                getColor(R.color.toolnexa_blue),
+                                getColor(R.color.toolnexa_red)
+                            )
+                        ).apply {
+                            cornerRadius = 15f
+                        }
+                        typeface =
+                            android.graphics.Typeface.DEFAULT_BOLD
+                        elevation = 3f
+                        stateListAnimator = null
                         setOnClickListener {
                             startProSubscription()
                         }
