@@ -75,16 +75,16 @@ jobs:
           for module in feature_business feature_image feature_audio; do
             cat >> "$module/build.gradle.kts" <<'EOF'
 
-android.signingConfigs.create("ciRelease") {
-    storeFile = file("../app/signing/toolnexa-upload.p12")
-    storePassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
-    keyAlias = System.getenv("TOOLNEXA_KEY_ALIAS")
-    keyPassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
-}
+            android.signingConfigs.create("ciRelease") {
+                storeFile = file("../app/signing/toolnexa-upload.p12")
+                storePassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
+                keyAlias = System.getenv("TOOLNEXA_KEY_ALIAS")
+                keyPassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
+            }
 
-android.buildTypes.getByName("release").signingConfig =
-    android.signingConfigs.getByName("ciRelease")
-EOF
+            android.buildTypes.getByName("release").signingConfig =
+                android.signingConfigs.getByName("ciRelease")
+            EOF
           done
 
       - name: Build APK
