@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "feature_business/**"
+      - "feature_image/**"
+      - "feature_audio/**"
   workflow_dispatch:
 
 concurrency:
