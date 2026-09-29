@@ -798,6 +798,18 @@ class CategoryActivity : Activity() {
             )
 
         if (packageInfo == null) {
+            if (toolId == "text-word-counter") {
+                startActivity(
+                    Intent(
+                        this,
+                        MainActivity::class.java
+                    ).apply {
+                        putExtra("open_tool", toolId)
+                    }
+                )
+                return
+            }
+
             android.widget.Toast.makeText(
                 this,
                 "Este pacote de ferramentas ainda não está disponível.",
