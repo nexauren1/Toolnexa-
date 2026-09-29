@@ -125,14 +125,23 @@ class MainActivity : ComponentActivity() {
 
         when (intent.getStringExtra("open_tool")) {
             "text-word-counter" -> showWordCounter()
+
             else -> {
-                if (
-                    intent.getStringExtra("open_screen") ==
-                        "settings"
+                when (
+                    intent.getStringExtra("open_screen")
                 ) {
-                    showSettings()
-                } else {
-                    showHome()
+                    "settings" -> showSettings()
+
+                    "update_base" -> {
+                        showHome()
+                        root.post {
+                            updateManager.checkForUpdate(
+                                showErrors = true
+                            )
+                        }
+                    }
+
+                    else -> showHome()
                 }
             }
         }
@@ -181,8 +190,11 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
 
+        AutoUpdateChecker.check(this)
+
         if (::updateManager.isInitialized) {
             updateManager.retryInstallAfterSettings()
+            updateManager.checkForUpdate()
         }
     }
 
