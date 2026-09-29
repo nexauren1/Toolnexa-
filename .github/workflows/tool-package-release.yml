@@ -18,6 +18,11 @@ permissions:
 jobs:
   build-packages:
     runs-on: ubuntu-latest
+    env:
+      TOOLNEXA_KEYSTORE_BASE64: ${{ secrets.TOOLNEXA_KEYSTORE_BASE64 }}
+      TOOLNEXA_STORE_PASSWORD: ${{ secrets.TOOLNEXA_STORE_PASSWORD }}
+      TOOLNEXA_KEY_ALIAS: ${{ secrets.TOOLNEXA_KEY_ALIAS }}
+      TOOLNEXA_KEY_PASSWORD: ${{ secrets.TOOLNEXA_KEY_PASSWORD }}
     timeout-minutes: 25
 
     steps:
@@ -35,13 +40,42 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
-      - name: Validate base version
+      - name: Validate base version and signing
+        env:
+          TOOLNEXA_KEYSTORE_BASE64: ${{ secrets.TOOLNEXA_KEYSTORE_BASE64 }}
+          TOOLNEXA_STORE_PASSWORD: ${{ secrets.TOOLNEXA_STORE_PASSWORD }}
+          TOOLNEXA_KEY_ALIAS: ${{ secrets.TOOLNEXA_KEY_ALIAS }}
+          TOOLNEXA_KEY_PASSWORD: ${{ secrets.TOOLNEXA_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           VERSION_CODE=$(grep -E 'versionCode = ' app/build.gradle.kts | head -1 | awk '{print $3}')
           VERSION_NAME=$(grep -E 'versionName = "' app/build.gradle.kts | head -1 | cut -d '"' -f2)
           test -n "$VERSION_CODE"
           test -n "$VERSION_NAME"
+          test -n "$TOOLNEXA_KEYSTORE_BASE64"
+          test -n "$TOOLNEXA_STORE_PASSWORD"
+          test -n "$TOOLNEXA_KEY_ALIAS"
+          test -n "$TOOLNEXA_KEY_PASSWORD"
+
+          mkdir -p app/signing
+          printf '%s' "$TOOLNEXA_KEYSTORE_BASE64" | base64 --decode > app/signing/toolnexa-upload.p12
+          test -s app/signing/toolnexa-upload.p12
+
+          for module in feature_business feature_image feature_audio; do
+            cat >> "$module/build.gradle.kts" <<'EOF'
+
+android.signingConfigs.create("ciRelease") {
+    storeFile = file("../app/signing/toolnexa-upload.p12")
+    storePassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
+    keyAlias = System.getenv("TOOLNEXA_KEY_ALIAS")
+    keyPassword = System.getenv("TOOLNEXA_STORE_PASSWORD")
+}
+
+android.buildTypes.getByName("release").signingConfig =
+    android.signingConfigs.getByName("ciRelease")
+EOF
+          done
+
           echo "versionCode=$VERSION_CODE"
           echo "versionName=$VERSION_NAME"
 
