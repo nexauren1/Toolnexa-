@@ -11,8 +11,8 @@ android {
         applicationId = "com.toolnexa.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 49
-        versionName = "1.34.3"
+        versionCode = 50
+        versionName = "1.34.4"
     }
 
     dynamicFeatures += setOf(
