@@ -210,85 +210,33 @@ class ToolPackageManager(
     }
 
     private fun fetchManifest(): PackageManifest {
-        val connection =
-            URL(PACKAGE_RELEASE_API)
-                .openConnection() as HttpURLConnection
-
-        connection.connectTimeout = 10000
-        connection.readTimeout = 15000
-        connection.requestMethod = "GET"
-        connection.setRequestProperty(
-            "Accept",
-            "application/vnd.github+json"
-        )
-        connection.setRequestProperty(
-            "User-Agent",
-            "ToolNexa-Android"
-        )
-
-        val code = connection.responseCode
-
-        if (code !in 200..299) {
-            connection.disconnect()
-            throw IllegalStateException(
-                "Servidor de pacotes indisponível (HTTP " +
-                    code +
-                    ")."
-            )
-        }
-
-        val releaseBody =
-            connection.inputStream
-                .bufferedReader()
-                .use { it.readText() }
-
-        connection.disconnect()
-
-        val release =
-            JSONObject(releaseBody)
-
-        val assets =
-            release.optJSONArray("assets")
-                ?: throw IllegalStateException(
-                    "Release de pacotes sem manifest."
-                )
-
-        var manifestUrl: String? = null
-
-        for (index in 0 until assets.length()) {
-            val item =
-                assets.optJSONObject(index)
-                    ?: continue
-
-            if (
-                item.optString("name") ==
-                    PACKAGE_MANIFEST_NAME
-            ) {
-                manifestUrl =
-                    item.optString(
-                        "browser_download_url"
-                    )
-                break
-            }
-        }
-
-        if (manifestUrl.isNullOrBlank()) {
-            throw IllegalStateException(
-                "Manifesto de pacotes não encontrado."
-            )
-        }
-
         val manifestConnection =
-            URL(manifestUrl)
+            URL(TOOL_PACKAGE_MANIFEST_URL)
                 .openConnection() as HttpURLConnection
 
         manifestConnection.connectTimeout = 10000
         manifestConnection.readTimeout = 15000
+        manifestConnection.instanceFollowRedirects = true
         manifestConnection.requestMethod = "GET"
+        manifestConnection.setRequestProperty(
+            "Accept",
+            "application/json"
+        )
         manifestConnection.setRequestProperty(
             "User-Agent",
             "ToolNexa-Android"
         )
+
+        val code = manifestConnection.responseCode
+
+        if (code !in 200..299) {
+            manifestConnection.disconnect()
+            throw IllegalStateException(
+                "Não foi possível consultar o pacote de ferramentas (HTTP " +
+                    code +
+                    ")."
+            )
+        }
 
         val manifestJson =
             manifestConnection.inputStream
@@ -627,11 +575,8 @@ class ToolPackageManager(
     }
 
     companion object {
-        private const val PACKAGE_RELEASE_API =
-            "https://api.github.com/repos/nexauren1/Toolnexa-/releases/tags/tool-packages"
-
-        private const val PACKAGE_MANIFEST_NAME =
-            "toolnexa-packages.json"
+        private const val TOOL_PACKAGE_MANIFEST_URL =
+            "https://github.com/nexauren1/Toolnexa-/releases/download/tool-packages/toolnexa-packages.json"
 
         private const val TOOL_PACKAGE_ASSET_BASE =
             "https://github.com/nexauren1/Toolnexa-/releases/download/tool-packages/"
