@@ -47,8 +47,13 @@ class HistoryActivity : Activity() {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(18), dp(18), dp(12))
-            background = GradientDrawable().apply {
-                setColor(surface)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(
+                    android.graphics.Color.parseColor("#0B1120"),
+                    android.graphics.Color.parseColor("#111C32")
+                )
+            ).apply {
                 setStroke(dp(1), border)
             }
         }
@@ -77,10 +82,10 @@ class HistoryActivity : Activity() {
             }
 
         listOf(
-            R.color.toolnexa_green,
-            R.color.toolnexa_blue,
             R.color.toolnexa_red,
-            R.color.toolnexa_yellow
+            R.color.toolnexa_blue,
+            R.color.toolnexa_purple,
+            R.color.toolnexa_cyan
         ).forEach { colorRes ->
             brandRail.addView(
                 View(this).apply {
@@ -190,11 +195,14 @@ class HistoryActivity : Activity() {
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(14), dp(16), dp(14))
-            background = GradientDrawable().apply {
-                setColor(surface)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(surface, android.graphics.Color.parseColor("#111B31"))
+            ).apply {
                 setStroke(dp(1), border)
                 cornerRadius = dp(18).toFloat()
             }
+            elevation = dp(2).toFloat()
             alpha = 0f
             translationY = dp(7).toFloat()
         }
@@ -328,11 +336,18 @@ class HistoryActivity : Activity() {
     private fun styleSecondary(button: Button) {
         button.setTextColor(blue)
         button.textSize = 14f
-        button.background = GradientDrawable().apply {
-            setColor(android.graphics.Color.TRANSPARENT)
+        button.background = GradientDrawable(
+            GradientDrawable.Orientation.LEFT_RIGHT,
+            intArrayOf(
+                android.graphics.Color.argb(18, 47, 128, 255),
+                android.graphics.Color.argb(18, 255, 61, 90)
+            )
+        ).apply {
             setStroke(dp(1), blue)
             cornerRadius = dp(14).toFloat()
         }
+        button.typeface = android.graphics.Typeface.DEFAULT_BOLD
+        button.isAllCaps = false
         button.minHeight = dp(48)
         button.stateListAnimator = null
     }
