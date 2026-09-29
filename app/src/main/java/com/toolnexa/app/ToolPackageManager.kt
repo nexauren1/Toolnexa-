@@ -1,106 +1,72 @@
 package com.toolnexa.app
 
 import android.app.Activity
+import android.app.PendingIntent
+import android.content.Intent
+import android.content.pm.PackageInstaller
+import android.os.Handler
+import android.os.Looper
 import com.google.android.play.core.splitcompat.SplitCompat
-import com.google.android.play.core.splitinstall.SplitInstallManager
-import com.google.android.play.core.splitinstall.SplitInstallManagerFactory
-import com.google.android.play.core.splitinstall.SplitInstallRequest
-import com.google.android.play.core.splitinstall.SplitInstallSessionState
-import com.google.android.play.core.splitinstall.model.SplitInstallSessionStatus
+import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
-/**
- * Registry of downloadable category packages.
- *
- * Each package maps to one Play Feature Delivery dynamic-feature module.
- * New tools are released by increasing the package version together with
- * the normal app release. Google Play updates installed feature modules
- * automatically when a new App Bundle is published.
- */
 object ToolPackageCatalog {
 
     data class Package(
         val category: String,
-        val module: String,
-        val version: Int
+        val module: String
     ) {
         val toolCount: Int
             get() = ToolRegistry.countFor(category)
     }
 
-    /*
-     * Only categories that already have a real dynamic-feature module
-     * are enabled here. As each new category is migrated to its own
-     * feature module, add one entry below. This prevents the app from
-     * showing a download button for a module that does not exist yet.
-     */
     private val packages = listOf(
-        Package(
-            category = "Business",
-            module = "feature_business",
-            version = 1
-        ),
-        Package(
-            category = "Imagem",
-            module = "feature_image",
-            version = 1
-        ),
-        Package(
-            category = "Áudio",
-            module = "feature_audio",
-            version = 1
-        )
+        Package("Business", "feature_business"),
+        Package("Imagem", "feature_image"),
+        Package("Áudio", "feature_audio")
     )
 
-    fun forCategory(category: String): Package? {
-        return packages.firstOrNull {
-            it.category.equals(
-                category,
-                ignoreCase = true
-            )
+    fun forCategory(category: String): Package? =
+        packages.firstOrNull {
+            it.category.equals(category, ignoreCase = true)
         }
-    }
 
-    fun all(): List<Package> {
-        return packages
-    }
+    fun all(): List<Package> = packages
 
-    fun activityClassFor(
-        toolId: String
-    ): String? {
-        return when (toolId) {
-            "business-invoice-maker",
-            "business-receipt-maker",
-            "business-quote-maker",
-            "business-profit-calculator",
-            "business-expense-tracker",
-            "business-plan",
-            "business-proposal",
-            "business-contract-maker",
-            "business-name-generator",
-            "business-pricing-calculator" ->
-                "com.toolnexa.business.BusinessToolActivity"
+    fun activityClassFor(toolId: String): String? = when (toolId) {
+        "business-invoice-maker",
+        "business-receipt-maker",
+        "business-quote-maker",
+        "business-profit-calculator",
+        "business-expense-tracker",
+        "business-plan",
+        "business-proposal",
+        "business-contract-maker",
+        "business-name-generator",
+        "business-pricing-calculator" ->
+            "com.toolnexa.business.BusinessToolActivity"
 
-            "image-compressor",
-            "image-resizer",
-            "image-converter" ->
-                "com.toolnexa.image.ToolWorkflowActivity"
+        "image-compressor",
+        "image-resizer",
+        "image-converter" ->
+            "com.toolnexa.image.ToolWorkflowActivity"
 
-            "background-remover" ->
-                "com.toolnexa.image.BackgroundRemoverActivity"
+        "background-remover" ->
+            "com.toolnexa.image.BackgroundRemoverActivity"
 
-            "audio-to-midi" ->
-                "com.toolnexa.audio.AudioToMidiActivity"
+        "audio-to-midi" ->
+            "com.toolnexa.audio.AudioToMidiActivity"
 
-            else -> null
-        }
+        else -> null
     }
 }
 
 class ToolPackageManager(
     private val activity: Activity
 ) {
-    private val manager: SplitInstallManager =
-        SplitInstallManagerFactory.create(activity)
 
     private val preferences =
         activity.getSharedPreferences(
@@ -108,44 +74,65 @@ class ToolPackageManager(
             Activity.MODE_PRIVATE
         )
 
-    fun installedVersion(
-        packageInfo: ToolPackageCatalog.Package
-    ): Int {
-        if (!isInstalled(packageInfo.module)) {
-            return 0
+    private val handler =
+        Handler(Looper.getMainLooper())
+
+    fun prepareActivity() {
+        try {
+            SplitCompat.installActivity(activity)
+        } catch (_: Exception) {
         }
-
-        return preferences.getInt(
-            "version_" + packageInfo.module,
-            0
-        )
     }
 
-    fun needsUpdate(
-        packageInfo: ToolPackageCatalog.Package
-    ): Boolean {
-        return installedVersion(packageInfo) <
-            packageInfo.version
+    fun isInstalled(module: String): Boolean = try {
+        val info =
+            activity.packageManager.getApplicationInfo(
+                activity.packageName,
+                0
+            )
+
+        info.splitNames?.contains(module) == true
+    } catch (_: Exception) {
+        false
     }
 
-    private fun markInstalled(
+    fun installedRevision(
         packageInfo: ToolPackageCatalog.Package
+    ): String {
+        return preferences.getString(
+            "revision_" + packageInfo.module,
+            ""
+        ).orEmpty()
+    }
+
+    fun markInstalled(
+        packageInfo: ToolPackageCatalog.Package,
+        revision: String
     ) {
         preferences.edit()
-            .putInt(
-                "version_" + packageInfo.module,
-                packageInfo.version
+            .putString(
+                "revision_" + packageInfo.module,
+                revision
+            )
+            .putBoolean(
+                "ever_installed_" + packageInfo.module,
+                true
             )
             .apply()
     }
 
-    fun prepareActivity() {
-        SplitCompat.installActivity(activity)
+    fun hasEverInstalled(
+        packageInfo: ToolPackageCatalog.Package
+    ): Boolean {
+        return preferences.getBoolean(
+            "ever_installed_" + packageInfo.module,
+            false
+        ) || isInstalled(packageInfo.module)
     }
 
-    fun isInstalled(module: String): Boolean {
-        return manager.installedModules.contains(module)
-    }
+    fun needsUpdate(
+        packageInfo: ToolPackageCatalog.Package
+    ): Boolean = false
 
     fun download(
         packageInfo: ToolPackageCatalog.Package,
@@ -153,101 +140,508 @@ class ToolPackageManager(
         onInstalled: () -> Unit,
         onError: (String) -> Unit
     ) {
-        val module = packageInfo.module
-        if (isInstalled(module)) {
-            markInstalled(packageInfo)
-            onProgress(100)
-            onInstalled()
-            return
+        Thread {
+            try {
+                val manifest = fetchManifest()
+                val remote =
+                    manifest.packages.optJSONObject(
+                        packageInfo.module
+                    ) ?: throw IllegalStateException(
+                        "O pacote " +
+                            packageInfo.category +
+                            " não está disponível."
+                    )
+
+                if (
+                    manifest.baseVersionCode !=
+                        BuildConfig.VERSION_CODE
+                ) {
+                    throw IllegalStateException(
+                        "Este pacote pertence a outra versão base da app. " +
+                            "Atualize primeiro o ToolNexa."
+                    )
+                }
+
+                val revision =
+                    remote.optString("revision").trim()
+
+                val asset =
+                    remote.optString("asset").trim()
+
+                if (
+                    revision.isBlank() ||
+                    asset.isBlank()
+                ) {
+                    throw IllegalStateException(
+                        "Metadados do pacote incompletos."
+                    )
+                }
+
+                val downloadUrl =
+                    remote.optString("downloadUrl")
+                        .takeIf {
+                            it.isNotBlank()
+                        }
+                        ?: TOOL_PACKAGE_ASSET_BASE + asset
+
+                val file =
+                    downloadAsset(
+                        downloadUrl,
+                        asset,
+                        onProgress
+                    )
+
+                installSplit(
+                    file,
+                    packageInfo,
+                    revision,
+                    onInstalled,
+                    onError
+                )
+            } catch (error: Exception) {
+                activity.runOnUiThread {
+                    onError(
+                        error.message
+                            ?: "Não foi possível preparar o pacote."
+                    )
+                }
+            }
+        }.start()
+    }
+
+    private fun fetchManifest(): PackageManifest {
+        val connection =
+            URL(PACKAGE_RELEASE_API)
+                .openConnection() as HttpURLConnection
+
+        connection.connectTimeout = 10000
+        connection.readTimeout = 15000
+        connection.requestMethod = "GET"
+        connection.setRequestProperty(
+            "Accept",
+            "application/vnd.github+json"
+        )
+        connection.setRequestProperty(
+            "User-Agent",
+            "ToolNexa-Android"
+        )
+
+        val code = connection.responseCode
+
+        if (code !in 200..299) {
+            connection.disconnect()
+            throw IllegalStateException(
+                "Servidor de pacotes indisponível (HTTP " +
+                    code +
+                    ")."
+            )
         }
 
-        val listener =
-            object :
-                com.google.android.play.core.splitinstall
-                    .SplitInstallStateUpdatedListener {
+        val releaseBody =
+            connection.inputStream
+                .bufferedReader()
+                .use { it.readText() }
 
-                override fun onStateUpdate(
-                    state: SplitInstallSessionState
-                ) {
-                    if (
-                        !state.moduleNames()
-                            .contains(module)
-                    ) {
-                        return
+        connection.disconnect()
+
+        val release =
+            JSONObject(releaseBody)
+
+        val assets =
+            release.optJSONArray("assets")
+                ?: throw IllegalStateException(
+                    "Release de pacotes sem manifest."
+                )
+
+        var manifestUrl: String? = null
+
+        for (index in 0 until assets.length()) {
+            val item =
+                assets.optJSONObject(index)
+                    ?: continue
+
+            if (
+                item.optString("name") ==
+                    PACKAGE_MANIFEST_NAME
+            ) {
+                manifestUrl =
+                    item.optString(
+                        "browser_download_url"
+                    )
+                break
+            }
+        }
+
+        if (manifestUrl.isNullOrBlank()) {
+            throw IllegalStateException(
+                "Manifesto de pacotes não encontrado."
+            )
+        }
+
+        val manifestConnection =
+            URL(manifestUrl)
+                .openConnection() as HttpURLConnection
+
+        manifestConnection.connectTimeout = 10000
+        manifestConnection.readTimeout = 15000
+        manifestConnection.requestMethod = "GET"
+        manifestConnection.setRequestProperty(
+            "User-Agent",
+            "ToolNexa-Android"
+        )
+
+        val manifestJson =
+            manifestConnection.inputStream
+                .bufferedReader()
+                .use { it.readText() }
+
+        manifestConnection.disconnect()
+
+        val json =
+            JSONObject(manifestJson)
+
+        return PackageManifest(
+            baseVersionCode =
+                json.optInt(
+                    "baseVersionCode",
+                    0
+                ),
+            packages =
+                json.optJSONObject(
+                    "packages"
+                ) ?: JSONObject()
+        )
+    }
+
+    private fun downloadAsset(
+        downloadUrl: String,
+        assetName: String,
+        onProgress: (Int) -> Unit
+    ): File {
+        val connection =
+            URL(downloadUrl)
+                .openConnection() as HttpURLConnection
+
+        connection.connectTimeout = 15000
+        connection.readTimeout = 30000
+        connection.requestMethod = "GET"
+        connection.setRequestProperty(
+            "User-Agent",
+            "ToolNexa-Android"
+        )
+        connection.connect()
+
+        val total =
+            connection.contentLengthLong
+
+        val directory =
+            File(
+                activity.filesDir,
+                "tool_packages"
+            )
+
+        directory.mkdirs()
+
+        val file =
+            File(
+                directory,
+                assetName
+            )
+
+        FileOutputStream(file).use { output ->
+            connection.inputStream.use { input ->
+                val buffer =
+                    ByteArray(16 * 1024)
+
+                var downloaded = 0L
+
+                while (true) {
+                    val read =
+                        input.read(buffer)
+
+                    if (read == -1) {
+                        break
                     }
 
-                    when (state.status()) {
-                        SplitInstallSessionStatus.DOWNLOADING,
-                        SplitInstallSessionStatus.INSTALLING -> {
-                            val total =
-                                state.totalBytesToDownload()
-                            val downloaded =
-                                state.bytesDownloaded()
+                    output.write(
+                        buffer,
+                        0,
+                        read
+                    )
 
-                            val percent =
-                                if (total > 0L) {
-                                    (
-                                        downloaded * 100L /
-                                            total
-                                        ).toInt()
-                                            .coerceIn(
-                                                0,
-                                                100
-                                            )
-                                } else {
-                                    0
-                                }
+                    downloaded += read
 
+                    if (total > 0L) {
+                        val percent =
+                            (
+                                downloaded * 100L /
+                                    total
+                                )
+                                .toInt()
+                                .coerceIn(
+                                    0,
+                                    100
+                                )
+
+                        activity.runOnUiThread {
                             onProgress(percent)
-                        }
-
-                        SplitInstallSessionStatus.INSTALLED -> {
-                            manager.unregisterListener(
-                                this
-                            )
-
-                            SplitCompat.installActivity(
-                                activity
-                            )
-
-                            markInstalled(packageInfo)
-                            onProgress(100)
-                            onInstalled()
-                        }
-
-                        SplitInstallSessionStatus.FAILED,
-                        SplitInstallSessionStatus.CANCELED -> {
-                            manager.unregisterListener(
-                                this
-                            )
-
-                            onError(
-                                "Não foi possível instalar o pacote. " +
-                                    "Verifique a internet e tente novamente."
-                            )
                         }
                     }
                 }
             }
+        }
 
-        manager.registerListener(listener)
+        connection.disconnect()
 
-        val request =
-            SplitInstallRequest
-                .newBuilder()
-                .addModule(module)
-                .build()
+        if (
+            !file.exists() ||
+            file.length() == 0L
+        ) {
+            throw IllegalStateException(
+                "O download do pacote ficou vazio."
+            )
+        }
 
-        manager.startInstall(request)
-            .addOnFailureListener {
-                manager.unregisterListener(
-                    listener
-                )
+        return file
+    }
 
-                onError(
-                    "O pacote ainda não está disponível " +
-                        "nesta versão da app."
+    private fun installSplit(
+        file: File,
+        packageInfo: ToolPackageCatalog.Package,
+        revision: String,
+        onInstalled: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val installer =
+            activity.packageManager.packageInstaller
+
+        val params =
+            PackageInstaller.SessionParams(
+                PackageInstaller.SessionParams
+                    .MODE_INHERIT_EXISTING
+            ).apply {
+                setAppPackageName(
+                    activity.packageName
                 )
             }
+
+        val sessionId =
+            installer.createSession(params)
+
+        preferences.edit()
+            .putString(
+                "pending_revision_" +
+                    packageInfo.module,
+                revision
+            )
+            .putString(
+                "pending_status_" +
+                    packageInfo.module,
+                "pending"
+            )
+            .apply()
+
+        installer.openSession(
+            sessionId
+        ).use { session ->
+
+            file.inputStream().use { input ->
+
+                session.openWrite(
+                    packageInfo.module,
+                    0,
+                    file.length()
+                ).use { output ->
+
+                    val buffer =
+                        ByteArray(32 * 1024)
+
+                    while (true) {
+                        val read =
+                            input.read(buffer)
+
+                        if (read == -1) {
+                            break
+                        }
+
+                        output.write(
+                            buffer,
+                            0,
+                            read
+                        )
+                    }
+
+                    output.flush()
+                    session.fsync(output)
+                }
+            }
+
+            val callbackIntent =
+                Intent(
+                    activity,
+                    ToolPackageInstallReceiver::class.java
+                ).apply {
+
+                    putExtra(
+                        ToolPackageInstallReceiver
+                            .EXTRA_MODULE,
+                        packageInfo.module
+                    )
+
+                    putExtra(
+                        ToolPackageInstallReceiver
+                            .EXTRA_REVISION,
+                        revision
+                    )
+
+                    putExtra(
+                        ToolPackageInstallReceiver
+                            .EXTRA_CATEGORY,
+                        packageInfo.category
+                    )
+                }
+
+            val pendingIntent =
+                PendingIntent.getBroadcast(
+                    activity,
+                    sessionId,
+                    callbackIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or
+                        PendingIntent.FLAG_IMMUTABLE
+                )
+
+            session.commit(
+                pendingIntent.intentSender
+            )
+        }
+
+        activity.runOnUiThread {
+            pollInstallResult(
+                packageInfo,
+                revision,
+                onInstalled,
+                onError
+            )
+        }
     }
+
+    private fun pollInstallResult(
+        packageInfo: ToolPackageCatalog.Package,
+        revision: String,
+        onInstalled: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val deadline =
+            System.currentTimeMillis() +
+                INSTALL_TIMEOUT_MS
+
+        fun poll() {
+            when (
+                preferences.getString(
+                    "pending_status_" +
+                        packageInfo.module,
+                    "pending"
+                )
+            ) {
+                "success" -> {
+                    if (
+                        isInstalled(
+                            packageInfo.module
+                        )
+                    ) {
+                        try {
+                            SplitCompat.installActivity(
+                                activity
+                            )
+                        } catch (_: Exception) {
+                        }
+
+                        markInstalled(
+                            packageInfo,
+                            revision
+                        )
+
+                        preferences.edit()
+                            .remove(
+                                "pending_status_" +
+                                    packageInfo.module
+                            )
+                            .remove(
+                                "pending_message_" +
+                                    packageInfo.module
+                            )
+                            .remove(
+                                "pending_revision_" +
+                                    packageInfo.module
+                            )
+                            .apply()
+
+                        onInstalled()
+                        return
+                    }
+                }
+
+                "failure" -> {
+                    val message =
+                        preferences.getString(
+                            "pending_message_" +
+                                packageInfo.module,
+                            "Não foi possível instalar o pacote."
+                        )
+                            ?: "Não foi possível instalar o pacote."
+
+                    preferences.edit()
+                        .remove(
+                            "pending_status_" +
+                                packageInfo.module
+                        )
+                        .remove(
+                            "pending_message_" +
+                                packageInfo.module
+                        )
+                        .apply()
+
+                    onError(message)
+                    return
+                }
+            }
+
+            if (
+                System.currentTimeMillis() >
+                    deadline
+            ) {
+                onError(
+                    "A instalação do pacote demorou demasiado. " +
+                        "Tente novamente."
+                )
+                return
+            }
+
+            handler.postDelayed(
+                { poll() },
+                700L
+            )
+        }
+
+        poll()
+    }
+
+    companion object {
+        private const val PACKAGE_RELEASE_API =
+            "https://api.github.com/repos/nexauren1/Toolnexa-/releases/tags/tool-packages"
+
+        private const val PACKAGE_MANIFEST_NAME =
+            "toolnexa-packages.json"
+
+        private const val TOOL_PACKAGE_ASSET_BASE =
+            "https://github.com/nexauren1/Toolnexa-/releases/download/tool-packages/"
+
+        private const val INSTALL_TIMEOUT_MS =
+            120_000L
+    }
+
+    private data class PackageManifest(
+        val baseVersionCode: Int,
+        val packages: JSONObject
+    )
 }
