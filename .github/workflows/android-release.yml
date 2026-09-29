@@ -176,9 +176,10 @@ jobs:
           EOF
 
       - name: Publish ToolNexa tool packages
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          export GH_TOKEN="$GITHUB_TOKEN"
 
           if gh release view tool-packages >/dev/null 2>&1; then
             gh release upload tool-packages               package-output/toolnexa-feature_business.apk               package-output/toolnexa-feature_image.apk               package-output/toolnexa-feature_audio.apk               package-output/toolnexa-packages.json               --clobber
