@@ -64,6 +64,10 @@
             </intent-filter>
         </activity>
 
+        <receiver
+            android:name=".ToolPackageInstallReceiver"
+            android:exported="false" />
+
         <service
             android:name=".ToolNexaMessagingService"
             android:exported="false">
