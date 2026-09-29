@@ -70,6 +70,9 @@ class MainActivity : ComponentActivity() {
     private val blue by lazy {
         getColor(R.color.toolnexa_blue)
     }
+    private val red by lazy {
+        getColor(R.color.toolnexa_red)
+    }
     private val bg by lazy {
         getColor(R.color.toolnexa_bg)
     }
