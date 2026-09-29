@@ -1416,13 +1416,17 @@ class LoginActivity : ComponentActivity() {
             android.graphics.Color.WHITE
         )
         button.textSize = 15f
+        button.typeface = android.graphics.Typeface.DEFAULT_BOLD
+        button.isAllCaps = false
         button.background =
-            android.graphics.drawable.GradientDrawable().apply {
-                setColor(blue)
-                cornerRadius =
-                    dp(14).toFloat()
+            android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(blue, getColor(R.color.toolnexa_red))
+            ).apply {
+                cornerRadius = dp(15).toFloat()
             }
         button.minHeight = dp(52)
+        button.elevation = dp(2).toFloat()
         button.stateListAnimator = null
     }
 
