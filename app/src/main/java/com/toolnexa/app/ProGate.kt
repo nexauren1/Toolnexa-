@@ -257,16 +257,16 @@ object ProGate {
                     android.graphics.Color.WHITE
                 )
 
-                background =
-                    GradientDrawable().apply {
-                        setColor(
-                            activity.getColor(
-                                R.color.toolnexa_blue
-                            )
-                        )
-                        cornerRadius =
-                            dp(activity, 14).toFloat()
-                    }
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT,
+                    intArrayOf(
+                        activity.getColor(R.color.toolnexa_blue),
+                        activity.getColor(R.color.toolnexa_red)
+                    )
+                ).apply {
+                    cornerRadius = dp(activity, 15).toFloat()
+                }
+                elevation = dp(activity, 2).toFloat()
 
                 setOnClickListener {
                     activity.startActivity(

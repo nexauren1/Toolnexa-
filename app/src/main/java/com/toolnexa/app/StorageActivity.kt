@@ -39,8 +39,13 @@ class StorageActivity : Activity() {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(18), dp(18), dp(12))
-            background = GradientDrawable().apply {
-                setColor(surface)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(
+                    android.graphics.Color.parseColor("#0B1120"),
+                    android.graphics.Color.parseColor("#111C32")
+                )
+            ).apply {
                 setStroke(dp(1), border)
             }
         }
@@ -71,10 +76,10 @@ class StorageActivity : Activity() {
             }
 
         listOf(
-            R.color.toolnexa_green,
-            R.color.toolnexa_blue,
             R.color.toolnexa_red,
-            R.color.toolnexa_yellow
+            R.color.toolnexa_blue,
+            R.color.toolnexa_purple,
+            R.color.toolnexa_cyan
         ).forEach { colorRes ->
             brandRail.addView(
                 View(this).apply {
@@ -118,11 +123,14 @@ class StorageActivity : Activity() {
         val folderCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(18), dp(18), dp(18))
-            background = GradientDrawable().apply {
-                setColor(surface)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(surface, android.graphics.Color.parseColor("#111B31"))
+            ).apply {
                 setStroke(dp(1), border)
                 cornerRadius = dp(18).toFloat()
             }
+            elevation = dp(3).toFloat()
         }
 
         folderCard.addView(
@@ -283,13 +291,17 @@ class StorageActivity : Activity() {
     private fun stylePrimary(button: Button) {
         button.setTextColor(Color.WHITE)
         button.textSize = 15f
-        button.background =
-            GradientDrawable().apply {
-                setColor(blue)
-                cornerRadius = dp(14).toFloat()
-            }
+        button.background = GradientDrawable(
+            GradientDrawable.Orientation.LEFT_RIGHT,
+            intArrayOf(blue, getColor(R.color.toolnexa_red))
+        ).apply {
+            cornerRadius = dp(15).toFloat()
+        }
         button.minHeight = dp(52)
+        button.typeface = android.graphics.Typeface.DEFAULT_BOLD
+        button.isAllCaps = false
         button.stateListAnimator = null
+        button.elevation = dp(2).toFloat()
     }
 
     private fun dp(value: Int): Int {

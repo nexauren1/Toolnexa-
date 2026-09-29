@@ -99,13 +99,13 @@ class CategoryActivity : Activity() {
                     dp(16),
                     dp(14)
                 )
-                background =
-                    GradientDrawable().apply {
-                        setColor(
-                            getColor(
-                                R.color.toolnexa_surface
-                            )
-                        )
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR,
+                    intArrayOf(
+                        getColor(R.color.toolnexa_surface),
+                        android.graphics.Color.parseColor("#10192D")
+                    )
+                ).apply {
                         setStroke(
                             dp(1),
                             getColor(
@@ -208,10 +208,10 @@ class CategoryActivity : Activity() {
             }
 
         listOf(
-            R.color.toolnexa_green,
-            R.color.toolnexa_blue,
             R.color.toolnexa_red,
-            R.color.toolnexa_yellow
+            R.color.toolnexa_blue,
+            R.color.toolnexa_purple,
+            R.color.toolnexa_cyan
         ).forEach { colorRes ->
             brandRail.addView(
                 View(this).apply {
@@ -617,22 +617,20 @@ class CategoryActivity : Activity() {
                     dp(12)
                 )
 
-                background =
-                    GradientDrawable().apply {
-                        setColor(
-                            getColor(
-                                R.color.toolnexa_surface
-                            )
-                        )
-                        setStroke(
-                            dp(1),
-                            getColor(
-                                R.color.toolnexa_border
-                            )
-                        )
-                        cornerRadius =
-                            dp(18).toFloat()
-                    }
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR,
+                    intArrayOf(
+                        getColor(R.color.toolnexa_surface),
+                        android.graphics.Color.parseColor("#111B31")
+                    )
+                ).apply {
+                    setStroke(
+                        dp(1),
+                        getColor(R.color.toolnexa_border)
+                    )
+                    cornerRadius = dp(18).toFloat()
+                }
+                elevation = dp(2).toFloat()
 
                 alpha = 0f
                 translationY =
@@ -800,6 +798,18 @@ class CategoryActivity : Activity() {
             )
 
         if (packageInfo == null) {
+            if (toolId == "text-word-counter") {
+                startActivity(
+                    Intent(
+                        this,
+                        MainActivity::class.java
+                    ).apply {
+                        putExtra("open_tool", toolId)
+                    }
+                )
+                return
+            }
+
             android.widget.Toast.makeText(
                 this,
                 "Este pacote de ferramentas ainda não está disponível.",

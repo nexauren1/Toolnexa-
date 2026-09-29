@@ -106,6 +106,13 @@ object ToolRegistry {
             id = "background-remover"
         ),
         ToolDefinition(
+            name = "Word Counter",
+            category = "Texto",
+            description = "Conte palavras, caracteres, linhas e estima o tempo de leitura.",
+            icon = android.R.drawable.ic_menu_edit,
+            id = "text-word-counter"
+        ),
+        ToolDefinition(
             name = "Audio to MIDI",
             category = "Áudio",
             description =

@@ -110,7 +110,7 @@ jobs:
           set -euo pipefail
           NOTES="ToolNexa Android v$VERSION
 
-          Firebase Authentication with Google, e-mail/password and international phone SMS verification, Firebase Analytics, image tools, local Audio to MIDI melody conversion, Cloudflare Worker integration, Background Remover using Cloudflare Images / BiRefNet, Nexauren X user storage, and Firebase update notifications."
+          Firebase Authentication with Google, e-mail/password and international phone SMS verification, Firebase Analytics, Word Counter, image tools, local Audio to MIDI melody conversion, Cloudflare Worker integration, Background Remover using Cloudflare Images / BiRefNet, Nexauren X user storage, a refreshed technology-focused UI, and Firebase update notifications."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" toolnexa.apk --clobber
             gh release edit "$TAG" --title "ToolNexa Android v$VERSION" --notes "$NOTES"

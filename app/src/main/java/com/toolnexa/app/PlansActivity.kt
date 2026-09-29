@@ -2,6 +2,7 @@ package com.toolnexa.app
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
@@ -189,22 +190,21 @@ class PlansActivity : Activity() {
                     20,
                     20
                 )
-                background =
-                    GradientDrawable().apply {
-                        setColor(
-                            getColor(
-                                R.color.toolnexa_surface
-                            )
-                        )
-                        setStroke(
-                            1,
-                            getColor(
-                                R.color.toolnexa_blue
-                            )
-                        )
-                        cornerRadius =
-                            22f
-                    }
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR,
+                    intArrayOf(
+                        Color.parseColor("#122B50"),
+                        Color.parseColor("#17172F"),
+                        Color.parseColor("#351522")
+                    )
+                ).apply {
+                    setStroke(
+                        1,
+                        Color.parseColor("#2F5C91")
+                    )
+                    cornerRadius = 22f
+                }
+                elevation = 3f
             }
 
         hero.addView(
@@ -255,7 +255,7 @@ class PlansActivity : Activity() {
                     GradientDrawable().apply {
                         setColor(
                             android.graphics.Color.parseColor(
-                                "#EAF0FF"
+                                "#102A4D"
                             )
                         )
                         cornerRadius =
@@ -832,23 +832,24 @@ class PlansActivity : Activity() {
                         this@PlansActivity
                     ).apply {
                         text = "Assinar Pro"
-                        isAllCaps = false
+                    isAllCaps = false
                         minHeight = 54
                         setTextColor(
                             android.graphics.Color.WHITE
                         )
-                        background =
-                            GradientDrawable().apply {
-                                setColor(
-                                    getColor(
-                                        R.color.toolnexa_blue
-                                    )
-                                )
-                                cornerRadius =
-                                    14f
-                            }
-                        stateListAnimator =
-                            null
+                        background = GradientDrawable(
+                            GradientDrawable.Orientation.LEFT_RIGHT,
+                            intArrayOf(
+                                getColor(R.color.toolnexa_blue),
+                                getColor(R.color.toolnexa_red)
+                            )
+                        ).apply {
+                            cornerRadius = 15f
+                        }
+                        typeface =
+                            android.graphics.Typeface.DEFAULT_BOLD
+                        elevation = 3f
+                        stateListAnimator = null
                         setOnClickListener {
                             startProSubscription()
                         }
