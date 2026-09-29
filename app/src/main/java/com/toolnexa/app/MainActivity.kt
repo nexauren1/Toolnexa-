@@ -120,13 +120,18 @@ class MainActivity : ComponentActivity() {
             auth.currentUser!!
         )
 
-        if (
-            intent.getStringExtra("open_screen") ==
-                "settings"
-        ) {
-            showSettings()
-        } else {
-            showHome()
+        when (intent.getStringExtra("open_tool")) {
+            "text-word-counter" -> showWordCounter()
+            else -> {
+                if (
+                    intent.getStringExtra("open_screen") ==
+                        "settings"
+                ) {
+                    showSettings()
+                } else {
+                    showHome()
+                }
+            }
         }
 
         I18n.localizeWindow(this)
@@ -1511,6 +1516,222 @@ class MainActivity : ComponentActivity() {
                 "image-converter"
             ) ?: return
         )
+    }
+
+    private fun showWordCounter() {
+        toolbarTitle.text = "Word Counter"
+        content.removeAllViews()
+        analytics.screen("tool_text_word_counter")
+
+        content.addView(space(18))
+
+        val hero = card().apply {
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+            background = heroBackground()
+        }
+
+        hero.addView(
+            TextView(this).apply {
+                text = "TEXT / ANALYTICS"
+                textSize = 10f
+                letterSpacing = 0.14f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                setTextColor(getColor(R.color.toolnexa_cyan))
+            }
+        )
+
+        hero.addView(
+            title("Word Counter", 27f)
+        )
+
+        hero.addView(
+            bodyText(
+                "Cole o teu texto para obter estatísticas instantâneas, totalmente offline."
+            )
+        )
+
+        content.addView(
+            hero,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(dp(16), 0, dp(16), dp(12))
+            }
+        )
+
+        val input = EditText(this).apply {
+            hint = "Escreve ou cola o teu texto aqui..."
+            minLines = 10
+            gravity = Gravity.TOP
+            textSize = 15f
+            setTextColor(textColor)
+            setHintTextColor(muted)
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            background = GradientDrawable().apply {
+                setColor(surface)
+                setStroke(dp(1), border)
+                cornerRadius = dp(18).toFloat()
+            }
+        }
+
+        content.addView(
+            input,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(260)
+            ).apply {
+                setMargins(dp(16), 0, dp(16), dp(12))
+            }
+        )
+
+        val stats = card().apply {
+            setPadding(dp(16), dp(16), dp(16), dp(12))
+        }
+
+        val wordsView = metricView("PALAVRAS", "0")
+        val charsView = metricView("CARACTERES", "0")
+        val linesView = metricView("LINHAS", "0")
+        val readingView = metricView("LEITURA", "0 min")
+
+        stats.addView(wordsView)
+        stats.addView(charsView)
+        stats.addView(linesView)
+        stats.addView(readingView)
+
+        content.addView(
+            stats,
+            LinearLayout.LayoutParams(
+                -1,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(dp(16), 0, dp(16), dp(12))
+            }
+        )
+
+        val copy = Button(this).apply {
+            text = "Copiar resumo"
+            isAllCaps = false
+        }
+        stylePrimary(copy)
+        copy.setOnClickListener {
+            val text = buildWordStats(
+                input.text?.toString().orEmpty()
+            )
+            val clipboard =
+                getSystemService(
+                    android.content.Context.CLIPBOARD_SERVICE
+                ) as android.content.ClipboardManager
+            clipboard.setPrimaryClip(
+                android.content.ClipData.newPlainText(
+                    "ToolNexa Word Counter",
+                    text
+                )
+            )
+            analytics.event("word_counter_copy")
+            toast("Resumo copiado.")
+        }
+
+        content.addView(
+            copy,
+            LinearLayout.LayoutParams(
+                -1,
+                dp(52)
+            ).apply {
+                setMargins(dp(16), 0, dp(16), dp(20))
+            }
+        )
+
+        fun renderStats(raw: String) {
+            val words = raw.trim()
+                .split(Regex("\\s+"))
+                .count { it.isNotBlank() }
+            val chars = raw.length
+            val lines = if (raw.isBlank()) 0 else raw.lines().size
+            val minutes = if (words == 0) 0 else kotlin.math.ceil(words / 200.0).toInt()
+
+            setMetric(wordsView, "PALAVRAS", words.toString())
+            setMetric(charsView, "CARACTERES", chars.toString())
+            setMetric(linesView, "LINHAS", lines.toString())
+            setMetric(
+                readingView,
+                "LEITURA",
+                if (minutes == 1) "1 min" else "$minutes min"
+            )
+        }
+
+        input.addTextChangedListener(
+            object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    renderStats(s?.toString().orEmpty())
+                }
+                override fun afterTextChanged(s: Editable?) = Unit
+            }
+        )
+
+        renderStats("")
+    }
+
+    private fun metricView(
+        label: String,
+        value: String
+    ): LinearLayout {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(6), 0, dp(6))
+        }
+
+        row.addView(
+            TextView(this).apply {
+                text = label
+                textSize = 10f
+                letterSpacing = 0.12f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                setTextColor(muted)
+            },
+            LinearLayout.LayoutParams(0, dp(42), 1f)
+        )
+
+        val valueView = TextView(this).apply {
+            text = value
+            textSize = 19f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(blue)
+            gravity = Gravity.CENTER_VERTICAL or Gravity.END
+        }
+
+        row.addView(
+            valueView,
+            LinearLayout.LayoutParams(dp(100), dp(42))
+        )
+
+        row.tag = valueView
+        return row
+    }
+
+    private fun setMetric(
+        row: LinearLayout,
+        label: String,
+        value: String
+    ) {
+        (row.tag as? TextView)?.text = value
+    }
+
+    private fun buildWordStats(raw: String): String {
+        val words = raw.trim()
+            .split(Regex("\\s+"))
+            .count { it.isNotBlank() }
+        val chars = raw.length
+        val lines = if (raw.isBlank()) 0 else raw.lines().size
+        val minutes = if (words == 0) 0 else kotlin.math.ceil(words / 200.0).toInt()
+
+        return "ToolNexa Word Counter\n" +
+            "Palavras: $words\n" +
+            "Caracteres: $chars\n" +
+            "Linhas: $lines\n" +
+            "Leitura estimada: $minutes min"
     }
 
     private fun showCategories() {
